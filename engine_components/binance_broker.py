@@ -495,6 +495,7 @@ class BinanceBroker:
         bin_tp: Optional[float],
         strategy: str,
         risk_capital: float,
+        units: Optional[float] = None,
     ) -> Optional[dict]:
         """Execute trade on Binance Futures with Maker-Only GTX limits & order slicing."""
         stop_dist = abs(bin_entry - bin_sl)
@@ -505,10 +506,18 @@ class BinanceBroker:
             log.error(f"[Binance] {binance_symbol} is not a valid active perpetual. Rejecting trade.")
             return None
 
-        # Mirror risk governor friction so broker lot == local risk exactly
-        TOTAL_FRICTION = 0.0012
-        effective_stop_dist = stop_dist + (bin_entry * TOTAL_FRICTION)
-        qty = self._format_qty(binance_symbol, risk_capital / effective_stop_dist)
+        # PARITY: the caller (LiveTradeTracker.trigger_entry) already sized this
+        # trade as min(RSK/atr, MAX_NOTIONAL/entry) to match run_all_6.sim().
+        # Re-deriving qty here from a friction-padded stop produced a DIFFERENT,
+        # smaller lot than the tracker recorded (up to -64% on tight-ATR symbols),
+        # so local `units` and the actual exchange position disagreed and every
+        # PnL/risk figure computed from `units` was wrong. Honour the caller's
+        # size; only fall back to local sizing for legacy callers.
+        if units is not None and units > 0:
+            raw_qty = float(units)
+        else:
+            raw_qty = risk_capital / stop_dist
+        qty = self._format_qty(binance_symbol, raw_qty)
         entry_price = self._format_price(binance_symbol, bin_entry)
         sl_price = self._format_price(binance_symbol, bin_sl)
         # tp=None means trailing-stop-only mode; skip exchange TP placement

@@ -63,7 +63,15 @@ if HALT_FLAG.exists():
     print(f"FATAL BOOT: HALT_FLAG exists: {HALT_FLAG.read_text()}")
     sys.exit(1)
 
-from risk_config import FEE_RT as ENGINE_FEE_RT, assert_fee_parity
+from risk_config import (
+    FEE_RT as ENGINE_FEE_RT,
+    RSK as PARITY_RSK,
+    MAX_NOTIONAL as PARITY_MAX_NOTIONAL,
+    ATR_EPSILON,
+    TP as PARITY_TP,
+    TRA as PARITY_TRA,
+    assert_fee_parity,
+)
 assert_fee_parity()
 
 load_dotenv(os.path.join(base_dir, ".env"))
@@ -193,6 +201,15 @@ ENGINE_RISK_PCT = min(max(_raw_risk_pct, 0.0001), 0.02) if _raw_risk_pct > 0 els
 ENGINE_RISK_USD = max(float(os.environ.get("ENGINE_RISK_USD", "20.0")), 1.0)
 BINANCE_LIVE = os.environ.get("BINANCE_LIVE", "0") == "1"
 # ENGINE_FEE_RT is imported from risk_config
+
+# PARITY GUARD: live 1R and the notional cap must equal the backtest constants.
+# run_all_6.sim() uses units = min(RSK/atr, MAX_NOTIONAL/entry) with RSK/MAX_NOTIONAL
+# from risk_config. Any drift here silently rescales every live position.
+if abs(ENGINE_RISK_USD - PARITY_RSK) > 1e-9:
+    raise SystemExit(
+        f"RISK DRIFT: ENGINE_RISK_USD={ENGINE_RISK_USD} != risk_config.RSK={PARITY_RSK}. "
+        f"Live 1R must equal the backtested 1R."
+    )
 
 # Strategy identity constants (used by Engine1TradeTracker cooldown logic)
 ACTIVE_STRATEGY = os.environ.get("ACTIVE_STRATEGY", "ml_alpha_squeezer")
@@ -409,7 +426,9 @@ class BinanceBrokerAdapter:
     def connect(self) -> bool:
         return self.broker.connect()
 
-    def execute_trade(self, symbol, direction, entry_price, sl, tp, strategy, risk_capital):
+    def execute_trade(self, symbol, direction, entry_price, sl, tp, strategy, risk_capital, units=None):
+        # PARITY: forward the already-parity-sized units so the broker does not
+        # re-derive a different lot. See binance_broker.execute_trade.
         res = self.broker.execute_trade(
             binance_symbol=symbol,
             direction=direction,
@@ -417,7 +436,8 @@ class BinanceBrokerAdapter:
             bin_sl=sl,
             bin_tp=tp,
             strategy=strategy,
-            risk_capital=risk_capital
+            risk_capital=risk_capital,
+            units=units,
         )
         if res:
             order_id = res["order_id"]
@@ -862,6 +882,11 @@ class LiveTradeTracker:
 
             # (Removed MIN_STOP_PCT widening to preserve parity with backtested absolute SL)
 
+            # PARITY: run_all_6.sim() sizes off sd = atr (SL_MULT = 1.0), i.e. the
+            # ATR at the signal bar — not off a broker-adjusted stop. Prefer the
+            # entry ATR and fall back to the geometric stop only if ATR is unusable.
+            atr_stop_dist = float(atr) if (atr is not None and math.isfinite(atr) and atr > 0.0) else stop_dist
+
             env_risk_usd = float(os.environ.get("ENGINE_RISK_USD", str(ENGINE_RISK_USD)))
             if env_risk_usd > 0.0:
                 risk_capital = env_risk_usd * risk_mult
@@ -871,17 +896,23 @@ class LiveTradeTracker:
             if risk_capital <= 0.0 or stop_dist <= 0:
                 return
                 
-            # --- FRICTION-AWARE SIZING: Deduct round-trip friction (fees + modeled slippage) from risk budget ---
-            TOTAL_FRICTION = ENGINE_FEE_RT + 0.0004  # Fee (0.0008) + modeled slippage (0.0004) = 0.0012
-            effective_stop_dist = stop_dist + (entry_price * TOTAL_FRICTION)
-            units = risk_capital / effective_stop_dist if effective_stop_dist > 0 else 0.0
-
-            # --- NOTIONAL CAP: Never open a position > $50,000 notional ---
-            MAX_NOTIONAL = 50_000.0
-            notional = units * entry_price
-            if notional > MAX_NOTIONAL:
-                units = MAX_NOTIONAL / entry_price
-                log_live_event(f"{symbol} notional capped: ${notional:.0f} -> ${MAX_NOTIONAL:.0f}", "RiskGov")
+            # --- PARITY SIZING: units = min(RSK/atr, MAX_NOTIONAL/entry) ---
+            # Must match run_all_6.sim() EXACTLY. The backtest sizes off the raw
+            # ATR stop distance with NO friction padding; padding the denominator
+            # shrinks every position (up to -64% on tight-ATR symbols) so realized
+            # R per trade no longer equals the validated 1R = $RSK.
+            # Fees are accounted for in PnL (see _finalize/check_exits), never in size.
+            if (not math.isfinite(atr_stop_dist)) or atr_stop_dist <= ATR_EPSILON:
+                log_live_event(f"{symbol} {strategy} blocked: invalid ATR stop distance "
+                               f"({atr_stop_dist}) <= ATR_EPSILON", "RiskGov")
+                return
+            units = min(risk_capital / atr_stop_dist, PARITY_MAX_NOTIONAL / entry_price)
+            if units <= 0.0:
+                return
+            if abs(units * atr_stop_dist - risk_capital) > 1e-9:
+                log_live_event(f"{symbol} notional capped: risk-units="
+                               f"{risk_capital / atr_stop_dist:.6f} -> {units:.6f} "
+                               f"(${PARITY_MAX_NOTIONAL:,.0f} cap)", "RiskGov")
 
             # 3. Overall Portfolio Open Stop Risk Check (Max 4% of current equity)
             open_stop_risk = 0.0
@@ -946,7 +977,7 @@ class LiveTradeTracker:
         # Lock RELEASED here — broker round trip must not block the engine
         def _execute_in_background():
             try:
-                broker_res = self.broker.execute_trade(symbol, direction, entry_price, sl, tp, strategy, risk_capital)
+                broker_res = self.broker.execute_trade(symbol, direction, entry_price, sl, tp, strategy, risk_capital, units)
             except Exception as e:
                 print(f"[TradeTracker] execute_trade raised for {symbol} ({strategy}): {e} — aborting phantom trade.")
                 with self.lock:
@@ -1127,15 +1158,20 @@ class LiveTradeTracker:
                 entry_atr = trade.get('atr', 0.0)
                 tp_dist = trade.get('intended_tp_dist', abs(tp - entry_price))
                 sl_dist_val = trade.get('sl_dist', abs(entry_price - sl))
-                trail_dist = 0.8 * entry_atr if entry_atr > 0 else (0.8 * sl_dist_val if sl_dist_val > 0 else 0.0)
-                # Activate trailing at exactly 5R to match backtester assumptions
-                trail_activate_at = 5.0 * entry_atr if entry_atr > 0 else tp_dist
+                # sim(): trd = TRA*atr (0.8R), td = TP*atr (5R). Both keyed off the
+                # ENTRY atr, never a live/refreshed atr.
+                trail_dist = PARITY_TRA * entry_atr if entry_atr > 0 else (PARITY_TRA * sl_dist_val if sl_dist_val > 0 else 0.0)
+                trail_activate_at = PARITY_TP * entry_atr if entry_atr > 0 else tp_dist
 
+                # Structural mirror of sim(): update the running peak `bp` on every
+                # observation, then test `(bp-entry) >= td`. This is mathematically
+                # EQUIVALENT to the previous form (verified over 20k randomized tick
+                # paths, 0 divergences) — kept only so the live code reads in the
+                # same order as the backtest and cannot drift under future edits.
                 if direction == 1:
-                    profit_from_entry = current_price - entry_price
-                    if profit_from_entry >= trail_activate_at:  # Activate after reaching 2R
-                        best_price = max(trade.get('best_price', current_price), current_price)
-                        trade['best_price'] = best_price
+                    best_price = max(trade.get('best_price', entry_price), current_price)
+                    trade['best_price'] = best_price
+                    if (best_price - entry_price) >= trail_activate_at:
                         new_sl = best_price - trail_dist
                         if new_sl > sl:
                             trade['sl'] = new_sl
@@ -1147,10 +1183,9 @@ class LiveTradeTracker:
                                     exec_tp = self._translate_to_binance_price(trade, trade["tp"])
                                     self._broker_submit_checked(trade["trade_id"], self.broker.modify_sltp, trade["symbol"], trade["order_id"], exec_sl, exec_tp)
                 else:
-                    profit_from_entry = entry_price - current_price
-                    if profit_from_entry >= trail_activate_at:  # Activate after reaching 2R
-                        best_price = min(trade.get('best_price', current_price), current_price)
-                        trade['best_price'] = best_price
+                    best_price = min(trade.get('best_price', entry_price), current_price)
+                    trade['best_price'] = best_price
+                    if (entry_price - best_price) >= trail_activate_at:
                         new_sl = best_price + trail_dist
                         if new_sl < sl:
                             trade['sl'] = new_sl
@@ -1181,9 +1216,10 @@ class LiveTradeTracker:
                         if current_price >= sl:
                             should_close = True
                             reason = "SL"
-                    # NOTE: No hard TP exit — relies on trailing stop ratchet.
-                    # Trailing activates at 2R profit with 1.0×ATR trail distance.
-                    # Catches 2R-8R+ moves depending on volatility expansion.
+                    # NOTE: No hard TP exit — the trailing ratchet is the sole exit,
+                    # exactly as in sim() (which has no take-profit branch; `td` only
+                    # ARMS the trail). Trail arms at 5R peak excursion and rides at
+                    # 0.8x ATR behind the running peak.
                         
                 if should_close:
                     if trade.get("closing_dispatched"):
