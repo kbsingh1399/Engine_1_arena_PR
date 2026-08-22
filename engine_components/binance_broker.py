@@ -152,8 +152,23 @@ class BinanceBroker:
                 err_msg = e.read().decode("utf-8") if hasattr(e, "read") else str(e)
 
                 if e.code in (429, 418):
-                    wait = self.RETRY_BACKOFF[min(attempt, len(self.RETRY_BACKOFF) - 1)]
-                    log.warning(f"[Binance] Rate limited ({e.code}). Retry {attempt+1}/{max_retries} in {wait}s...")
+                    # Finding 5: Parse Retry-After header — Binance tells us exactly how long to wait.
+                    # Using a fixed backoff ignores this and causes a full REST ban (418) if we
+                    # keep hammering. Cap at 60s to prevent indefinite blocking.
+                    retry_after = None
+                    try:
+                        retry_after_hdr = e.headers.get("Retry-After") if hasattr(e, "headers") and e.headers else None
+                        if retry_after_hdr:
+                            retry_after = min(float(retry_after_hdr), 60.0)
+                    except Exception:
+                        pass
+                    wait = retry_after if retry_after is not None else self.RETRY_BACKOFF[min(attempt, len(self.RETRY_BACKOFF) - 1)]
+                    if e.code == 418:
+                        # IP ban — do NOT retry, honour the full ban window
+                        log.error(f"[Binance] IP BAN (418) — Retry-After={wait:.0f}s. Halting this request chain.")
+                        self._backoff_sleep(wait)
+                        return None
+                    log.warning(f"[Binance] Rate limited (429). Retry {attempt+1}/{max_retries} in {wait:.1f}s (Retry-After={retry_after}s)...")
                     self._backoff_sleep(wait)
                     continue
 
@@ -288,7 +303,7 @@ class BinanceBroker:
             known_majors = {
                 "BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT",
                 "ADAUSDT", "TRXUSDT", "LINKUSDT", "AVAXUSDT", "SUIUSDT", "NEARUSDT",
-                "DOTUSDT", "LTCUSDT"
+                "DOTUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "OPUSDT", "ARBUSDT"
             }
             return symbol in known_majors
         return symbol in self.valid_perpetuals
@@ -359,10 +374,21 @@ class BinanceBroker:
         prec = rules.get("qty_prec", 3)
         # Always floor to keep position within the risk budget and clean precision
         formatted = round(self._round_step(qty, step, direction="down"), prec)
-        return max(formatted, min_q)
+        result = max(formatted, min_q)
+        # Finding 8: Warn on minQty forced-up sizing — if min_qty bumped qty by >1%,
+        # the actual risk per trade will exceed the validated 1R target.
+        if result > qty * 1.01 and qty > 0:
+            overshoot_pct = (result / qty - 1.0) * 100.0
+            log.warning(
+                f"[{symbol}] minQty forced-up: requested={qty:.6f} → formatted={result:.6f} "
+                f"(+{overshoot_pct:.1f}% risk overshoot vs 1R target). "
+                f"min_qty={min_q} step={step}"
+            )
+        return result
 
     def _place_algo_conditional(
-        self, symbol: str, side: str, order_type: str, trigger_price: float, label: str
+        self, symbol: str, side: str, order_type: str, trigger_price: float, label: str,
+        idempotency_key: Optional[str] = None,
     ) -> Optional[dict]:
         """Place a conditional algo order (SL or TP) on Binance Futures."""
         if self.dry_run:
@@ -380,6 +406,11 @@ class BinanceBroker:
             "priceProtect": "true",
             "algoType": "CONDITIONAL",
         }
+        # Finding 6: Idempotency key — deterministic clientAlgoId prevents duplicate SL
+        # orders if the same SL is retried after a transient 429/timeout. The exchange
+        # will reject the duplicate with -4120/-4130 (already active), which we treat as success.
+        if idempotency_key:
+            params["clientAlgoId"] = idempotency_key[:64]  # Binance max 64 chars
         res = self._request("POST", "/fapi/v1/algoOrder", params=params, signed=True)
         if res and res.get("code") in (-4120, -4130, -4138):
             log.info(f"[Binance] {label} position already protected by existing exchange stop ({res.get('code')}). Local Engine_1 check_exits active.")
@@ -670,14 +701,19 @@ class BinanceBroker:
                             log.info(f"[Binance] LIMIT+GTX filled slice {slice_idx+1}/{n_slices} (maker rebate: {MAKER_FEE*100:+.3f}%)")
                             continue
                         else:
-                            # Check partial fill before canceling
+                            # Finding 7: GTX fill/cancel race. Must cancel FIRST, then fetch the final
+                            # status. If we fetch then cancel, the order can fill in between, and we'd
+                            # double-buy with the market fallback.
+                            self._cancel_limit_order(binance_symbol, order_id)
+                            
                             order_info = self._request('GET', '/fapi/v1/order', params={'symbol': binance_symbol, 'orderId': order_id}, signed=True)
                             exec_qty = float(order_info.get('executedQty', 0.0)) if order_info else 0.0
-                            self._cancel_limit_order(binance_symbol, order_id)
+                            
                             if exec_qty > 0:
                                 total_filled_qty += exec_qty
                                 all_order_ids.append(order_id)
                                 log.info(f"[Binance] LIMIT+GTX partially filled {exec_qty:.4f}/{slice_qty:.4f}")
+                                
                             remaining_slice = slice_qty - exec_qty
                             if remaining_slice <= 0:
                                 continue
@@ -754,9 +790,13 @@ class BinanceBroker:
             final_tp = self._format_price(binance_symbol, avg_price - abs(tp_price - entry_price), "nearest") if tp_price is not None else None
 
         sl_res = None
+        # Finding 6: Deterministic SL idempotency key — all retry attempts for the same
+        # entry use the same clientAlgoId so the exchange deduplicates them.
+        sl_idempotency_key = f"E1_SL_{all_order_ids[0] if all_order_ids else int(time.time_ns() % 1_000_000_000)}"
         for _sl_attempt in range(3):
             try:
-                sl_res = self._place_algo_conditional(binance_symbol, opposite_side, "STOP_MARKET", final_sl, "SL")
+                sl_res = self._place_algo_conditional(binance_symbol, opposite_side, "STOP_MARKET", final_sl, "SL",
+                                                      idempotency_key=sl_idempotency_key)
             except Exception as e:
                 log.warning(f"[Binance] SL algo order exception (attempt {_sl_attempt + 1}): {e}")
             if sl_res and ("algoId" in sl_res or "clientAlgoId" in sl_res or "orderId" in sl_res

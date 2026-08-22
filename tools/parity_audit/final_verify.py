@@ -1,9 +1,9 @@
-import sys; sys.path.insert(0,'/home/user/Engine_1_arena_PR')
+﻿import sys; sys.path.insert(0,'/home/user/Engine_1_arena_PR')
 import inspect, importlib.util
 from risk_config import RSK, MAX_NOTIONAL, ATR_EPSILON, TP, TRA
 spec=importlib.util.spec_from_file_location('bb','engine_components/binance_broker.py')
 print("== FINAL VERIFICATION ==")
-src=open('Engine_1.py').read(); bsrc=open('engine_components/binance_broker.py').read()
+src=open('Engine_1.py', encoding='utf-8').read(); bsrc=open('engine_components/binance_broker.py', encoding='utf-8').read()
 sse=open('six_strategy_engine.py').read(); tr=open('train_six_strategy.py').read()
 checks=[
  ("Engine_1 sizing == min(RSK/atr, MAXN/entry)", "min(risk_capital / atr_stop_dist, PARITY_MAX_NOTIONAL / entry_price)" in src),

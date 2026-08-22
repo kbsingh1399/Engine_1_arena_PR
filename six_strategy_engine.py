@@ -806,6 +806,14 @@ class LiveSixStrategyPredictor:
             if prev and int(prev.get('open_time', 0)) < open_time:
                 prev_ot = int(prev['open_time'])
                 if not history or int(history[-1].get('open_time', 0)) != prev_ot:
+                    # ----- GAP DETECTION FIX -----
+                    if history:
+                        last_saved_ot = int(history[-1].get('open_time', 0))
+                        gap_seconds = prev_ot - last_saved_ot
+                        if gap_seconds > 900:  # > 15 minutes gap
+                            print(f"[Engine] [ALERT] GAP DETECTED in {symbol} history ({gap_seconds}s). Purging buffer.")
+                            history.clear()
+                    # -----------------------------
                     history.append(dict(prev))
             # FIX: Increment monotonic bar counter on each candle rollover
             self._bar_counter[symbol] = self._bar_counter.get(symbol, 0) + 1

@@ -82,6 +82,7 @@ class DualTee:
     def __init__(self, original_stream, log_filepath):
         self.original = original_stream
         self.log_filepath = log_filepath
+        self.max_bytes = 50 * 1024 * 1024  # 50MB
         try:
             self.file = open(log_filepath, "a", encoding="utf-8", buffering=1)
         except Exception:
@@ -95,6 +96,15 @@ class DualTee:
             print(f"[WARN] Swallowed exception: {e}")
         if self.file:
             try:
+                # Check rotation
+                if os.path.exists(self.log_filepath) and os.path.getsize(self.log_filepath) > self.max_bytes:
+                    self.file.close()
+                    backup = f"{self.log_filepath}.1"
+                    if os.path.exists(backup):
+                        os.remove(backup)
+                    os.rename(self.log_filepath, backup)
+                    self.file = open(self.log_filepath, "a", encoding="utf-8", buffering=1)
+                
                 clean_data = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', data)
                 self.file.write(clean_data)
                 self.file.flush()
@@ -544,7 +554,8 @@ class BinanceBrokerAdapter:
             res = self.broker._request("GET", "/fapi/v2/positionRisk", signed=True, max_retries=1)
             if not res:
                 return []
-            owned_symbols = {t.get("symbol") for t in self.tracker.active_trades.values() if t.get("symbol")}
+            with self.tracker.lock:
+                owned_symbols = {t.get("symbol") for t in self.tracker.active_trades.values() if t.get("symbol")}
             orphans = []
             for p in res:
                 try:
@@ -1308,7 +1319,7 @@ class LiveTradeTracker:
         Keep active_trades in absolute sync with Binance positions.
         Called periodically from the rollover watchdog (non-blocking path).
         """
-        if getattr(self.broker, "dry_run", True):
+        if getattr(self.broker, "dry_run", False):
             return
 
         with self.lock:
@@ -1348,6 +1359,18 @@ class LiveTradeTracker:
 
             ticket = trade.get("order_id")
             if not ticket:
+                # Finding 2 — Zombie guard: trade has no order_id and is not in_flight.
+                # Could be a race where broker rejected but tracker wasn't cleaned, or a
+                # crash-recovery remnant. Age it out: 3 reconcile cycles (~90s) then purge.
+                zombie_count = trade.get("zombie_count", 0) + 1
+                if zombie_count >= 3:
+                    log_live_event(
+                        f"[ZOMBIE] {trade.get('symbol')} ({trade.get('strategy')}) has no order_id "
+                        f"after {zombie_count} reconcile cycles — purging.", "Reconcile"
+                    )
+                    stale_ids.append(tid)
+                else:
+                    updates[tid] = {"zombie_count": zombie_count}
                 continue
             if ticket not in broker_positions:
                 if hasattr(self.broker, "get_position_state"):
@@ -4445,7 +4468,7 @@ async def renderer_loop(store: SnapshotStore, stop: asyncio.Event) -> None:
 
                     renderer_loop._prev_snapshot_cols = curr_cols
                 except Exception as audit_err:
-                    print(f"[WARN] Swallowed exception: {e}")
+                    print(f"[WARN] Swallowed exception: {audit_err}")
 
             await asyncio.sleep(1.0 / REFRESH_HZ)
 
@@ -5077,13 +5100,21 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
         async def rollover_watchdog(tracker, stop_event):
             while not stop_event.is_set():
                 try:
-                    tracker.update_day()
-                    # Non-blocking Binance position sync (prevents order-tracking drift)
-                    if hasattr(tracker, "reconcile_with_broker"):
-                        await asyncio.get_event_loop().run_in_executor(API_POOL, tracker.reconcile_with_broker)
-                except Exception as ex:
-                    log_live_event(f"Rollover watchdog failed: {ex}", "WDog")
-                await asyncio.sleep(30.0)  # tighter sync cadence for exit safety
+                    while not stop_event.is_set():
+                        try:
+                            tracker.update_day()
+                            # Non-blocking Binance position sync (prevents order-tracking drift)
+                            if hasattr(tracker, "reconcile_with_broker"):
+                                await asyncio.get_event_loop().run_in_executor(API_POOL, tracker.reconcile_with_broker)
+                        except Exception as ex:
+                            log_live_event(f"Rollover watchdog failed: {ex}", "WDog")
+                            await asyncio.sleep(5.0)
+                        await asyncio.sleep(30.0)  # tighter sync cadence for exit safety
+                except asyncio.CancelledError:
+                    break
+                except Exception as fatal_ex:
+                    log_live_event(f"Watchdog FATAL loop break: {fatal_ex}. Restarting...", "WDog")
+                    await asyncio.sleep(5.0)
 
         async def event_loop_monitor(stop_event: asyncio.Event, threshold_sec: float = 2.0) -> None:
             consecutive_blocks = 0
