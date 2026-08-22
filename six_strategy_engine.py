@@ -809,10 +809,32 @@ class LiveSixStrategyPredictor:
                     # ----- GAP DETECTION FIX -----
                     if history:
                         last_saved_ot = int(history[-1].get('open_time', 0))
-                        gap_seconds = prev_ot - last_saved_ot
-                        if gap_seconds > 900:  # > 15 minutes gap
-                            print(f"[Engine] [ALERT] GAP DETECTED in {symbol} history ({gap_seconds}s). Purging buffer.")
-                            history.clear()
+                        
+                        # 1. Monotonicity check: if time went backwards, pop overlapping bars
+                        while history and last_saved_ot >= prev_ot:
+                            history.pop()
+                            if history:
+                                last_saved_ot = int(history[-1].get('open_time', 0))
+                                
+                        if history:
+                            gap_seconds = prev_ot - last_saved_ot
+                            if gap_seconds > 900:  # > 15 minutes gap
+                                print(f"[Engine] [ALERT] GAP DETECTED in {symbol} history ({gap_seconds}s). Forward-filling synthetic bars.")
+                                num_missing = (gap_seconds // 900) - 1
+                                last_candle = history[-1]
+                                last_close = last_candle.get('close', 0.0)
+                                for i in range(num_missing):
+                                    syn_ot = last_saved_ot + (i + 1) * 900
+                                    syn_candle = {
+                                        'open_time': syn_ot, 'open': last_close, 'high': last_close,
+                                        'low': last_close, 'close': last_close, 'volume': 0.0,
+                                        'fut_cvd': last_candle.get('fut_cvd', 0.0), 'spot_cvd': last_candle.get('spot_cvd', 0.0),
+                                        'funding': last_candle.get('funding', 0.0), 'liq_long': 0.0,
+                                        'liq_short': 0.0, 'ls_ratio': last_candle.get('ls_ratio', 1.0),
+                                        'oi': last_candle.get('oi', 0.0), 'coins_bid': 0.0,
+                                        'coins_ask': 0.0, 'dollars_bid': 0.0, 'dollars_ask': 0.0
+                                    }
+                                    history.append(syn_candle)
                     # -----------------------------
                     history.append(dict(prev))
             # FIX: Increment monotonic bar counter on each candle rollover

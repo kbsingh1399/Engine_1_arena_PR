@@ -374,17 +374,15 @@ class BinanceBroker:
         prec = rules.get("qty_prec", 3)
         # Always floor to keep position within the risk budget and clean precision
         formatted = round(self._round_step(qty, step, direction="down"), prec)
-        result = max(formatted, min_q)
-        # Finding 8: Warn on minQty forced-up sizing — if min_qty bumped qty by >1%,
-        # the actual risk per trade will exceed the validated 1R target.
-        if result > qty * 1.01 and qty > 0:
-            overshoot_pct = (result / qty - 1.0) * 100.0
+        
+        # Finding 8 (Fix): Reject trade instead of sizing up if below minQty
+        if formatted < min_q:
             log.warning(
-                f"[{symbol}] minQty forced-up: requested={qty:.6f} → formatted={result:.6f} "
-                f"(+{overshoot_pct:.1f}% risk overshoot vs 1R target). "
-                f"min_qty={min_q} step={step}"
+                f"[{symbol}] Calculated qty {formatted} is below exchange minQty {min_q}. Rejecting trade size to 0."
             )
-        return result
+            return 0.0
+            
+        return formatted
 
     def _place_algo_conditional(
         self, symbol: str, side: str, order_type: str, trigger_price: float, label: str,
@@ -562,6 +560,10 @@ class BinanceBroker:
         else:
             raw_qty = risk_capital / stop_dist
         qty = self._format_qty(binance_symbol, raw_qty)
+        if qty == 0.0:
+            log.warning(f"[Binance RISK] Trade for {binance_symbol} REJECTED — Quantity below exchange minQty.")
+            return None
+            
         entry_price = self._format_price(binance_symbol, bin_entry)
         sl_price = self._format_price(binance_symbol, bin_sl)
         # tp=None means trailing-stop-only mode; skip exchange TP placement
@@ -902,7 +904,13 @@ class BinanceBroker:
             log.warning(f"[Binance] Exception fetching old algo orders: {e}")
 
         # Step 2: Place NEW SL first — position remains protected by old SL during this call
-        new_sl_res = self._place_algo_conditional(binance_symbol, opposite_side, "STOP_MARKET", formatted_sl, "NEW_SL")
+        # Finding F6: duplicate-SL race. Pass idempotency key for ratchets.
+        sl_str = str(formatted_sl).replace('.', '')
+        mod_key = f"E1_MOD_{position_ticket}_{sl_str}"
+        new_sl_res = self._place_algo_conditional(
+            binance_symbol, opposite_side, "STOP_MARKET", formatted_sl, "NEW_SL",
+            idempotency_key=mod_key
+        )
         sl_placed = bool(new_sl_res and (
             "algoId" in new_sl_res or "clientAlgoId" in new_sl_res or "orderId" in new_sl_res
         ))

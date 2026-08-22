@@ -78,60 +78,74 @@ load_dotenv(os.path.join(base_dir, ".env"))
 load_dotenv(os.path.join(base_dir, "..", ".env"))
 
 # Dual stream logging tee to live_engine_output.txt
+_dual_tee_lock = threading.Lock()
+_dual_tee_file = None
+_dual_tee_lines = 0
+
 class DualTee:
     def __init__(self, original_stream, log_filepath):
         self.original = original_stream
         self.log_filepath = log_filepath
         self.max_bytes = 50 * 1024 * 1024  # 50MB
-        try:
-            self.file = open(log_filepath, "a", encoding="utf-8", buffering=1)
-        except Exception:
-            self.file = None
+        global _dual_tee_file
+        if _dual_tee_file is None:
+            try:
+                _dual_tee_file = open(log_filepath, "a", encoding="utf-8", buffering=1)
+            except Exception:
+                _dual_tee_file = None
 
     def write(self, data):
+        global _dual_tee_file, _dual_tee_lines
         try:
             self.original.write(data)
             self.original.flush()
         except Exception as e:
             print(f"[WARN] Swallowed exception: {e}")
-        if self.file:
-            try:
-                # Check rotation
-                if os.path.exists(self.log_filepath) and os.path.getsize(self.log_filepath) > self.max_bytes:
-                    self.file.close()
-                    backup = f"{self.log_filepath}.1"
-                    if os.path.exists(backup):
-                        os.remove(backup)
-                    os.rename(self.log_filepath, backup)
-                    self.file = open(self.log_filepath, "a", encoding="utf-8", buffering=1)
-                
-                clean_data = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', data)
-                self.file.write(clean_data)
-                self.file.flush()
-            except Exception as e:
-                print(f"[WARN] Swallowed exception: {e}")
+        
+        if _dual_tee_file:
+            with _dual_tee_lock:
+                try:
+                    _dual_tee_lines += 1
+                    # Check rotation only every 1000 lines to avoid constant getsize calls
+                    if _dual_tee_lines % 1000 == 0:
+                        if os.path.exists(self.log_filepath) and os.path.getsize(self.log_filepath) > self.max_bytes:
+                            _dual_tee_file.close()
+                            backup = f"{self.log_filepath}.1"
+                            if os.path.exists(backup):
+                                try:
+                                    os.remove(backup)
+                                except Exception:
+                                    pass
+                            try:
+                                os.rename(self.log_filepath, backup)
+                            except Exception:
+                                pass
+                            _dual_tee_file = open(self.log_filepath, "a", encoding="utf-8", buffering=1)
+                    
+                    clean_data = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', data)
+                    _dual_tee_file.write(clean_data)
+                    _dual_tee_file.flush()
+                except Exception as e:
+                    print(f"[WARN] Swallowed exception in DualTee lock block: {e}")
 
     def flush(self):
         try:
             self.original.flush()
         except Exception as e:
             print(f"[WARN] Swallowed exception: {e}")
-        if self.file:
-            try:
-                self.file.flush()
-            except Exception as e:
-                print(f"[WARN] Swallowed exception: {e}")
+        global _dual_tee_file
+        if _dual_tee_file:
+            with _dual_tee_lock:
+                try:
+                    _dual_tee_file.flush()
+                except Exception as e:
+                    print(f"[WARN] Swallowed exception: {e}")
 
     def isatty(self):
         return getattr(self.original, 'isatty', lambda: False)()
 
     def close(self):
-        if self.file:
-            try:
-                self.file.close()
-                self.file = None
-            except Exception as e:
-                print(f"[WARN] Swallowed exception closing DualTee: {e}")
+        pass # Handle is shared, do not close per-instance.
 
 _live_log_path = os.path.join(base_dir, "live_engine_output.txt")
 sys.stdout = DualTee(sys.stdout, _live_log_path)
@@ -1359,6 +1373,10 @@ class LiveTradeTracker:
 
             ticket = trade.get("order_id")
             if not ticket:
+                if trade.get("broker_sync_error") == "UNVERIFIED_OPEN_POSITION":
+                    # Keep tracking the trade so the orchestrator can continue attempting to resolve it
+                    continue
+
                 # Finding 2 — Zombie guard: trade has no order_id and is not in_flight.
                 # Could be a race where broker rejected but tracker wasn't cleaned, or a
                 # crash-recovery remnant. Age it out: 3 reconcile cycles (~90s) then purge.
