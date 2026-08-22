@@ -3303,7 +3303,7 @@ class CoinglassTab:
             await asyncio.sleep(0.3)
 
             # --- Dynamic Gap Calculation ---
-            target_steps = 120
+            target_steps = 800
             print(f"\n==================================================")
             print(f"[{self.tab_id}] {symbol} MEMORY-ONLY SEEDING:")
             print(f"[{self.tab_id}] -> WILL SCRAPE {target_steps} CANDLES NOW TO WARM UP MEMORY.")
@@ -3597,7 +3597,7 @@ def fetch_binance_funding_rates(symbol: str) -> List[Dict[str, Any]]:
 def fetch_binance_open_interest(symbol: str) -> List[Dict[str, Any]]:
     import urllib.request
     import json
-    url = f"https://fapi.binance.com/futures/data/openInterestHist?symbol={symbol}&period=15m&limit=120"
+    url = f"https://fapi.binance.com/futures/data/openInterestHist?symbol={symbol}&period=15m&limit=500"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -3609,7 +3609,7 @@ def fetch_binance_open_interest(symbol: str) -> List[Dict[str, Any]]:
 def fetch_binance_ls_ratio(symbol: str) -> List[Dict[str, Any]]:
     import urllib.request
     import json
-    url = f"https://fapi.binance.com/data/globalLongShortAccountRatio?symbol={symbol}&period=15m&limit=120"
+    url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=15m&limit=500"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as response:

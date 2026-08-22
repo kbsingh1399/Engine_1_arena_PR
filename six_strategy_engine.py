@@ -619,7 +619,7 @@ class LiveSixStrategyPredictor:
                       f"thresh lift {old_lift:.3f}->{new_lift:.3f} (exp decay)", "LossFilter")
 
     def set_history(self, symbol: str, candles):
-        """Set historical candle data for a symbol."""
+        """Set or merge historical candle data for a symbol."""
         now_open = int(time.time() // 900) * 900
         cleaned = []
         for c in candles:
@@ -632,11 +632,32 @@ class LiveSixStrategyPredictor:
                 row['open_time'] = ot
                 cleaned.append(row)
 
+        if not cleaned:
+            return
+
         cleaned.sort(key=lambda r: r['open_time'])
-        cleaned = cleaned[-1200:]
-        self.candles_history[symbol] = collections.deque(cleaned, maxlen=1200)
-        if cleaned:
-            self._last_predict_bar[symbol] = 0
+        
+        if symbol not in self.candles_history:
+            self.candles_history[symbol] = collections.deque(maxlen=1200)
+            
+        current = list(self.candles_history[symbol])
+        if current:
+            existing_by_time = {c['open_time']: c for c in current}
+            for c in cleaned:
+                if c['open_time'] in existing_by_time:
+                    existing_by_time[c['open_time']].update(c)
+                else:
+                    existing_by_time[c['open_time']] = c
+                    
+            merged = list(existing_by_time.values())
+            merged.sort(key=lambda r: r['open_time'])
+            merged = merged[-1200:]
+            self.candles_history[symbol] = collections.deque(merged, maxlen=1200)
+        else:
+            cleaned = cleaned[-1200:]
+            self.candles_history[symbol] = collections.deque(cleaned, maxlen=1200)
+            
+        self._last_predict_bar[symbol] = 0
 
     def load_history_from_disk(self, max_candles: int = 800):
         """Load historical candles directly from parquet backtesting data or Binance REST API (zero Excel dependency)."""
