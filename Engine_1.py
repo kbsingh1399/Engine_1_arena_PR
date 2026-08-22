@@ -4239,10 +4239,16 @@ def render_table(snap: Dict[str, AssetSnapshot], trade_tracker: Any = None, stor
         pnl_clr = "bright_green" if total_pnl >= 0 else "bright_red"
         pnl_sign = "+" if total_pnl >= 0 else ""
 
+        api_weight = 0
+        if hasattr(trade_tracker, 'broker') and hasattr(trade_tracker.broker, 'broker'):
+            api_weight = getattr(trade_tracker.broker.broker, 'current_api_weight', 0)
+        weight_clr = "bright_red" if api_weight > 900 else "bright_yellow"
+
         stats_text = (
             f"Capital: [bold bright_cyan]${stats['current_capital']:,.2f}[/]  |  "
             f"PnL: [bold {pnl_clr}]{pnl_sign}${total_pnl:.2f} ({pnl_pct:+.2f}%)[/]  |  "
-            f"Trades: [bold bright_yellow]{stats['total']}[/]  |  Winrate: [bold bright_yellow]{winrate:.1f}%[/]"
+            f"Trades: [bold bright_yellow]{stats['total']}[/]  |  Winrate: [bold bright_yellow]{winrate:.1f}%[/]  |  "
+            f"API Weight: [bold {weight_clr}]{api_weight}/1200[/]"
         )
 
     t3 = Table(

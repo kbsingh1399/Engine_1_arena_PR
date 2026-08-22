@@ -69,6 +69,7 @@ class BinanceBroker:
         self.valid_perpetuals: set = set()
         self.active_orders: Dict[str, dict] = {}
         self.time_offset = 0
+        self.current_api_weight = 0
 
         # Fee Optimization Tuning parameters
         self.post_only_timeout_secs: float = 3.0
@@ -133,6 +134,18 @@ class BinanceBroker:
                 req = urllib.request.Request(url, data=data, headers=headers, method=method)
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     res_bytes = resp.read()
+                    
+                    # ── Active Telemetry & Circuit Breaker ──
+                    weight_header = resp.headers.get("X-MBX-USED-WEIGHT-1M")
+                    if weight_header:
+                        try:
+                            self.current_api_weight = int(weight_header)
+                            if self.current_api_weight > 1000:
+                                log.warning(f"[RATE LIMIT ALERT] Binance 1M weight is {self.current_api_weight}/1200! Throttling API_POOL for 1.5s...")
+                                self._backoff_sleep(1.5)
+                        except ValueError:
+                            pass
+
                     return json.loads(res_bytes.decode("utf-8"))
 
             except urllib.error.HTTPError as e:
