@@ -78,7 +78,7 @@ load_dotenv(os.path.join(base_dir, ".env"))
 load_dotenv(os.path.join(base_dir, "..", ".env"))
 
 # Dual stream logging tee to live_engine_output.txt
-_dual_tee_lock = threading.Lock()
+_dual_tee_lock = threading.RLock()
 _dual_tee_file = None
 _dual_tee_lines = 0
 
@@ -99,8 +99,8 @@ class DualTee:
         try:
             self.original.write(data)
             self.original.flush()
-        except Exception as e:
-            print(f"[WARN] Swallowed exception: {e}")
+        except Exception:
+            pass
         
         if _dual_tee_file:
             with _dual_tee_lock:
@@ -125,8 +125,8 @@ class DualTee:
                     clean_data = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', data)
                     _dual_tee_file.write(clean_data)
                     _dual_tee_file.flush()
-                except Exception as e:
-                    print(f"[WARN] Swallowed exception in DualTee lock block: {e}")
+                except Exception:
+                    pass
 
     def flush(self):
         try:
@@ -2088,22 +2088,28 @@ class BinanceTradePriceWebSocketFeed:
                             if sym not in self.symbols:
                                 continue
                             
+                            # ── Clock-driven 15m liquidation boundary check ──
+                            now_sec = time.time()
+                            msg_time_ms = data.get("E", int(now_sec * 1000))
+                            current_15m = int(msg_time_ms // (15 * 60 * 1000))
+                            sym_last_15m = self.last_15m_per_sym.get(sym, 0)
+                            if current_15m != sym_last_15m:
+                                self.last_15m_per_sym[sym] = current_15m
+                                self.liq_long_accum[sym] = 0.0
+                                self.liq_short_accum[sym] = 0.0
+                                await self.store.update(
+                                    sym, source="binance_ws",
+                                    liq_long=0.0,
+                                    liq_short=0.0
+                                )
+
                             if event_type == "forceOrder":
                                 # Process liquidation
                                 o = data.get("o", {})
                                 side = o.get("S")
                                 qty = finite_float_or_none(o.get("q"))
                                 px = finite_float_or_none(o.get("p"))
-                                evt_time = o.get("T", data.get("E", 0))
-                                if qty and side and evt_time:
-                                    current_15m = evt_time // (15 * 60 * 1000)
-                                    sym_last_15m = self.last_15m_per_sym.get(sym, 0)
-                                    if current_15m != sym_last_15m:
-                                        # New 15m window for THIS symbol only
-                                        self.last_15m_per_sym[sym] = current_15m
-                                        self.liq_long_accum[sym] = 0.0
-                                        self.liq_short_accum[sym] = 0.0
-                                    
+                                if qty and side:
                                     usd_val = qty * px if px is not None else None
                                     if usd_val is None:
                                         continue

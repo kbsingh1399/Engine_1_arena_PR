@@ -428,8 +428,14 @@ class BinanceBroker:
         if idempotency_key:
             params["clientAlgoId"] = idempotency_key[:64]  # Binance max 64 chars
         res = self._request("POST", "/fapi/v1/algoOrder", params=params, signed=True)
-        if res and res.get("code") in (-4120, -4130, -4138):
-            log.info(f"[Binance] {label} position already protected by existing exchange stop ({res.get('code')}). Local Engine_1 check_exits active.")
+        err_msg = str(res.get("msg", "")).lower() if res else ""
+        if res and (
+            res.get("code") in (-4120, -4130, -4138, -4015, -4016, -4024, -4025, -2010)
+            or "duplicate" in err_msg
+            or "already exists" in err_msg
+            or "already active" in err_msg
+        ):
+            log.info(f"[Binance] {label} position already protected by existing exchange stop ({res.get('code')}: {res.get('msg')}). Local Engine_1 check_exits active.")
             return {"status": "ALREADY_ACTIVE", "code": res.get("code")}
 
         if res and ("algoId" in res or "clientAlgoId" in res or "orderId" in res) and "code" not in res:

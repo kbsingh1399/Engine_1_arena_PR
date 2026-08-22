@@ -619,7 +619,7 @@ class LiveSixStrategyPredictor:
                       f"thresh lift {old_lift:.3f}->{new_lift:.3f} (exp decay)", "LossFilter")
 
     def set_history(self, symbol: str, candles):
-        """Set or merge historical candle data for a symbol."""
+        """Set or merge historical candle data for a symbol (thread-safe)."""
         now_open = int(time.time() // 900) * 900
         cleaned = []
         for c in candles:
@@ -637,77 +637,84 @@ class LiveSixStrategyPredictor:
 
         cleaned.sort(key=lambda r: r['open_time'])
         
-        if symbol not in self.candles_history:
-            self.candles_history[symbol] = collections.deque(maxlen=1200)
-            
-        current = list(self.candles_history[symbol])
-        if current:
-            existing_by_time = {c['open_time']: c for c in current}
-            for c in cleaned:
-                if c['open_time'] in existing_by_time:
-                    existing_by_time[c['open_time']].update(c)
-                else:
-                    existing_by_time[c['open_time']] = c
-                    
-            merged = list(existing_by_time.values())
-            merged.sort(key=lambda r: r['open_time'])
-            merged = merged[-1200:]
-            self.candles_history[symbol] = collections.deque(merged, maxlen=1200)
-        else:
-            cleaned = cleaned[-1200:]
-            self.candles_history[symbol] = collections.deque(cleaned, maxlen=1200)
-            
-        self._last_predict_bar[symbol] = 0
+        with self._lock:
+            if symbol not in self.candles_history:
+                self.candles_history[symbol] = collections.deque(maxlen=1200)
+                
+            current = list(self.candles_history[symbol])
+            if current:
+                existing_by_time = {c['open_time']: c for c in current}
+                for c in cleaned:
+                    if c['open_time'] in existing_by_time:
+                        existing_by_time[c['open_time']].update(c)
+                    else:
+                        existing_by_time[c['open_time']] = c
+                        
+                merged = list(existing_by_time.values())
+                merged.sort(key=lambda r: r['open_time'])
+                merged = merged[-1200:]
+                self.candles_history[symbol] = collections.deque(merged, maxlen=1200)
+            else:
+                cleaned = cleaned[-1200:]
+                self.candles_history[symbol] = collections.deque(cleaned, maxlen=1200)
+                
+            self._last_predict_bar[symbol] = 0
 
     def load_history_from_disk(self, max_candles: int = 800):
-        """Load historical candles directly from parquet backtesting data or Binance REST API (zero Excel dependency)."""
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(base_dir, "backtesting_data")
+        """Load historical candles directly from Binance REST API (zero Excel dependency) with retries."""
         loaded = 0
+        import urllib.request, json
         
         for sym in self.symbols:
             candles = []
-            # 1. Primary Source: Live Binance Futures REST API
-            try:
-                import urllib.request, json
-                url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit={max_candles}"
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    raw = json.loads(resp.read().decode())
-                    for k in raw:
-                        o_val = float(k[1])
-                        h_val = float(k[2])
-                        l_val = float(k[3])
-                        c_val = float(k[4])
-                        v_val = float(k[5])
-                        candles.append({
-                            'open_time': int(k[0] // 1000),
-                            'open': o_val,
-                            'high': h_val,
-                            'low': l_val,
-                            'close': c_val,
-                            'volume': v_val,
-                            'Open': o_val,
-                            'High': h_val,
-                            'Low': l_val,
-                            'Close': c_val,
-                            'Volume': v_val,
-                            'fut_cvd': 0.0,
-                            'spot_cvd': 0.0,
-                            'oi': 0.0,
-                            'funding': 0.0,
-                            'liq_long': 0.0,
-                            'liq_short': 0.0,
-                            'ls_ratio': 1.0,
-                        })
-            except Exception:
-                pass
+            for attempt in range(3):
+                try:
+                    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit={max_candles}"
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=8) as resp:
+                        raw = json.loads(resp.read().decode())
+                        for k in raw:
+                            o_val = float(k[1])
+                            h_val = float(k[2])
+                            l_val = float(k[3])
+                            c_val = float(k[4])
+                            v_val = float(k[5])
+                            candles.append({
+                                'open_time': int(k[0] // 1000),
+                                'open': o_val,
+                                'high': h_val,
+                                'low': l_val,
+                                'close': c_val,
+                                'volume': v_val,
+                                'Open': o_val,
+                                'High': h_val,
+                                'Low': l_val,
+                                'Close': c_val,
+                                'Volume': v_val,
+                                'fut_cvd': 0.0,
+                                'spot_cvd': 0.0,
+                                'oi': 0.0,
+                                'funding': 0.0,
+                                'liq_long': 0.0,
+                                'liq_short': 0.0,
+                                'ls_ratio': 1.0,
+                            })
+                        if candles:
+                            break
+                except Exception as e:
+                    self._log(f"[SixStrategy] REST seed attempt {attempt+1}/3 failed for {sym}: {e}", "Seeding")
+                    time.sleep(1.0 * (attempt + 1))
 
             if candles:
                 self.set_history(sym, candles[-max_candles:])
                 loaded += 1
+            else:
+                self._log(f"[SixStrategy] [ERROR] Failed to load Binance REST history for {sym} after 3 attempts!", "Seeding")
 
-        print(f"[SixStrategy] Successfully seeded history for {loaded}/{len(self.symbols)} symbols (max {max_candles} candles window, zero Excel dependency).")
+        if loaded < len(self.symbols):
+            print(f"[SixStrategy] [ALERT] WARNING: Only {loaded}/{len(self.symbols)} symbols loaded history from Binance REST!")
+        else:
+            print(f"[SixStrategy] Successfully seeded history for {loaded}/{len(self.symbols)} symbols (max {max_candles} candles window, zero Excel dependency).")
         self._precompute_initial_indicators()
         print("[SixStrategy] Precomputed initial indicators for all symbols.")
 
@@ -913,6 +920,14 @@ class LiveSixStrategyPredictor:
         if len(history) < 800:
             import dataclasses
             return dataclasses.replace(snap, strategy_armed=f"WARM({len(history)}/800)")
+
+        # Finding N2: Data quality check — ensure rich features (CVD/OI) are populated and not all-zero REST placeholders
+        recent_check = list(history)[-60:] if len(history) >= 60 else list(history)
+        has_cvd = any(abs(c.get('fut_cvd', 0.0) or c.get('CVD', 0.0)) > 1e-6 for c in recent_check)
+        has_oi = any((c.get('oi', 0.0) or c.get('OI', 0.0)) > 1e-6 for c in recent_check)
+        if not (has_cvd and has_oi):
+            import dataclasses
+            return dataclasses.replace(snap, strategy_armed=f"WARM({len(history)}/800:SEEDING)")
 
         self._last_predict_bar[symbol] = last_bar
 
