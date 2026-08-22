@@ -13,6 +13,14 @@ Your objective is to output the final Python patches required to fix the confirm
 1. **Fetch the Code**: Use the raw GitHub URLs below to fetch and read the exact source code if you need context for your patches:
    - 📄 [Engine_1.py](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_1.py)
    - 📄 [run_all_6.py](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/run_all_6.py)
+   
+   **Layer 1 Attack Reports:**
+   - 📄 [layer1_glm5.2_output.md](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Debate_Audit_Response/layer1_glm5.2_output.md)
+   - 📄 [layer1_sonnet5_output.md](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Debate_Audit_Response/layer1_sonnet5_output.md)
+
+   **Layer 2 Defense Reports:**
+   - 📄 [layer2_codex5.3_output.md](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Debate_Audit_Response/layer2_codex5.3_output.md)
+   - 📄 [layer2_qwen3.8_output.md](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Debate_Audit_Response/layer2_qwen3.8_output.md)
 
 ---
 
@@ -40,4 +48,3 @@ The following Layer 1 findings were thoroughly debunked by Layer 2 and must be i
 
 **Output Requirement:**
 Output your final patches as **RAW MARKDOWN** Python code blocks outlining exactly how `run_all_6.py` and `Engine_1.py` should be patched. Do not use ZIP files or HTML output. Markdown file should be single copy and paste.
-
