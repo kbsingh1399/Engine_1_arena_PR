@@ -430,7 +430,7 @@ class BinanceBroker:
         res = self._request("POST", "/fapi/v1/algoOrder", params=params, signed=True)
         err_msg = str(res.get("msg", "")).lower() if res else ""
         if res and (
-            res.get("code") in (-4120, -4130, -4138, -4015, -4016, -4024, -4025, -2010)
+            res.get("code") in (-4120, -4130, -4138)
             or "duplicate" in err_msg
             or "already exists" in err_msg
             or "already active" in err_msg
