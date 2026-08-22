@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from risk_config import FEE_RT as FEE, CAP, RSK, TWR, TDD, MINTR
+from risk_config import FEE_RT as FEE, CAP, RSK, TWR, TDD, MINTR, MAXTR
 MIN_SAVE_WR=0.40; VAL_DAYS=60; CAL_GAP=30
 MIN_TRAIN_TRADES=30; MIN_POSITIVE=5; MIN_NEGATIVE=5
 
@@ -112,18 +112,65 @@ def pred_proba(models,fcs,df):
     return np.mean([m.predict_proba(X)[:,1] for m in models],axis=0)
 
 def best_thresh(pdf):
-    """Exact run_all_6.best_thresh: WR>=TWR=40, roi>0, dd<TDD=30, n>=MINTR=6."""
-    best=None; best_score=-1e9
-    for p in np.arange(0.50,0.92,0.02):
-        c=pdf[pdf['prob']>=p]; n=len(c)
-        if n<MINTR: continue
-        nw=(c['net_pnl']>0).sum(); wr=(nw/n)*100.0
-        tp=c['net_pnl'].sum(); roi=(tp/CAP)*100.0
-        eq=CAP+c['net_pnl'].cumsum(); dd=((eq.cummax()-eq)/eq.cummax()*100.0).max()
-        if wr>=TWR and roi>0 and dd<TDD:
-            score=roi*(wr/100.0)/max(dd,0.1)*np.log1p(n)
-            if score>best_score: best=float(round(p,2)); best_score=score
-    return best if best is not None else 0.55
+    """Byte-for-byte port of run_all_6.best_thresh.
+
+    PARITY FIXES (the previous version diverged on five axes, so the deployed
+    threshold disagreed with the walk-forward threshold on 12/12 random trials):
+      1. grid started at 0.50, backtest starts at 0.51 (MIN grid floor);
+      2. count window was [MINTR, inf); backtest requires [MINTR*2, MAXTR]
+         (the 2x trade-count safety margin) with a [MINTR*4, MAXTR*2] rank
+         fallback;
+      3. gate was `wr>=TWR`; backtest uses strict `wr>TWR`;
+      4. drawdown used closed-equity only; backtest uses
+         max(closed_equity_drawdown, mark_to_market_drawdown);
+      5. `net_pnl` here is a FRACTION of CAP (six_strategy_engine._sim_trade
+         returns RISK_PCT-scaled PnL) while the backtest's is USD, making roi
+         and dd ~CAP times too small so `dd<TDD` could never bind.
+    Returning None (no deployable threshold) is preserved by the caller.
+    """
+    pdf=pdf.sort_values('entry_time') if 'entry_time' in pdf.columns else pdf
+
+    # (5) normalize fractional PnL to USD so the ROI/DD gates are on the
+    # same scale the backtest gates were tuned on.
+    pnl=pdf['net_pnl'].astype(float)
+    if len(pnl) and pnl.abs().max()<1.0:
+        pnl=pnl*CAP
+    pdf=pdf.assign(pnl_usd_parity=pnl)
+
+    def _closed_dd(c):
+        eq=CAP+c['pnl_usd_parity'].cumsum()
+        eq=pd.concat([pd.Series([float(CAP)]),eq.reset_index(drop=True)],ignore_index=True)
+        peak=eq.cummax()
+        return float(((peak-eq)/peak.clip(lower=1e-12)*100.0).max())
+
+    def _mtm_dd(c):
+        if 'mae_dollar' not in c.columns: return _closed_dd(c)
+        equity=CAP; peak=CAP; worst=0.0
+        for row in c.itertuples():
+            mae=max(0.0,float(getattr(row,'mae_dollar',0.0) or 0.0))
+            worst=max(worst,(peak-(equity-mae))/max(peak,1e-12)*100.0)
+            equity+=float(row.pnl_usd_parity); peak=max(peak,equity)
+        return float(worst)
+
+    def choose(thresholds,min_n,max_n):
+        best=None; best_score=-1e9
+        for p in thresholds:
+            c=pdf[pdf['prob']>=p]; n=len(c)
+            if n<min_n or n>max_n: continue                      # (2)
+            wr=((c['pnl_usd_parity']>0).sum()/n)*100.0
+            roi=(c['pnl_usd_parity'].sum()/CAP)*100.0
+            dd=max(_closed_dd(c),_mtm_dd(c))                     # (4)
+            if wr>TWR and roi>0 and dd<TDD:                      # (3)
+                score=roi*(wr/100.0)/max(dd,0.1)*np.log1p(n)
+                if score>best_score: best=float(p); best_score=score
+        return best
+
+    best=choose(np.arange(0.51,0.92,0.02),MINTR*2,MAXTR)         # (1)
+    if best is not None: return best
+
+    probs=pdf['prob'].dropna().sort_values(ascending=False)
+    ranks=[float(probs.iloc[k-1]) for k in range(MINTR*4,min(MAXTR*2,len(probs))+1,2)]
+    return choose(ranks,MINTR*4,MAXTR*2)
 
 def extract_trade_df(df,signal_func_vec,btc_ref=None):
     df_feat=featurize(df.copy(),btc_ref); signals=signal_func_vec(df_feat)
@@ -197,18 +244,32 @@ def train_all_strategies():
                 print(f"ERROR ({e})"); skipped+=1; continue
             if result is None: print("SKIP (model failed)"); skipped+=1; continue
             models,selected_cols=result
-            best_t=0.55; cal_wr=float(y_tr.mean()); n_cal=0
+            # PARITY: best_thresh now returns None when NO threshold satisfies the
+            # walk-forward gates. The old code silently fell back to 0.55, deploying
+            # an uncalibrated gate the backtest never validated. Deploying nothing is
+            # the correct behaviour — run_all_6 also trades nothing in that window.
+            best_t=None; cal_wr=float(y_tr.mean()); n_cal=0
             for eval_df in [cal_df,val_df,train_df.tail(max(MINTR*4,40))]:
                 if eval_df is None or len(eval_df)<MINTR: continue
                 try:
                     probs=pred_proba(models,selected_cols,eval_df[fcs])
                     ep=eval_df.copy().assign(prob=probs)
-                    t=best_thresh(ep); filt=ep[ep['prob']>=t]
+                    t=best_thresh(ep)
+                    if t is None: continue
+                    filt=ep[ep['prob']>=t]
                     if len(filt)>=MINTR:
                         best_t=t; cal_wr=float((filt['net_pnl']>0).mean()); n_cal=len(filt); break
                 except Exception:
                     continue
             output_path=MODEL_DIR/f'{strat_key}_{symbol}.pkl'
+            if best_t is None:
+                print(f"BLOCKED (no threshold satisfied WR>{TWR}/roi>0/dd<{TDD} gates)")
+                blocked+=1
+                with open(output_path,'wb') as f:
+                    pickle.dump({'models':None,'selected_cols':selected_cols,'threshold':None,
+                                 'n_trades':len(trade_df),'n_wins':int(trade_df['label'].sum()),
+                                 'win_rate':cal_wr,'blocked':True},f)
+                continue
             if cal_wr<MIN_SAVE_WR:
                 print(f"BLOCKED (t={best_t:.2f},n={n_cal},WR={cal_wr:.1%}<{MIN_SAVE_WR:.0%})")
                 blocked+=1

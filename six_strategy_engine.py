@@ -45,6 +45,10 @@ from risk_config import FEE_RT as FEE_PCT, CAP, RSK, MAX_NOTIONAL, ATR_EPSILON
 RISK_PCT = RSK / CAP
 MAX_NOTIONAL_PCT = MAX_NOTIONAL / CAP
 
+# Live-only research toggle. Default OFF so the deployed gate is the exact
+# fixed threshold that run_all_6.py validated.
+ADAPTIVE_LIFT_ENABLED = os.environ.get("ENGINE_ADAPTIVE_LIFT", "0") == "1"
+
 SYMBOLS = [
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT',
     'TRXUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT', 'LTCUSDT', 'NEARUSDT', 'SUIUSDT'
@@ -265,7 +269,25 @@ def featurize(df, btc_ref=None):
 
 
 # ─── Signal Generators (imported from canonical module) ────────────────
-from signals_shared import STRAT_MAP as SIGNAL_FUNCS
+# PARITY FIX: signals_shared.STRAT_MAP is keyed by the LONG canonical name
+# ('S1_Liquidation'). Every consumer in this file treats the key as the SHORT
+# key ('S1'): STRATEGY_NAMES[strat_key] and the on-disk model filename
+# 'six_strategy_models/{strat_key}_{sym}.pkl' written by train_six_strategy.py.
+# Importing STRAT_MAP directly made load_models() look for
+# 'S1_Liquidation_BTCUSDT.pkl' (never written -> zero models loaded -> every
+# symbol short-circuits on NO_MODEL) and made STRATEGY_NAMES[strat_key] raise
+# KeyError inside the signal loop. Re-key to the short keys used everywhere.
+from signals_shared import STRAT_MAP as _CANONICAL_STRAT_MAP
+
+SIGNAL_FUNCS = {
+    short_key: _CANONICAL_STRAT_MAP[long_name]
+    for short_key, long_name in STRATEGY_NAMES.items()
+}
+
+# Boot-time guard: the short-key map must cover every canonical strategy exactly.
+assert set(SIGNAL_FUNCS) == set(STRATEGY_NAMES), "SIGNAL_FUNCS/STRATEGY_NAMES key drift"
+assert {STRATEGY_NAMES[k] for k in SIGNAL_FUNCS} == set(_CANONICAL_STRAT_MAP), \
+    "SIGNAL_FUNCS does not cover signals_shared.STRAT_MAP"
 
 
 # ─── ML Model Training (matches run_all_6.py bmodel) ────────────────
@@ -480,9 +502,19 @@ class LiveSixStrategyPredictor:
                     try:
                         with open(path, 'rb') as f:
                             data = pickle.load(f)
+                        # PARITY FIX: fail closed. train_six_strategy.py writes a
+                        # blocked artifact (models=None / threshold=None) when no
+                        # threshold satisfied the walk-forward gates. Loading it
+                        # registered a None model and defaulted the gate to 0.55 —
+                        # trading a strategy the backtest refused to deploy.
+                        thr = data.get('threshold')
+                        if data.get('blocked', False) or data.get('models') is None or thr is None:
+                            print(f"[SixStrategy] Skipping {strat_key}_{sym}: "
+                                  f"BLOCKED / no validated threshold")
+                            continue
                         self.models[strat_key][sym] = data['models']
                         self.selected_cols[strat_key][sym] = data['selected_cols']
-                        self.thresholds[strat_key][sym] = data.get('threshold', 0.55)
+                        self.thresholds[strat_key][sym] = float(thr)
                     except Exception as e:
                         print(f"[SixStrategy] Error loading {strat_key}_{sym}: {e}")
 
@@ -907,9 +939,12 @@ class LiveSixStrategyPredictor:
                 import dataclasses
                 return dataclasses.replace(snap, strategy_armed="DRIFT_BLOCK")
             
-            # PARITY FIX: Use raw ATR without artificial floor
+            # PARITY FIX: reject the ATR sentinel exactly as the backtest does.
+            # gen_trades_numba requires av > ATR_EPSILON; signals_shared.atr()
+            # maps zero-range candles to 1e-6, so `atr_val > 0` let the sentinel
+            # through and would size RSK/1e-6 units.
             atr_val = float(last_row.get('atr', 0))
-            if atr_val <= 0 or np.isnan(atr_val) or snap.price <= 0:
+            if (not np.isfinite(atr_val)) or atr_val <= ATR_EPSILON or snap.price <= 0:
                 return snap
 
             # Run all 6 strategies
@@ -945,14 +980,20 @@ class LiveSixStrategyPredictor:
                 if direction in pa_blocks:
                     continue
 
-                # Block if this symbol+direction is suspended after excessive consecutive losses
-                suspend_key = (symbol, direction)
+                strat_name = STRATEGY_NAMES[strat_key]
+
+                # Block if this symbol+direction+strategy is suspended after excessive
+                # consecutive losses.
+                # PARITY FIX: notify_trade_closed writes the 3-tuple
+                # (symbol, direction, strategy) but this read used the 2-tuple
+                # (symbol, direction), so the lookup always missed and the
+                # suspension never fired. Key shapes must match.
+                suspend_key = (symbol, direction, strat_name)
                 if self._dir_suspend_until.get(suspend_key, 0) > current_bar_index:
                     remaining = self._dir_suspend_until[suspend_key] - current_bar_index
-                    self._log(f"{symbol} dir={direction} suspended for {remaining} more bars.", "LossFilter")
+                    self._log(f"{symbol} dir={direction} strat={strat_name} "
+                              f"suspended for {remaining} more bars.", "LossFilter")
                     continue
-
-                strat_name = STRATEGY_NAMES[strat_key]
 
                 # Check for active trade in this strategy
                 if trade_tracker:
@@ -978,12 +1019,19 @@ class LiveSixStrategyPredictor:
                         self.ml_failures = {}
                     self.ml_failures[symbol] = 0
 
-                    # FIX: Apply adaptive _thresh_lift to actual threshold check
-                    # After consecutive losses, lift raises the bar for ML confidence
-                    base_thresh = self.thresholds[strat_key].get(symbol, 0.55)
-                    adaptive_lift = self._thresh_lift.get(symbol, 0.0)
-                    effective_thresh = float(base_thresh) + float(adaptive_lift)
-                    if float(prob) < (effective_thresh - 1e-5):
+                    # PARITY: run_all_6 applies ONE fixed threshold `bp` chosen on
+                    # prior-only validation data — `tp[tp['prob'] >= bp]`. No
+                    # adaptive lift and no epsilon slack exist in the backtest.
+                    #  * the -1e-5 slack admitted trades the backtest rejects
+                    #    (strict `>=` boundary),
+                    #  * _thresh_lift raised the bar after losses, rejecting trades
+                    #    the backtest takes.
+                    # Both break the calibrated threshold, so both are removed.
+                    # ENGINE_ADAPTIVE_LIFT=1 re-enables the lift for research only.
+                    base_thresh = float(self.thresholds[strat_key].get(symbol, 0.55))
+                    if ADAPTIVE_LIFT_ENABLED:
+                        base_thresh += float(self._thresh_lift.get(symbol, 0.0))
+                    if float(prob) < base_thresh:
                         continue
                 except Exception as e:
                     if not hasattr(self, 'ml_failures'):
