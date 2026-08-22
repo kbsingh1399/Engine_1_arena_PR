@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-CAP=5000.0; RSK=20.0; FEE=0.0020; TWR=40.0; TDD=30.0; MINTR=6
+from risk_config import FEE_RT as FEE, CAP, RSK, TWR, TDD, MINTR
 MIN_SAVE_WR=0.40; VAL_DAYS=60; CAL_GAP=30
 MIN_TRAIN_TRADES=30; MIN_POSITIVE=5; MIN_NEGATIVE=5
 
