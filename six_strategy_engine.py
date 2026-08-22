@@ -702,53 +702,6 @@ class LiveSixStrategyPredictor:
                         })
             except Exception:
                 pass
-            
-            # 2. Secondary Source: Parquet backtesting files fallback
-            if len(candles) < 20:
-                candles = []
-                summary_path = os.path.join(data_dir, f"Master_{sym}_15m_Final_Summary.parquet")
-                fp_path = os.path.join(data_dir, f"Master_{sym}_15m_Final_Footprint.parquet")
-                if os.path.exists(summary_path):
-                    try:
-                        df = pd.read_parquet(summary_path)
-                        if os.path.exists(fp_path):
-                            try:
-                                df_fp = pd.read_parquet(fp_path)
-                                cj = [c for c in df_fp.columns if c not in df.columns]
-                                if cj:
-                                    df = df.join(df_fp[cj], how='left')
-                            except Exception:
-                                pass
-                        df = df.tail(max_candles)
-                        for idx, row in df.iterrows():
-                            d = row.to_dict()
-                            if 'open_time' not in d:
-                                if hasattr(idx, 'timestamp'):
-                                    d['open_time'] = int(idx.timestamp())
-                                elif 'timestamp' in d:
-                                    d['open_time'] = int(pd.to_datetime(d['timestamp']).timestamp())
-                                else:
-                                    d['open_time'] = int(time.time() - (len(df) - len(candles)) * 900)
-                            o_val = float(d.get('open', d.get('Open', 0.0)))
-                            h_val = float(d.get('high', d.get('High', 0.0)))
-                            l_val = float(d.get('low', d.get('Low', 0.0)))
-                            c_val = float(d.get('close', d.get('Close', 0.0)))
-                            v_val = float(d.get('volume', d.get('Volume', 0.0)))
-                            d['open'] = d['Open'] = o_val
-                            d['high'] = d['High'] = h_val
-                            d['low'] = d['Low'] = l_val
-                            d['close'] = d['Close'] = c_val
-                            d['volume'] = d['Volume'] = v_val
-                            d['fut_cvd'] = float(d.get('fut_cvd', d.get('CVD', d.get('futCvd', 0.0))))
-                            d['spot_cvd'] = float(d.get('spot_cvd', d.get('Spot_CVD', d.get('spotCvd', 0.0))))
-                            d['oi'] = float(d.get('oi', d.get('OI', d.get('open_interest', 0.0))))
-                            d['funding'] = float(d.get('funding', d.get('Funding', d.get('funding_rate', 0.0))))
-                            d['liq_long'] = float(d.get('liq_long', d.get('Liq_Long', d.get('liquidations_long', 0.0))))
-                            d['liq_short'] = float(d.get('liq_short', d.get('Liq_Short', d.get('liquidations_short', 0.0))))
-                            d['ls_ratio'] = float(d.get('ls_ratio', d.get('LSR', d.get('lsRatio', 1.0))))
-                            candles.append(d)
-                    except Exception:
-                        pass
 
             if candles:
                 self.set_history(sym, candles[-max_candles:])
