@@ -2,6 +2,8 @@
 
 You are an expert quantitative developer and ML engineer. We are running a 20-window walk-forward backtest for a live trading engine with a strict maximum drawdown constraint of 30.0% (`TDD = 30.0`).
 
+**Important Context:** We have just pushed all our latest local files to the GitHub repository. Please start by reading the entire repository to get the hang of everything (especially `run_all_6.py`, `risk_config.py`, and `sim()` logic) before answering.
+
 Our strategy `S1_Liquidation` recently failed Window 17 strictly due to massive Drawdown (146.8%) and reported a mathematically impossible PnL, because of a near-zero ATR division bug in our sizing logic.
 
 Here is the log for the failed window before the fix:
