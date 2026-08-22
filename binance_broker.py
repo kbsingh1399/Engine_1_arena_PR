@@ -874,7 +874,9 @@ class BinanceBroker:
             return "OPEN", 1.0
         try:
             res = self._request("GET", "/fapi/v2/positionRisk", params={"symbol": symbol}, signed=True)
-            if res and isinstance(res, list):
+            if res is None:
+                return "UNKNOWN", 0.0
+            if isinstance(res, list):
                 for pos in res:
                     if pos.get("symbol") == symbol:
                         amt = float(pos.get("positionAmt", 0.0))

@@ -449,6 +449,11 @@ class BinanceBrokerAdapter:
     def account_size(self, val):
         pass
 
+    def get_position_state(self, symbol: str) -> Tuple[str, float]:
+        if hasattr(self.broker, "get_position_state"):
+            return self.broker.get_position_state(symbol)
+        return "UNKNOWN", 0.0
+
     def connect(self) -> bool:
         return self.broker.connect()
 
@@ -1851,12 +1856,15 @@ class SnapshotStore:
             
             if has_active:
                 if hasattr(self.trade_tracker, "broker_executor"):
-                    self.trade_tracker.broker_executor.submit(
-                        self.trade_tracker.check_exits, symbol, new_snap.price, atr_dict
-                    )
+                    def _do_exits_and_pnl(s=symbol, p=new_snap.price, a=atr_dict, engine=self):
+                        engine.trade_tracker.check_exits(s, p, a)
+                        engine.trade_tracker.update_live_pnl(s, p, engine)
+                    self.trade_tracker.broker_executor.submit(_do_exits_and_pnl)
                 else:
                     self.trade_tracker.check_exits(symbol, new_snap.price, atr_dict)
-            self.trade_tracker.update_live_pnl(symbol, new_snap.price, self)
+                    self.trade_tracker.update_live_pnl(symbol, new_snap.price, self)
+            else:
+                self.trade_tracker.update_live_pnl(symbol, new_snap.price, self)
 
         if price_fresh and self.predictor:
             # Time-based ML dispatch throttle (2.0s per symbol using monotonic clock)
@@ -5171,7 +5179,8 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
                 if elapsed > threshold_sec:
                     consecutive_blocks += 1
                     if consecutive_blocks >= 10:
-                        log_live_event("Event loop lag exceeded threshold for 10 consecutive ticks!", "PERF")
+                        print("[Watchdog] [ALERT] [LATENCY_CRITICAL] Event loop lag exceeded threshold for 10 consecutive ticks!")
+                        log_live_event("[Watchdog] [ALERT] [LATENCY_CRITICAL] Event loop lag exceeded threshold for 10 consecutive ticks!", "PERF")
                         consecutive_blocks = 0
                 else:
                     consecutive_blocks = 0

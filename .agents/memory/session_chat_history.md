@@ -15838,3 +15838,18 @@ Running terminal commands:
 
 **User:** Push all local files git main
 **OMNI:** Deploying all Fable 5 patches to git main immediately.
+
+**User:** @[.agents/rules/AGENTS.md] Instantiated
+**OMNI:** ? AGENTS.md fully loaded — All Core parts active. I have executed the full session context load.
+
+**User:** Meanwhile...give me final prompt for opencode to review the changes we done..
+**OMNI:** Here is the ultimate audit prompt for Opencode to verify all our Fable 5 parity patches.
+
+**User:** @[.agents/rules/AGENTS.md] /coordinate @[TerminalName: opencode, ProcessId: 17636] Fix which are not done and required for us
+**OMNI:** [OK] Coordination complete. I have directly patched the final blocking constraints for F1 and F3.
+
+**User:** @[TerminalName: opencode, ProcessId: 17636] check output
+**OMNI:** [OK] Patched engine_components/binance_broker.py and added bare print to event_loop_monitor in Engine_1.py.
+
+**User:** give me prmpt to feed and ask him to review it once again if we are ready to go live
+**OMNI:** [OK] Providing final Opencode verification prompt.
