@@ -1,42 +1,42 @@
-# LAYER 3: SUPREME JUDGE (VERDICT & SYNTHESIS ROUND)
+# ⚖️ LAYER 3: SUPREME JUDGE (VERDICT & SYNTHESIS ROUND)
 
-You are the Supreme Judge in a multi-agent adversarial audit of `Engine_1.py`.
-Two elite defenders (Flash 3.7 & Qwen 3.8) have cross-examined a Layer 1 Attack Report. 
+You are the Supreme Judge in a multi-agent adversarial audit of `Engine_1.py` and its simulated backtest architecture.
 
-As the Orchestrator, I have analyzed their 1500-line JSON reports and synthesized the exact state of the debate below to save your context window.
+Two elite defenders (Codex 5.3 & Qwen 3.8) have cross-examined the Layer 1 Attack Reports (from GLM 5.2 & Sonnet 5). 
 
-Your objective is to output the final JSON patch array fixing the confirmed bugs. 
+As the Orchestrator, I have analyzed the Layer 2 JSON reports and synthesized the exact state of the debate below to save your context window.
+
+Your objective is to output the final Python patches required to fix the confirmed parity breaks and vulnerabilities. 
+
+### Instructions for Execution
+
+1. **Fetch the Code**: Use the raw GitHub URLs below to fetch and read the exact source code if you need context for your patches:
+   - 📄 [Engine_1.py](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_1.py)
+   - 📄 [run_all_6.py](https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/run_all_6.py)
+
+---
 
 ## 1. UNANIMOUSLY CONFIRMED BUGS (Patch Required)
-Both defenders agreed these are real, critical bugs. Provide a unified patch for these:
-*   **A-2 (Z-Score Warmup):** Live 5s rows pollute the 15m Z-score normalization window. CVD baselines reset on reload. (Fix: Diff session-relative CVD, only admit closed 15m bars to `_zscore`).
-*   **A-3 (Indicator Latency):** 150+ features are rebuilt on every tick. (Fix: Gate `featurize()` and EMA updates to closed-bar boundaries, cache per bar timestamp).
-*   **B-1 (Sync Order Blocking):** GTX-LIMIT fallback uses synchronous REST (`urllib.request`) inside the asyncio WS loop. (Fix: Offload exit-checks and broker I/O to a dedicated `asyncio.Queue` worker).
-*   **B-2 (Orphaned Tasks):** `asyncio.create_task(run_drift_detector())` lacks strong references. (Fix: Add a task registry with `add_done_callback` to prevent GC).
-*   **C-1 (Partial Fills):** GTX limit partial fills are followed by a naked MARKET sweep of the full quantity, double-filling. (Fix: Reconcile filled qty via GET /order, compute VWAP, sweep only the residual).
-*   **C-2 (Ghost Positions):** Orders fully rejected by Binance still consume local risk budgets. (Fix: Book trades only on confirmed fill, rollback reservations on rejection).
-*   **C-3 (Rate Limits):** No exponential backoff for HTTP 429/418. (Fix: Parse `Retry-After`, apply exponential backoff + jitter).
-*   **C-4 (Stale Limit Price):** GTX limit placed at stale signal price. (Fix: Price the sweep from `bookTicker` mid ± collar, not the lagged `aggTrade` price).
-*   **D-1 (REST/WS Duplicate Seam):** WebSocket reconnects inject duplicate candles overlapping the REST poll. (Fix: Track candle open_time high-watermark, deduplicate overlaps).
-*   **D-4 (Timestamp Monotonicity):** 15-minute rollover uses `!=` instead of `<`. Replayed ticks clear accumulators. (Fix: Ignore backward-time ticks, strictly use `<` for rollover).
+Both Layer 2 defenders agreed these are real, critical bugs. Provide a unified patch for these:
 
-## 2. DISPUTED BUGS (Judge Must Resolve)
-The defenders disagreed on these. Review and decide whether to patch:
-*   **A-1 (CVD Rollover Float Math):** Flash claims `math.isclose()` is used on float timestamps for 15m rollovers, causing precision misses. Qwen claims this is a hallucination; the engine uses exact integer division (`evt_time // 900000`). Judge: Check the code. If Qwen is right, drop this.
-*   **B-3 (Inline Persistence Blocking):** Flash flags a blocking Database write. Qwen rejects it, stating no DB exists, but admits JSON/openpyxl file I/O blocks the thread. Judge: Patch the file I/O blocking using `asyncio.to_thread`.
-*   **D-5 (Reconnect State Flush):** Flash claims flushing deque on WS reconnect destroys 800 bars of historical data. Qwen argues we MUST flush derived accumulators and mark snapshots stale, or replayed `forceOrder` history will double-count. Judge: Resolve the architectural tradeoff.
+*   **F-03 / BT-01 (Fee Model Mismatch):** Live engine charges ~0.08% RT. Backtest assumes 0.20% RT (`FEE=0.0020`). **Fix:** Ensure both engines import a single, shared round-trip fee constant.
+*   **BT-02 (Funding Bug):** The funding cost is computed using `abs(avg_fr)` in the backtest runner, discarding the sign. Shorts are charged during positive funding instead of getting paid. **Fix:** Remove `abs()` and correctly apply signed funding costs.
+*   **F-04 (Threshold Lookahead):** `MAXTR` loop re-selects the probability cutoff (`bp`) based on trade counts *within the test window*. **Fix:** Remove retroactive test-window threshold tuning; enforce strict causality.
+*   **F-06 (Exception Swallowing):** Blank `except Exception as e: pass` wrap the entire ledger-write path and Engine startup path. **Fix:** Force explicit exception logging and fail-loud logic on capital paths.
+*   **F-01 (Strategy Duplication):** The live engine delegates to a separate, duplicated module (`six_strategy_engine`) rather than importing the canonical backtest strategies, leading to massive divergence. **Fix:** Enforce single-sourcing. Both engines must import `signals_shared.STRAT_MAP`.
+
+## 2. NEW LAYER 2 DISCOVERIES (Patch Required)
+Qwen 3.8 went above and beyond and discovered these critical, previously missed issues:
+
+*   **ATR Math Divergence (Critical):** `six_strategy_engine` calculates ATR using True Range (incorporating previous close). The backtest (`run_all_6.py`) uses `(High - Low)`. This mathematically scales all normalized features (`p8`, `p21`) differently. **Fix:** Unify the ATR calculation to a single source of truth across both live and backtest.
+*   **BROKER_SYNC Unbounded Loss (Critical):** `BROKER_SYNC` exits routinely exceed the registered 1-ATR stop-loss (empirically reaching 8.75x intended loss in ledger). **Fix:** Reconciliation must verify the broker-side stop's existence; if missing, flatten AND halt the governor.
 
 ## 3. UNANIMOUSLY REJECTED (Do Not Patch)
-*   **D-2 & D-3:** Attacks on `deque(maxlen=1200)` memory safety were unanimously debunked as fundamentally misunderstanding Python GC semantics.
+The following Layer 1 findings were thoroughly debunked by Layer 2 and must be ignored:
+*   **LV-04 (Asymmetric SL/TP Tick Rounding):** Claimed SL rounded away and TP rounded towards entry systematically. Ledger proves it is symmetric, standard nearest-tick quantization.
+*   **LV-05 (Dual PnL Accounting):** Claimed double counting. Ledger proves `live_pnl_usd` is merely an unrealized mark-to-market snapshot, while `pnl_usd` is the realized PnL.
 
 ---
 
 **Output Requirement:**
-Output ONLY a JSON array containing the final, unified patches for the confirmed and resolved bugs. 
-Format:
-[
-  {
-    "file": "Engine_1.py",
-    "diffCode": "unified diff patch"
-  }
-]
+Output your final patches as **RAW MARKDOWN** Python code blocks outlining exactly how `run_all_6.py` and `Engine_1.py` should be patched. Do not use ZIP files or HTML output.
