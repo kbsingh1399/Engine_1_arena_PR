@@ -41,8 +41,9 @@ TP_MULT = 5.0
 TRAIL_ATR = 0.8
 SL_MULT = 1.0
 MAX_BARS = 288       # 72 hours of 15m bars
-RISK_PCT = 0.004     # 0.4% per trade (matches RSK=20 on $5000)
-from risk_config import FEE_RT as FEE_PCT
+from risk_config import FEE_RT as FEE_PCT, CAP, RSK, MAX_NOTIONAL, ATR_EPSILON
+RISK_PCT = RSK / CAP
+MAX_NOTIONAL_PCT = MAX_NOTIONAL / CAP
 
 SYMBOLS = [
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT',
@@ -60,9 +61,11 @@ STRATEGY_NAMES = {
 
 
 # ─── Numba Trade Simulation (exact copy from run_all_6.py) ──────────
-@njit(fastmath=True, nogil=True)
+@njit(nogil=True)
 def _sim_trade(h, l, c, entry_idx, entry, atr, dr):
-    """Simulate a single trade forward from entry_idx."""
+    """Simulate one trade with the backtest's ATR and notional guards."""
+    if (not np.isfinite(atr)) or (not np.isfinite(entry)) or atr <= ATR_EPSILON or entry <= 0.0:
+        return 0.0, 0.0, 0.0, 0
     n = len(c)
     sd = atr * SL_MULT
     td = atr * TP_MULT
@@ -95,7 +98,7 @@ def _sim_trade(h, l, c, entry_idx, entry, atr, dr):
             if ns < cs:
                 cs = ns
 
-    units = RISK_PCT / sd if sd > 0 else 0
+    units = min(RISK_PCT / sd, MAX_NOTIONAL_PCT / entry)
     gross = units * (ep - entry) if dr == 1 else units * (entry - ep)
     fees = units * entry * FEE_PCT / 2.0 + units * abs(ep) * FEE_PCT / 2.0
     net_pnl = gross - fees
@@ -104,7 +107,7 @@ def _sim_trade(h, l, c, entry_idx, entry, atr, dr):
     return net_pnl, r_mult, win, bh
 
 
-@njit(fastmath=True, nogil=True)
+@njit(nogil=True)
 def gen_trades_numba(h, l, c, o, a, sig):
     """Numba-compiled vectorized trade generator."""
     n = len(c)
@@ -118,7 +121,7 @@ def gen_trades_numba(h, l, c, o, a, sig):
             if dr != 0:
                 entry = o[i + 1] if i + 1 < n else c[i]
                 av = a[i]
-                if av > 0 and not np.isnan(av):
+                if np.isfinite(av) and np.isfinite(entry) and av > ATR_EPSILON and entry > 0.0:
                     net, r, lb, bh = _sim_trade(h, l, c, i, entry, av, int(dr))
                     results.append((i, dr, net, r, lb, bh))
                     cd = i + int(bh) + 2
@@ -143,7 +146,7 @@ def featurize(df, btc_ref=None):
         if cj:
             df = df.join(btc_ref[cj], how='left')
         if 'btc_CVD' in df.columns:
-            df['btc_CVD'] = df['btc_CVD'].ffill().bfill().fillna(0)
+            df['btc_CVD'] = df['btc_CVD'].ffill().fillna(0)
 
     # PARITY FIX: True Range / ATR must match run_all_6.py exactly
     from signals_shared import atr

@@ -4,7 +4,9 @@
 
 FEE_RT = 0.0008          # round-trip cost: 0.04% per side x 2 -- MATCHES live execution
 CAP    = 5000.0          # walk-forward starting equity
-RSK    = 20.0            # USD risked per trade (1R)
+RSK    = 20.0            # USD stop-distance risked per trade (1R), before fees
+MAX_NOTIONAL = 50_000.0  # hard sizing cap; matches Engine_1.LiveTradeTracker
+ATR_EPSILON = 1e-6       # ATR values at/below this are invalid, not tradable volatility
 TWR    = 40.0            # walk-forward gates
 TROI   = 20.0
 TDD    = 30.0
