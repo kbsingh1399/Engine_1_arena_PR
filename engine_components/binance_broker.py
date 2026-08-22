@@ -315,6 +315,22 @@ class BinanceBroker:
             return float(res.get("availableBalance", 0.0)), float(res.get("totalWalletBalance", 0.0))
         return 0.0, 0.0
 
+    def get_position_state(self, symbol: str) -> Tuple[str, float]:
+        """Fetch real-time position state and amount from Binance."""
+        if self.dry_run:
+            return "OPEN", 1.0
+        try:
+            res = self._request("GET", "/fapi/v2/positionRisk", params={"symbol": symbol}, signed=True)
+            if res and isinstance(res, list):
+                for pos in res:
+                    if pos.get("symbol") == symbol:
+                        amt = float(pos.get("positionAmt", 0.0))
+                        return ("OPEN", amt) if amt != 0.0 else ("CLOSED", 0.0)
+            return "CLOSED", 0.0
+        except Exception as e:
+            log.warning(f"Binance API transient failure getting state for {symbol}: {e}")
+            return "UNKNOWN", 0.0
+
     def get_all_positions(self) -> List[dict]:
         """Fetch all active positions from the exchange."""
         res = self._request("GET", "/fapi/v2/positionRisk", signed=True)

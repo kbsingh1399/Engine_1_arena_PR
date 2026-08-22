@@ -868,6 +868,21 @@ class BinanceBroker:
                     return False
         return True
 
+    def get_position_state(self, symbol: str) -> Tuple[str, float]:
+        """Fetch real-time position state and amount from Binance."""
+        if self.dry_run:
+            return "OPEN", 1.0
+        try:
+            res = self._request("GET", "/fapi/v2/positionRisk", params={"symbol": symbol}, signed=True)
+            if res and isinstance(res, list):
+                for pos in res:
+                    if pos.get("symbol") == symbol:
+                        amt = float(pos.get("positionAmt", 0.0))
+                        return ("OPEN", amt) if amt != 0.0 else ("CLOSED", 0.0)
+            return "CLOSED", 0.0
+        except Exception as e:
+            log.warning(f"Binance API transient failure getting state for {symbol}: {e}")
+            return "UNKNOWN", 0.0
     def get_position_history_profit(self, position_ticket: int) -> Tuple[float, float]:
         """Fetch realized profit and exit price from user trades."""
         if self.dry_run:

@@ -92,8 +92,8 @@ def make_signal_s3(df: pd.DataFrame) -> np.ndarray:
     mc = _get(df, "mc").values
     p8 = _get(df, "p8").values
 
-    out[(mc > 0) & (p8 < -0.11)] = 1
-    out[(mc < 0) & (p8 > 0.11)] = -1
+    out[(mc > 0) & (p8 < -0.08)] = 1
+    out[(mc < 0) & (p8 > 0.08)] = -1
     return out
 
 

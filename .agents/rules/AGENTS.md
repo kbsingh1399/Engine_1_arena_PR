@@ -38,7 +38,7 @@ Read: .agents/memory/MEMORY.md
 Read: .agents/memory/session_chat_history.md
 Search: conversation transcript
 ```
-MANDATORY: Append new conversation turns to `.agents/memory/session_chat_history.md`.
+🔴 **STRICT MANDATE FOR EVERY TURN:** You MUST append your final output and the user's prompt to `.agents/memory/session_chat_history.md` at the END of every single response without fail. Failure to append chat history causes irreversible context amnesia. Also review `.agents/rules/Gemini.md`
 
 **Step 3: Load the Fable 5 Checklist (CRITICAL)**
 Because the full Fable 5 checklists exceed context limits, they are stored separately.
@@ -72,3 +72,12 @@ This Kaizen loop ensures that `AGENTS.md` remains a lightweight router, while th
 * **No Observational Verbs**: Removed "I see", "Looking at", "I notice", "Based on my memory".
 * **No Forbidden Bullets**: Is explanatory/conversational content written in prose?
 * **Arena.ai Prompt Protocol**: When generating prompts for Arena.ai, NEVER inject large source code blocks directly. You MUST strictly point to Git references (raw GitHub URLs) so the model fetches the files directly, bypassing character limits.
+
+---
+
+# PART 3: COMMIT & EXECUTION GATES (AGENTIC WORKFLOW)
+
+Before committing any code to git, or declaring a task complete, you MUST execute the following verification loop:
+1. **Ruflo Verification**: You must actively engage the Ruflo bridge/testing tools to verify structural and execution parity. Never commit blindly.
+2. **GEMINI.md Formatting**: You must review `.agents/rules/GEMINI.md` and ensure your output perfectly aligns with the required persona and format (i.e. `[🔓OMNI]` only).
+3. **Execution Over Inspection**: Prove the code works by running it (e.g. `run_all_6.py` or the specific module) rather than just inspecting the text. Only say it is fixed once the local verification loop has passed successfully.

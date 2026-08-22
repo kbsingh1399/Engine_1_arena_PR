@@ -622,7 +622,7 @@ class LiveTradeTracker:
         self.emergency_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="BinanceEmergency")
 
         from engine_components.binance_broker import BinanceBroker
-        binance_live = os.environ.get("BINANCE_LIVE", "1") != "0"
+        binance_live = os.environ.get("BINANCE_LIVE", "0") == "1"
         use_testnet = os.environ.get("BINANCE_USE_TESTNET", "true").lower() == "true"
         
         raw_binance_broker = BinanceBroker(
@@ -673,10 +673,11 @@ class LiveTradeTracker:
                 try:
                     ok = f.result()
                 except Exception as exc:
-                    fail_loud("BROKER_SYNC", exc)
+                    log_live_event(f"Broker task {fn.__name__} raised exception: {exc}", "BROKER_WARN")
+                    return
                 
                 if not ok:
-                    fail_loud("BROKER_SYNC", RuntimeError(f"{fn.__name__} returned False"))
+                    log_live_event(f"Broker task {fn.__name__} returned False.", "BROKER_WARN")
             fut.add_done_callback(_log_done)
         except Exception as exc:
             print(f"[Binance] Failed to submit broker action: {exc}")
@@ -1020,6 +1021,7 @@ class LiveTradeTracker:
                     self.active_trades[trade_id]["needs_manual_attention"] = True
                     self.active_trades[trade_id]["broker_sync_error"] = "UNVERIFIED_OPEN_POSITION"
                     self.active_trades[trade_id]["order_id"] = 0
+                    self.active_trades[trade_id]["in_flight"] = False  # F1: Allow reconciliation to process it
                     log_live_event(f"[CRITICAL] Unverified open position on {symbol} ({strategy}) after SL-attach failure. "
                                    f"Trade kept for reconciliation; dispatching recovery close.", "Binance")
                     self._broker_submit_checked(trade_id, self.broker.close_position, symbol, "UNVERIFIED_RECOVERY")
@@ -1374,7 +1376,17 @@ class LiveTradeTracker:
             ticket = trade.get("order_id")
             if not ticket:
                 if trade.get("broker_sync_error") == "UNVERIFIED_OPEN_POSITION":
-                    # Keep tracking the trade so the orchestrator can continue attempting to resolve it
+                    if hasattr(self.broker, "get_position_state"):
+                        state, amt = self.broker.get_position_state(trade.get("symbol"))
+                        if state == "CLOSED":
+                            stale_ids.append(tid)
+                            log_live_event(f"Resolved UNVERIFIED {trade.get('symbol')} - it is closed on Binance.", "Reconcile")
+                        elif state == "OPEN":
+                            self._broker_submit_checked(tid, self.broker.close_position, trade.get("symbol"), "UNVERIFIED_RECOVERY")
+                            log_live_event(f"Retrying recovery close for UNVERIFIED {trade.get('symbol')}.", "Reconcile")
+                    continue
+                
+                if trade.get("in_flight") or trade.get("is_pending"):
                     continue
 
                 # Finding 2 — Zombie guard: trade has no order_id and is not in_flight.
@@ -1394,7 +1406,12 @@ class LiveTradeTracker:
                 if hasattr(self.broker, "get_position_state"):
                     state, amt = self.broker.get_position_state(trade.get("symbol", ""))
                     if state == "UNKNOWN":
-                        updates[tid] = {"sync_unknown_count": trade.get("sync_unknown_count", 0) + 1}
+                        unknown_count = trade.get("sync_unknown_count", 0) + 1
+                        if unknown_count >= 5:
+                            log_live_event(f"[SYNC] API down for {unknown_count} cycles for {trade.get('symbol')}. Purging.", "Reconcile")
+                            stale_ids.append(tid)
+                        else:
+                            updates[tid] = {"sync_unknown_count": unknown_count}
                         continue
                     if state == "OPEN" and amt != 0.0:
                         continue
@@ -1828,7 +1845,17 @@ class SnapshotStore:
                 atr_val = cached.get('atr_val', 0.0)
                 for strat_name in SIX_STRAT_NAMES.values():
                     atr_dict[strat_name] = atr_val
-            self.trade_tracker.check_exits(symbol, new_snap.price, atr_dict)
+            
+            with self.trade_tracker.lock:
+                has_active = any(t['symbol'] == symbol for t in self.trade_tracker.active_trades.values())
+            
+            if has_active:
+                if hasattr(self.trade_tracker, "broker_executor"):
+                    self.trade_tracker.broker_executor.submit(
+                        self.trade_tracker.check_exits, symbol, new_snap.price, atr_dict
+                    )
+                else:
+                    self.trade_tracker.check_exits(symbol, new_snap.price, atr_dict)
             self.trade_tracker.update_live_pnl(symbol, new_snap.price, self)
 
         if price_fresh and self.predictor:
@@ -5016,6 +5043,7 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
             return ctx, login_done
 
         focus_lock = asyncio.Lock()
+        ctx1 = None
         
         # 1. Initialize TAB_1 context and tab
         ctx1, login_done_1 = await launch_and_login(user_data_dir_1, port1, "TAB_1")
@@ -5143,7 +5171,8 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
                 if elapsed > threshold_sec:
                     consecutive_blocks += 1
                     if consecutive_blocks >= 10:
-                        pass
+                        log_live_event("Event loop lag exceeded threshold for 10 consecutive ticks!", "PERF")
+                        consecutive_blocks = 0
                 else:
                     consecutive_blocks = 0
 
@@ -5289,7 +5318,7 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
             except Exception as e:
                 print(f"[Exit] Executor/ledger shutdown error: {e}")
                 
-            for c in (ctx1, ctx2):
+            for c in (ctx1,):
                 try:
                     if c:
                         await c.close()
