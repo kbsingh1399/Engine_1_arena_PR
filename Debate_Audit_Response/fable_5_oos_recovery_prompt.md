@@ -18,9 +18,14 @@ Here is the log for the failed window before the fix:
 1. **Zero-ATR Position Sizing Bug**: We patched `sim()` in `run_all_6.py` with `if atr < 1e-6: return 0.0...` to prevent infinite unit sizing on dead candles.
 2. **Validation DD Constraint**: We updated `best_thresh` to explicitly enforce `if wr>0 and roi>0 and dd<TDD:` so the ML threshold optimizer penalizes any threshold that yields >30% DD on the validation set.
 
-### Your Mission
-1. Analyze if the above patches are sufficient to guarantee `S1_Liquidation` (and the other 5 strategies) will pass all 20 windows with the new 0.08% RT fee, or if the strategy inherently risks violating the 30% drawdown rule without further modification.
-2. If further modification is needed to the ML features, threshold logic, or position sizing (perhaps scaling risk inversely to volatility?), provide a **direct Python code patch** for `run_all_6.py`.
-3. Give us a master plan to ensure a 100% pass rate across all 20 OOS windows.
+### Your Absolute Mandate
+You are operating in Agentic Mode. Your goal is to guarantee that **ALL 6 STRATEGIES** pass **ALL 20 OOS WINDOWS** under the new `0.08%` RT fee structure. 
 
-Output any modified code block directly.
+1. **Relentless Execution:** Do NOT stop iterating, testing, and modifying the codebase until you have run the tests against the data in the `backtesting_data` folder and verified that 100% of the windows pass for 100% of the strategies.
+2. **Strict Integrity:** 
+   - **No Hallucinations:** Do not guess the results. Run the actual code against the actual Parquet files in `backtesting_data`.
+   - **No Bias or Future Peeking:** Do not curve-fit, overfit, or introduce any look-ahead bias (future leakage) into the Walk-Forward process to artificially pass the windows. 
+3. **Execution Plan:** 
+   - Analyze if our local patches are sufficient to guarantee survival. 
+   - If a strategy fails any window, rewrite the ML features, threshold logic, or position sizing in `run_all_6.py` to fix it. 
+   - Output the finalized, battle-tested Python code patches directly once you have mathematically proven they pass.
