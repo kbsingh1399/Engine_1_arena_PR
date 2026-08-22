@@ -42,7 +42,7 @@ TRAIL_ATR = 0.8
 SL_MULT = 1.0
 MAX_BARS = 288       # 72 hours of 15m bars
 RISK_PCT = 0.004     # 0.4% per trade (matches RSK=20 on $5000)
-FEE_PCT = 2 * float(os.environ.get("ENGINE_FEE_PER_SIDE", "0.0004"))  # Round-trip fee (centralized)
+from risk_config import FEE_RT as FEE_PCT
 
 SYMBOLS = [
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT',
@@ -146,12 +146,8 @@ def featurize(df, btc_ref=None):
             df['btc_CVD'] = df['btc_CVD'].ffill().bfill().fillna(0)
 
     # PARITY FIX: True Range / ATR must match run_all_6.py exactly
-    prev_close = df['Close'].shift(1)
-    tr1 = df['High'] - df['Low']
-    tr2 = (df['High'] - prev_close).abs()
-    tr3 = (df['Low'] - prev_close).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    df["atr"] = tr.rolling(14, min_periods=1).mean()
+    from signals_shared import atr
+    df["atr"] = atr(df, 14)
 
     # CVD features
     if 'CVD' in df.columns:

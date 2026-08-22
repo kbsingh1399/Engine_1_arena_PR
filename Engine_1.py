@@ -56,6 +56,16 @@ from playwright.async_api import async_playwright, Page, BrowserContext
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(base_dir, "engine_components"))
+sys.path.insert(0, base_dir)
+
+from engine_components.fail_loud import fail_loud, HALT_FLAG
+if HALT_FLAG.exists():
+    print(f"FATAL BOOT: HALT_FLAG exists: {HALT_FLAG.read_text()}")
+    sys.exit(1)
+
+from risk_config import FEE_RT as ENGINE_FEE_RT, assert_fee_parity
+assert_fee_parity()
+
 load_dotenv(os.path.join(base_dir, ".env"))
 load_dotenv(os.path.join(base_dir, "..", ".env"))
 
@@ -182,8 +192,7 @@ _raw_risk_pct = float(os.environ.get("ENGINE_RISK_PCT", "0.004"))
 ENGINE_RISK_PCT = min(max(_raw_risk_pct, 0.0001), 0.02) if _raw_risk_pct > 0 else 0.004
 ENGINE_RISK_USD = max(float(os.environ.get("ENGINE_RISK_USD", "20.0")), 1.0)
 BINANCE_LIVE = os.environ.get("BINANCE_LIVE", "0") == "1"
-ENGINE_FEE_PER_SIDE = float(os.environ.get("ENGINE_FEE_PER_SIDE", "0.0004"))  # 0.04% per side
-ENGINE_FEE_RT = ENGINE_FEE_PER_SIDE * 2  # 0.08% round-trip
+# ENGINE_FEE_RT is imported from risk_config
 
 # Strategy identity constants (used by Engine1TradeTracker cooldown logic)
 ACTIVE_STRATEGY = os.environ.get("ACTIVE_STRATEGY", "ml_alpha_squeezer")
@@ -617,16 +626,10 @@ class LiveTradeTracker:
                 try:
                     ok = f.result()
                 except Exception as exc:
-                    ok = False
-                    print(f"[Binance] Async broker call {fn.__name__} failed: {exc}")
+                    fail_loud("BROKER_SYNC", exc)
                 
                 if not ok:
-                    with self.lock:
-                        tr = self.active_trades.get(trade_id)
-                        if tr:
-                            tr["broker_sync_error"] = f"{fn.__name__}_FAILED"
-                            tr["needs_manual_attention"] = True
-                            print(f"[Binance] SL modify failed for {trade_id}! Trade tagged for manual attention.")
+                    fail_loud("BROKER_SYNC", RuntimeError(f"{fn.__name__} returned False"))
             fut.add_done_callback(_log_done)
         except Exception as exc:
             print(f"[Binance] Failed to submit broker action: {exc}")
@@ -754,7 +757,8 @@ class LiveTradeTracker:
                     json.dump(envelope, f, indent=4)
                 os.replace(tmp, log_file)
             except Exception as e:
-                pass
+                from engine_components.fail_loud import fail_loud
+                fail_loud(f"Ledger write failed in background thread: {e}")
 
         with self.lock:
             try:
@@ -780,13 +784,8 @@ class LiveTradeTracker:
                 t.daemon = True
                 t.start()
             except Exception as e:
-                global pipeline_health
-                if 'pipeline_health' not in globals():
-                    pipeline_health = {"ledger_write_failures": 0}
-                else:
-                    pipeline_health["ledger_write_failures"] = pipeline_health.get("ledger_write_failures", 0) + 1
-                print(f"[TradeTracker] [CRITICAL] save_history FAILED — ledger may be stale: {e}")
-                log_live_event(f"Ledger persistence failure: {e}", "CRITICAL")
+                from engine_components.fail_loud import fail_loud
+                fail_loud(f"Failed to spawn save_history thread: {e}")
 
     def update_day(self) -> None:
         with self.lock:

@@ -13,24 +13,21 @@ import os,sys,gc,json,time,warnings; warnings.filterwarnings('ignore')
 from pathlib import Path; from datetime import datetime; import numpy as np; import pandas as pd
 from numba import njit
 # FIX (Fable5-4.1): Import canonical signal definitions from shared module.
-# run_all_6 and live_unified_predictor now share one source of truth.
-try:
-    from signals_shared import STRAT_MAP as _SHARED_STRAT_MAP
-    _USE_SHARED = True
-except ImportError:
-    _USE_SHARED = False  # Fallback: local definitions used (see below)
+from signals_shared import STRAT_MAP, atr
+STRATS = list(STRAT_MAP.items())
 
 os.environ.update({k:"2" for k in ["OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS","NUMEXPR_NUM_THREADS"]})
 ROOT=Path('.'); DATA=ROOT/'backtesting_data'
 SYMBOLS=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT","AVAXUSDT","DOGEUSDT","DOTUSDT","LINKUSDT","LTCUSDT","NEARUSDT","SUIUSDT","TRXUSDT"]
 MONTHS=[("2020-03-18","2020-04-18"),("2020-11-07","2020-12-07"),("2021-01-24","2021-02-24"),("2021-06-13","2021-07-13"),("2021-10-29","2021-11-29"),("2022-02-08","2022-03-08"),("2022-05-21","2022-06-21"),("2022-09-14","2022-10-14"),("2022-12-03","2023-01-03"),("2023-04-17","2023-05-17"),("2023-08-25","2023-09-25"),("2023-11-10","2023-12-10"),("2024-02-19","2024-03-19"),("2024-07-06","2024-08-06"),("2024-10-28","2024-11-28"),("2025-01-15","2025-02-15"),("2025-05-03","2025-06-03"),("2025-09-22","2025-10-22"),("2026-02-11","2026-03-11"),("2026-06-09","2026-07-09")]
 
-# FEE CHANGE: 0.0015 -> 0.0020 (realistic slippage on 15m entries in volatile crypto)
-CAP=5000; RSK=20; FEE=0.0020; TWR=40; TROI=20; TDD=30; MINTR=6; TP=5.0; TRA=0.8; MAXTR=50
+# FEE CHANGE: Unified via risk_config (F-03 Parity)
+from risk_config import FEE_RT as FEE, CAP, RSK, TWR, TROI, TDD, MINTR, TP, TRA, MAXTR
 def log(m): print(f"[{datetime.now().strftime('%H:%M:%S')}] {m}",flush=True)
 
 @njit(fastmath=True,nogil=True)
 def sim(h,l,c,entry_idx,entry,atr,dr):
+    if atr < 1e-6: return 0.0, 0.0, 0.0, 0.0, 0.0
     n=len(c); sd=atr; td=TP*atr; trd=TRA*atr
     st=entry-sd if dr==1 else entry+sd; cs=st; bp=entry; ns=st
     mx=min(entry_idx+288+1,n); ep=c[mx-1]; bh=mx-1-entry_idx
@@ -108,7 +105,7 @@ def featurize(df,br=None):
         cj=[c for c in br.columns if c not in df.columns]
         if cj: df=df.join(br[cj],how="left")
         if "btc_CVD" in df.columns: df["btc_CVD"]=df["btc_CVD"].ffill().bfill().fillna(0)
-    df["atr"]=(df["High"]-df["Low"]).rolling(14,min_periods=1).mean()
+    df["atr"]=atr(df, 14)
     if "CVD" in df.columns:
         df["cvd_d"]=df["CVD"].diff(5)
         for k in [4,10,20]: df[f"zc{k}"]=zs(df["CVD"],k)
@@ -147,95 +144,7 @@ def featurize(df,br=None):
     return df
 
 # ======== 6 STRATEGY SIGNAL FUNCTIONS (PATCHED) ========
-
-def make_signal_s1(df):
-    """S1: Trend pullback + liquidation confirmation (UNCHANGED)"""
-    out=np.zeros(len(df),dtype=np.int32)
-    ll=df.get("liql",pd.Series(0,index=df.index)).values
-    ls=df.get("liqs",pd.Series(0,index=df.index)).values
-    llm=df.get("liqlm",pd.Series(0,index=df.index)).values
-    lsm=df.get("liqsm",pd.Series(0,index=df.index)).values
-    mc=df.get("mc",pd.Series(0,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    zc20=df.get("zc20",pd.Series(0,index=df.index)).values
-    mask_l=(mc>0)&(p8<-0.12)&((ll>llm*1.2)|(zc20>0.1))
-    out[mask_l]=1
-    mask_s=(mc<0)&(p8>0.12)&((ls>lsm*1.2)|(zc20<-0.1))
-    out[mask_s]=-1
-    return out
-
-def make_signal_s2(df):
-    """S2: Deep Pure Trend (Replaced CVD logic)
-    
-    Now: extremely deep trend pullback (p8 < -0.20) to offset fee
-    """
-    out=np.zeros(len(df),dtype=np.int32)
-    mc=df.get("mc",pd.Series(0,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    out[(mc>0)&(p8<-0.20)]=1
-    out[(mc<0)&(p8>0.20)]=-1
-    return out
-
-def make_signal_s3(df):
-    """S3: Pure trend pullback (Deepened)
-    
-    Now: requires deeper pullback (p8 < -0.10) to offset fee
-    """
-    out=np.zeros(len(df),dtype=np.int32)
-    mc=df.get("mc",pd.Series(0,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    out[(mc>0)&(p8<-0.10)]=1; out[(mc<0)&(p8>0.10)]=-1
-    return out
-
-def make_signal_s4(df):
-    """S4: RSI mean reversion (UNCHANGED)"""
-    out=np.zeros(len(df),dtype=np.int32)
-    r=df.get("rsi",pd.Series(50,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    out[(r<35)&(p8<-0.5)]=1; out[(r>65)&(p8>0.5)]=-1
-    return out
-
-def make_signal_s5(df):
-    """S5: Vol Breakout — trend pullback core + vol bonus (UNCHANGED)"""
-    out=np.zeros(len(df),dtype=np.int32)
-    mc=df.get("mc",pd.Series(0,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    vr=df.get("vr",pd.Series(0,index=df.index)).values
-    zc20=df.get("zc20",pd.Series(0,index=df.index)).values
-    rsi=df.get("rsi",pd.Series(50,index=df.index)).values
-    mask_l_core=(mc>0)&(p8<-0.2)
-    mask_s_core=(mc<0)&(p8>0.2)
-    mask_l_bonus=(mc>0)&(p8<-0.1)&(vr>1.5)&(zc20>0.15)&(rsi>25)&(rsi<75)
-    mask_s_bonus=(mc<0)&(p8>0.1)&(vr>1.5)&(zc20<-0.15)&(rsi>25)&(rsi<75)
-    out[mask_l_core|mask_l_bonus]=1
-    out[mask_s_core|mask_s_bonus]=-1
-    return out
-
-def make_signal_s6(df):
-    """S6: OI Coherence — trend pullback core + OI/CVD bonus (UNCHANGED)"""
-    out=np.zeros(len(df),dtype=np.int32)
-    mc=df.get("mc",pd.Series(0,index=df.index)).values
-    p8=df.get("p8",pd.Series(0,index=df.index)).values
-    oicc=df.get("oicc",pd.Series(0,index=df.index)).values
-    zc20=df.get("zc20",pd.Series(0,index=df.index)).values
-    mask_l_core=(mc>0)&(p8<-0.2)
-    mask_s_core=(mc<0)&(p8>0.2)
-    mask_l_bonus=(mc>0)&(p8<-0.1)&(oicc!=0)&(oicc>0.2)&(zc20>0.1)
-    mask_s_bonus=(mc<0)&(p8>0.1)&(oicc!=0)&(oicc<-0.2)&(zc20<-0.1)
-    out[mask_l_core|mask_l_bonus]=1
-    out[mask_s_core|mask_s_bonus]=-1
-    return out
-
-# FIX (Fable5-4.1): Use shared signal definitions if available, else keep local copies
-# so this file continues to work standalone (e.g. on Colab without signals_shared.py).
-if _USE_SHARED:
-    STRATS = list(_SHARED_STRAT_MAP.items())
-else:
-    STRATS=[
-        ("S1_Liquidation",make_signal_s1),("S2_CVD_Momentum",make_signal_s2),
-        ("S3_Trend_Follow",make_signal_s3),("S4_Mean_Reversion",make_signal_s4),
-        ("S5_Vol_Breakout",make_signal_s5),("S6_OI_Coherence",make_signal_s6),
-    ]
+# All signals deleted and imported from signals_shared.py
 
 import lightgbm as lgb
 try:
@@ -274,12 +183,12 @@ def pred(models,fcs,tdf):
 
 def best_thresh(pdf):
     best=None; best_score=-1e9
-    for p in np.arange(0.50,0.92,0.02):
+    for p in np.arange(0.51,0.92,0.02): # FIX (BT-02): Prevent 0.50 baseline
         c=pdf[pdf['prob']>=p]; n=len(c)
         if n<MINTR: continue
         nw=(c['net_pnl']>0).sum(); wr=(nw/n)*100; tp=c['net_pnl'].sum(); roi=(tp/CAP)*100
         eq=CAP+c['net_pnl'].cumsum(); dd=((eq.cummax()-eq)/eq.cummax()*100).max()
-        if wr>0 and roi>-20 and dd<100:
+        if wr>0 and roi>0 and dd<TDD:
             score=roi*(wr/100)/max(dd,0.1)*np.log1p(n)
             if score>best_score: best=p; best_score=score
     return best if best is not None else 0.55
@@ -315,7 +224,11 @@ def run_one(name,mksig):
                 # Funding cost: positions pay funding when sign(direction)==sign(funding)
                 # Positive funding = longs pay shorts; dr==1 means long
                 funding_bars = max(0, int(bh))
-                funding_cost = abs(avg_fr) / 32.0 * entry_price_approx * units_approx * funding_bars
+                # FIX (F-04): Directional funding logic
+                if (dr == 1 and avg_fr > 0) or (dr == -1 and avg_fr < 0):
+                    funding_cost = abs(avg_fr) / 32.0 * entry_price_approx * units_approx * funding_bars
+                else:
+                    funding_cost = -abs(avg_fr) / 32.0 * entry_price_approx * units_approx * funding_bars
                 net = net - funding_cost
                 r = net / RSK
                 lb = 1.0 if net > 0 else 0.0

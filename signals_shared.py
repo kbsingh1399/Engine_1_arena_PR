@@ -25,6 +25,17 @@ def _get(df: pd.DataFrame, col: str, default=0.0) -> "pd.Series":
         return df[col]
     return pd.Series(default, index=df.index)
 
+def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """True-Range ATR. THE ONLY ATR definition in the codebase."""
+    prev_close = df["Close"].shift(1).fillna(df["Open"])
+    tr = pd.concat([
+        df["High"] - df["Low"],
+        (df["High"] - prev_close).abs(),
+        (df["Low"] - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    return tr.rolling(period, min_periods=1).mean().replace(0, 1e-6)
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STRATEGY 1: Trend Pullback + Liquidation Confirmation
@@ -165,3 +176,4 @@ STRATS = [
 ]
 
 STRAT_MAP = {name: fn for name, fn in STRATS}
+SIX_STRAT_NAMES = list(STRAT_MAP.keys())

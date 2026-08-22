@@ -94,7 +94,8 @@ def patch_engine():
                     json.dump(envelope, f, indent=4)
                 os.replace(tmp, log_file)
             except Exception as e:
-                pass
+                from engine_components.fail_loud import fail_loud
+                fail_loud(f"Ledger write failed in background thread: {e}")
 
         with self.lock:
             try:
