@@ -143,6 +143,8 @@ import concurrent.futures
 # Dedicated thread pools — prevents ML predictor tasks from starving the renderer
 ML_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="ML")
 RENDER_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="Renderer")
+IO_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="DiskIO")
+API_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=5, thread_name_prefix="BinanceAPI")
 
 # Reconfigure sys.stdout and sys.stderr to use UTF-8 encoding to prevent UnicodeEncodeError on Windows
 try:
@@ -1561,7 +1563,8 @@ class SnapshotStore:
     def __init__(self, symbols: List[str], predictor=None, trade_tracker: Any = None):
         self.normalizer = CoinglassNormalizer()
         self._data: Dict[str, AssetSnapshot] = {s: AssetSnapshot(symbol=s) for s in symbols}
-        self._locks = {s: asyncio.Lock() for s in symbols}
+        import threading
+        self._locks = {s: threading.RLock() for s in symbols}
         self._seq = 0
         self.predictor = predictor
         self.trade_tracker = trade_tracker
@@ -1632,7 +1635,7 @@ class SnapshotStore:
             return
         if not patch:
             return
-        async with self._locks[symbol]:
+        with self._locks[symbol]:
             cur = self._data[symbol]
             clean_patch = {}
             _now_sec = time.time()
@@ -1947,7 +1950,7 @@ class BinanceTradePriceWebSocketFeed:
                 import urllib.request, json
                 with urllib.request.urlopen("https://fapi.binance.com/fapi/v1/time", timeout=3) as r:
                     return json.loads(r.read().decode())["serverTime"]
-            server_time = await loop.run_in_executor(None, _fetch_time)
+            server_time = await loop.run_in_executor(API_POOL, _fetch_time)
             self.clock_offset_ms = (time.time() * 1000) - server_time
         except Exception:
             self.clock_offset_ms = 0.0
@@ -4372,7 +4375,7 @@ async def renderer_loop(store: SnapshotStore, stop: asyncio.Event) -> None:
                                 f.write(txt)
                         except Exception as e:
                             print(f"[WARN] Swallowed exception: {e}")
-                    await asyncio.to_thread(_write_debug, snap)
+                    asyncio.create_task(_loop.run_in_executor(IO_POOL, _write_debug, snap))
                 except Exception as e:
                     print(f"[WARN] Swallowed exception: {e}")
 
@@ -4454,10 +4457,10 @@ async def watchdog(components: List[Any], focus_lock: asyncio.Lock, stop: asynci
             try:
                 now = time.time_ns()
                 for c in components:
-                    if hasattr(c, 'last_heartbeat_ns') and now - c.last_heartbeat_ns > 120_000_000_000:
+                    if hasattr(c, 'last_heartbeat_ns') and now - c.last_heartbeat_ns > 30_000_000_000:
                         if getattr(c, 'skip_watchdog', False) or getattr(c, 'is_seeding', False):
                             continue
-                        log_live_event(f"Subsystem '{c.__class__.__name__}' ({getattr(c, 'tab_id', 'Unknown')}) hung >120s.", "WDog")
+                        log_live_event(f"Subsystem '{c.__class__.__name__}' ({getattr(c, 'tab_id', 'Unknown')}) hung >30s.", "WDog")
                         if isinstance(c, CoinglassTab):
                             log_live_event(f"Attempting soft reload recovery for '{c.tab_id}'...", "WDog")
                             try:
@@ -4735,7 +4738,7 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
     
     # Load cached history from disk (full 800 candles window)
     import asyncio
-    await asyncio.to_thread(predictor.load_history_from_disk, 800)
+    await asyncio.get_event_loop().run_in_executor(IO_POOL, predictor.load_history_from_disk, 800)
     print(f"[Setup] Six-Strategy Predictor initialized with {len(predictor.models)} model sets")
     
     # Drift detector dry-run mode: log blocks instead of enforcing (24h calibration)
@@ -5071,7 +5074,7 @@ async def main(skip_seed: bool = True, skip_train: bool = False, skip_login: boo
                     tracker.update_day()
                     # Non-blocking Binance position sync (prevents order-tracking drift)
                     if hasattr(tracker, "reconcile_with_broker"):
-                        await asyncio.to_thread(tracker.reconcile_with_broker)
+                        await asyncio.get_event_loop().run_in_executor(API_POOL, tracker.reconcile_with_broker)
                 except Exception as ex:
                     log_live_event(f"Rollover watchdog failed: {ex}", "WDog")
                 await asyncio.sleep(30.0)  # tighter sync cadence for exit safety

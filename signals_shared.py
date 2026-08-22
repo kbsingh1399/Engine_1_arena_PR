@@ -85,15 +85,15 @@ def make_signal_s2(df: pd.DataFrame) -> np.ndarray:
 # ─────────────────────────────────────────────────────────────────────────────
 def make_signal_s3(df: pd.DataFrame) -> np.ndarray:
     """
-    S3_Trend_Follow: Moderate pullback (p8 < -0.10) in trend direction.
+    S3_Trend_Follow: Moderate pullback (p8 < -0.11) in trend direction.
     No RSI filter — that was a live-only deviation not present in backtest.
     """
     out = np.zeros(len(df), dtype=np.int32)
     mc = _get(df, "mc").values
     p8 = _get(df, "p8").values
 
-    out[(mc > 0) & (p8 < -0.10)] = 1
-    out[(mc < 0) & (p8 > 0.10)] = -1
+    out[(mc > 0) & (p8 < -0.11)] = 1
+    out[(mc < 0) & (p8 > 0.11)] = -1
     return out
 
 
