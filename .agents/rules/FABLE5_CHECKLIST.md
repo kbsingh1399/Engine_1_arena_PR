@@ -156,3 +156,7 @@ Scan available skills in `.agents/skills/` before coding.
 15-Word Hard Ceiling for quotes.
 ### 8.6 Chrome 136+ Debug Profile Launch Protocol (CDP Standard)
 Use fresh isolated profile dir `C:\ChromeDebugFresh`, launch with `--user-data-dir=$profileDir --remote-debugging-port=19333`. Never copy `Default\` dir. User logs in manually. Use `websocket-client` directly for raw CDP connection if Playwright fails.
+
+### 2.4 OMNI Protocol & Kaizen Enforcement
+- [ ] Did the agent maintain the strict OMNI dual-response format ([??CLASSIC] / [??OMNI]) as mandated by GEMINI.md?
+- [ ] Was the Kaizen Verification Loop executed at the end of the task, regardless of whether it was a code edit or a chat response?
