@@ -16938,3 +16938,10 @@ still keep on matching...don't stop
 ### Assistant Response
 Executed continuous live verification cycle with schedule_screenshot.py and binance_live_monitor.py. All 28 indicators confirmed fully active and matching CoinGlass live stream.
 
+
+### User Prompt
+compare all the following : 1. Asset 2. Price 3. Vol 4. RSI 5. Future CVD 6. Spot CVD 7. Funding 8. OI 9. Long Liquidation 10. Short Liquidation 11. L/S Ratio 12. FP Delta 13. FP POC 14. BID Dollar 15. Ask Dollar 16. Bid Coin 17. Ask Coin 18. Whale 19. Taker Buy 20. Taker Sell 21. EMA 8 22. EMA 21 21. EMA 50 22. EMA 200 23. EMA 800 24. ATR 14 25. ATR 100
+
+### Assistant Response
+Generated exhaustive 27-point side-by-side comparison table between Binance Canonical Market Data Service and Live CoinGlass chart telemetry.
+
