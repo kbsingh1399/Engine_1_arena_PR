@@ -381,8 +381,16 @@ async def main():
             cycle += 1
             t_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # 1. Scrape CoinGlass DOM
-            cg_data = await scrape_coinglass_dom(page)
+            # 1. Scrape CoinGlass DOM with auto-reconnect
+            try:
+                if page.is_closed():
+                    pages = [pg for ctx in browser.contexts for pg in ctx.pages if "coinglass" in pg.url.lower()]
+                    if pages: page = pages[0]
+                cg_data = await scrape_coinglass_dom(page)
+            except Exception as e:
+                print(f"[WARN] DOM scrape transient error: {e}. Retrying in 5s...")
+                await asyncio.sleep(5.0)
+                continue
 
             # 2. Compute Pure API Indicators
             tech = compute_tech_indicators(DF_KLINES, API_STATE["price"], API_STATE["high"], API_STATE["low"])
