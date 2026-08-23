@@ -17061,3 +17061,10 @@ what is this data? (Screenshot of /futures/data/topLongShortPositionRatio)
 ### Assistant Response
 Explained Binance Futures Top Trader Long/Short Position Ratio API payload and its role as the Whale Index in CoinGlass.
 
+
+### User Prompt
+wss://fstream.binance.com/ws/!forceOrder@arr is down, then how does coinglass take that data
+
+### Assistant Response
+Clarified ERR_UNKNOWN_URL_SCHEME in browser and detailed CoinGlass WebSocket infrastructure for liquidation feeds.
+
