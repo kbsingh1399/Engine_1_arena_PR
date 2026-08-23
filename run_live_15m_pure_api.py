@@ -44,45 +44,43 @@ from rich import box
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LIVE_TXT_PATH = os.path.join(BASE_DIR, "live_data", "pure_api_live_27_params.txt")
-PARQUET_PATH = os.path.join(BASE_DIR, "Backtesting_Training_Data", "Master_BTCUSDT_15m_Final_Summary.parquet")
 os.makedirs(os.path.join(BASE_DIR, "live_data"), exist_ok=True)
 
-# 1. Warmup Baseline Alignment
-# Live CoinGlass Screenshot Reference Anchor (2026-08-23 17:09 IST)
+# 1. Warmup Baseline Alignment (Updated to latest live candle state)
 ANCHOR = {
-    "price": 77299.90,
+    "price": 77293.20,
     "open": 77161.20,
-    "high": 77350.00,
+    "high": 77400.00,
     "low": 77127.40,
-    "close": 77299.90,
-    "volume_sma9": 88.122e6,
-    "rsi_14": 70.24,
-    "fut_cvd": 65877.0,
-    "spot_cvd": 7303.0,
-    "funding_rate": 0.00009618,
-    "oi": 126727.0,
+    "close": 77293.20,
+    "volume_sma9": 147.57e6,
+    "rsi_14": 70.32,
+    "fut_cvd": 66039.0,
+    "spot_cvd": 7337.0,
+    "funding_rate": 0.00009626,
+    "oi": 126752.0,
     "liq_long": 10491.0,
-    "liq_short": -45280.0,
+    "liq_short": -507421.0,  # Updated to exact active 15m candle short liquidation total
     "ls_ratio": 1.0450,
-    "fp_delta": 3724.0,
-    "fp_poc": 77299.90,
-    "bid_dollar": 153.394e6,
-    "ask_dollar": -140.760e6,
-    "bid_coin": 1996.0,
-    "ask_coin": -1828.0,
+    "fp_delta": 4598.0,
+    "fp_poc": 77293.20,
+    "bid_dollar": 159.888e6,
+    "ask_dollar": -144.116e6,
+    "bid_coin": 2077.0,
+    "ask_coin": -1848.0,
     "whale_index": 106.975,
-    "taker_buy": 14054.0,
-    "taker_sell": -10330.0,
-    "ema_8": 76920.60,
-    "ema_21": 76698.70,
-    "ema_50": 76735.60,
-    "ema_200": 76309.40,
+    "taker_buy": 22171.0,
+    "taker_sell": -17573.0,
+    "ema_8": 76919.10,
+    "ema_21": 76698.10,
+    "ema_50": 76735.30,
+    "ema_200": 76309.30,
     "ema_800": 70835.80,
-    "atr_14": 237.30,
-    "atr_100": 278.40
+    "atr_14": 240.90,
+    "atr_100": 278.90
 }
 
-# Live Active State (initialized directly from calibrated live anchor)
+# Live Active State
 STATE = {
     "asset": "BTCUSDT",
     "price": ANCHOR["price"],
@@ -164,7 +162,7 @@ async def binance_futures_ws_listener():
                         k = d.get("k", {})
                         t_open = int(k.get("t", 0))
                         
-                        # Reset bar liquidations and volumes on new 15m candle bar
+                        # When a new 15m candle bar starts, reset bar liquidations to 0.0
                         if STATE["current_bar_open_time"] != 0 and t_open != STATE["current_bar_open_time"]:
                             STATE["liq_long"] = 0.0
                             STATE["liq_short"] = 0.0
@@ -245,7 +243,7 @@ async def binance_spot_ws_listener():
                     qty = float(t.get("q", 0.0))
                     is_buyer_maker = t.get("m", False)
                     delta = -qty if is_buyer_maker else qty
-                    STATE["spot_cvd"] += delta * 0.005  # real-time incremental spot CVD
+                    STATE["spot_cvd"] += delta * 0.005
         except (asyncio.CancelledError, KeyboardInterrupt):
             break
         except Exception:
