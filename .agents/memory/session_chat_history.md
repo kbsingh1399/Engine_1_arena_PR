@@ -17131,3 +17131,10 @@ are we considering all usdt, usdm and usd p etc aLSO all values should be live f
 ### Assistant Response
 Clarified exact instrument coverage across USD?-M (USDT/USDC) and COIN-M (BTCUSD_PERP), verified total OI aggregation, fixed terminal live refresh with os.system('cls'), and reviewed official Binance Developer Catalog specs.
 
+
+### User Prompt
+not just Binance Developer Docs (https://developers.binance.com/en): but all it's sub pages..each directory...read and abosro
+
+### Assistant Response
+Provided exhaustive architectural decomposition and deep dive into every Binance Developer Catalog directory across USD?-M (/fapi), COIN-M (/dapi), Spot (/api/v3), Portfolio Margin (/papi), WebSocket Streams, WebSocket API, Authentication & Signing, and Order Execution Engine.
+
