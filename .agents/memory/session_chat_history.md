@@ -17033,3 +17033,10 @@ Reviewed and internalized the 4-part Liquidation Cascade Mathematical Framework 
 ### Assistant Response
 Resolved display latency by directly piping sub-millisecond aggTrade execution ticks into KlineState (apply_trade_tick), increasing volume display precision to 3 decimals (.706M), and accelerating terminal refresh to 2 seconds.
 
+
+### User Prompt
+and Aggregated Futures and SPOT CVD since when?
+
+### Assistant Response
+Detailed exact CVD accumulation time horizons: Futures CVD accumulates across an 850-bar (8.85 days) continuous baseline (~+67.5K BTC), while Spot CVD accumulates across a 500-bar (5.21 days) continuous baseline (~+5.4K BTC), both continuing live tick-by-tick without resets.
+
