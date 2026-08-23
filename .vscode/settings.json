@@ -1,0 +1,31 @@
+{
+    "files.watcherExclude": {
+        "**/backtesting_data/**": true,
+        "**/Backtesting_Training_Data/**": true,
+        "**/downloads/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/logs/**": true,
+        "**/live_data/*.txt": true,
+        "**/live_data/*.json": true,
+        "**/session-*.md": true
+    },
+    "search.exclude": {
+        "**/backtesting_data": true,
+        "**/Backtesting_Training_Data": true,
+        "**/downloads": true,
+        "**/logs": true,
+        "**/session-*.md": true
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+    "editor.maxTokenizationLineLength": 5000,
+    "workbench.editor.restoreViewState": false
+}
