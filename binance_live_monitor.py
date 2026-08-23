@@ -79,6 +79,8 @@ class AggTradeSnapshot:
     quality: DataQuality
     session_cvd: float
     cvd_24h: float
+    candle_buy_btc: float
+    candle_sell_btc: float
     fp_delta: float
     fp_poc: Optional[float]
 
@@ -86,6 +88,9 @@ class AggTradeSnapshot:
 class SpotAggTradeSnapshot:
     quality: DataQuality
     session_cvd: float
+    candle_buy_btc: float
+    candle_sell_btc: float
+    candle_delta_btc: float
 
 @dataclass(frozen=True)
 class KlineSnapshot:
@@ -383,10 +388,15 @@ class AggTradeState:
 
     @property
     def snapshot(self) -> AggTradeSnapshot:
+        now_cts = (int(time.time() * 1000) // 900000) * 900000
+        buy = self.candle_buy_btc if now_cts == self.current_candle_ts else 0.0
+        sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
         return AggTradeSnapshot(
             quality=self.quality,
             session_cvd=self.session_cvd,
             cvd_24h=self.cvd_24h,
+            candle_buy_btc=buy,
+            candle_sell_btc=sell,
             fp_delta=self.fp_delta,
             fp_poc=self.profile.poc
         )
@@ -599,33 +609,53 @@ class KlineState:
 class SpotAggTradeState:
     """
     Running session CVD from spot BTCUSDT aggTrade stream.
-    No candle reset — accumulates from service start.
+    Also tracks 15m candle Taker Buy, Taker Sell, and Candle Delta matching CoinGlass.
     """
     def __init__(self):
+        self.current_candle_ts = 0
+        self.candle_buy_btc = 0.0
+        self.candle_sell_btc = 0.0
         self.session_cvd = 0.0   # BTC net (buy - sell) since session start
         self.quality = DataQuality.PARTIAL
         self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
         self._first_trade_seen = False
 
-    async def apply(self, qty_str, is_buyer_maker, agg_id=None):
+    async def apply(self, qty_str, is_buyer_maker, agg_id=None, ts_ms=None):
+        if ts_ms is None:
+            ts_ms = int(time.time() * 1000)
+        cts = (ts_ms // 900000) * 900000
         async with self._lock:
             if not self._first_trade_seen:
                 self._first_trade_seen = True
                 self.quality = DataQuality.CANONICAL
+            if self.current_candle_ts == 0:
+                self.current_candle_ts = cts
+            elif cts != self.current_candle_ts:
+                self.current_candle_ts = cts
+                self.candle_buy_btc = self.candle_sell_btc = 0.0
+
             qty = float(qty_str)
             if is_buyer_maker:
+                self.candle_sell_btc += qty
                 self.session_cvd -= qty
             else:
+                self.candle_buy_btc += qty
                 self.session_cvd += qty
             if agg_id:
                 self.last_aggregate_trade_id = agg_id
 
     @property
     def snapshot(self) -> SpotAggTradeSnapshot:
+        now_cts = (int(time.time() * 1000) // 900000) * 900000
+        buy = self.candle_buy_btc if now_cts == self.current_candle_ts else 0.0
+        sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
         return SpotAggTradeSnapshot(
             quality=self.quality,
-            session_cvd=self.session_cvd
+            session_cvd=self.session_cvd,
+            candle_buy_btc=buy,
+            candle_sell_btc=sell,
+            candle_delta_btc=buy - sell
         )
 
 
@@ -1026,7 +1056,11 @@ async def compute_snapshot(seq_id):
                 "rsi":        fv(kl_snap.rsi, kq),
                 "future_cvd": fv(fcv_24h, fcvd_q),
                 "future_cvd_session": fv(agg_snap.session_cvd, fcvd_q),
+                "fut_buy_15m": fv(agg_snap.candle_buy_btc, agg_snap.quality),
+                "fut_sell_15m":fv(agg_snap.candle_sell_btc, agg_snap.quality),
                 "spot_cvd":   fv(scvd, scvd_q),
+                "spot_buy_15m":fv(spot_agg_snap.candle_buy_btc, spot_agg_snap.quality),
+                "spot_sell_15m":fv(spot_agg_snap.candle_sell_btc, spot_agg_snap.quality),
                 "funding_pct":fv(funding, mp_q),
                 "basis":      fv(basis, mp_q),
                 "oi_k":       fv(oi_k),
@@ -1119,10 +1153,17 @@ async def terminal_observer_loop():
         vol_str = f"{bar_vol} (SMA9:{sma9})"
         lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
-        lines.append(R(" 5","FUT CVD 24H", f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "24h Rolling Futures CVD"))
-        if f.get('future_cvd_session') and f['future_cvd_session'].value is not None:
-            lines.append(R(" 5b","FUT CVD SES", f"{f['future_cvd_session'].value/1e3:+.3f}K", f['future_cvd_session'].quality, "Session Futures CVD"))
-        lines.append(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
+        
+        fut_ses = f"{f['future_cvd_session'].value/1e3:+.3f}K" if f.get('future_cvd_session') and f['future_cvd_session'].value is not None else "N/A"
+        fut_buy = f"{f['fut_buy_15m'].value:.1f}" if f.get('fut_buy_15m') and f['fut_buy_15m'].value is not None else "0.0"
+        fut_sell = f"{f['fut_sell_15m'].value:.1f}" if f.get('fut_sell_15m') and f['fut_sell_15m'].value is not None else "0.0"
+        lines.append(R(" 5","FUT CVD",      f"{fut_ses} [+{fut_buy}/-{fut_sell}B]", f['future_cvd_session'].quality if f.get('future_cvd_session') else f['future_cvd'].quality, "Session [15m Buy/Sell]"))
+        
+        spot_ses = f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A"
+        spot_buy = f"{f['spot_buy_15m'].value:.1f}" if f.get('spot_buy_15m') and f['spot_buy_15m'].value is not None else "0.0"
+        spot_sell = f"{f['spot_sell_15m'].value:.1f}" if f.get('spot_sell_15m') and f['spot_sell_15m'].value is not None else "0.0"
+        lines.append(R(" 6","SPOT CVD",     f"{spot_ses} [+{spot_buy}/-{spot_sell}B]",f['spot_cvd'].quality, "Session [15m Buy/Sell]"))
+        
         lines.append(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
         lines.append(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
         lines.append(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))
