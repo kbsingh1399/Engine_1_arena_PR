@@ -17110,3 +17110,10 @@ how to open browser in antigravity ide
 ### Assistant Response
 Provided instructions for opening integrated Simple Browser tab, Ports tab preview, terminal launch, and agent browser automation in Antigravity IDE.
 
+
+### User Prompt
+Simple Browser: Show not letting me login in coinglass
+
+### Assistant Response
+Explained Simple Browser Electron webview limitations (Cloudflare Turnstile CAPTCHA block, popup OAuth prevention, cookie sandboxing) and advised using native System Chrome side-by-side.
+
