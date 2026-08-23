@@ -17222,3 +17222,10 @@ Do more intensive and exhaustive research about coinglass data collection, you m
 ### Assistant Response
 Dissected CoinGlass DOM, TradingView internal state, and WebSocket protocols via Chrome CDP: identified 15 chart panes, 187 study schemas, Gzip-compressed WebSocket payloads (buy_sell_number_kline, kline, afcvd, ascvd, aggregated_contract_hundredth_depth_1), and verified exact aggregation formulas.
 
+
+### User Prompt
+Visited and analyzed 5 CoinGlass GitHub repositories and Go SDK: coinglass-api-skills, dineshpinto/coinglass-api, StephanAkkerman/liquidations-chart, coinglass-api-docs, and tigusigalpa/coinglass-go.
+
+### Assistant Response
+Extracted complete architectural taxonomy across all 5 repos: validated liquidation directional aggregation (BUY=Shorts, SELL=Longs), topLongShortPositionRatio mathematical foundation for Whale Index, WebSocket streaming architecture, multi-market depth schemas, and official CoinGlass API skills structure.
+
