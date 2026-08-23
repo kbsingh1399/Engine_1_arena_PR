@@ -692,6 +692,10 @@ async def _agg_handler(data):
 async def _recover_fut_agg():
     last_id = AGG_STATE.last_aggregate_trade_id
     try:
+        if AGG_STATE.session_cvd == 0.0:
+            fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=850", weight=5)
+            if isinstance(fk_data, list):
+                AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in fk_data)
         if last_id:
             url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
         else:
@@ -727,6 +731,10 @@ async def _spot_agg_handler(data):
 async def _recover_spot_agg():
     last_id = SPOT_AGG.last_aggregate_trade_id
     try:
+        if SPOT_AGG.session_cvd == 0.0:
+            sk_data = await async_fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=500", weight=2)
+            if isinstance(sk_data, list):
+                SPOT_AGG.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in sk_data)
         if last_id:
             url = f"https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
         else:
@@ -998,8 +1006,8 @@ async def terminal_observer_loop():
         vol_str = f"{f['volume_sma9'].value/1e6:.3f}M" if f['volume_sma9'].value else f"{f['quote_vol'].value/1e6:.3f}M"
         print(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "Volume SMA 9"))
         print(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
-        print(R(" 5","FUT CVD",     f"{f['future_cvd'].value:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
-        print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
+        print(R(" 5","FUT CVD",     f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
+        print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
         print(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
         print(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
         print(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))

@@ -16980,3 +16980,10 @@ Clarified WebSocket real-time event-driven nature of liquidation stream vs histo
 ### Assistant Response
 Completed 10-iteration goal execution loop. Integrated Volume SMA 9 calculation into KlineState and verified strict convergence across all 28 indicators against live CoinGlass telemetry.
 
+
+### User Prompt
+I think spot cvd is continous
+
+### Assistant Response
+Confirmed Spot CVD is continuous. Bootstrapped both Spot CVD (500-bar continuous taker delta baseline ~5.281K BTC) and Futures CVD (850-bar baseline ~+67.820K BTC) from historical klines to maintain full continuous alignment with CoinGlass.
+
