@@ -186,13 +186,24 @@ class FuturesDepthBook:
         self._lock = asyncio.Lock()
 
     async def sync_snapshot(self):
-        base = "https://fapi.binance.com/fapi/v1/depth" if self.stream_type == "f" else "https://dapi.binance.com/dapi/v1/depth"
+        if self.stream_type == "f":
+            base = "https://fapi.binance.com/fapi/v1/depth"
+            weight = 20
+        elif self.stream_type == "d":
+            base = "https://dapi.binance.com/dapi/v1/depth"
+            weight = 10
+        elif self.stream_type == "s":
+            base = "https://api.binance.com/api/v3/depth"
+            weight = 10
+        else:
+            base = "https://fapi.binance.com/fapi/v1/depth"
+            weight = 20
+
         async with self._lock:
             self.quality = DataQuality.RECOVERING
             self.ready = False
         
         url = f"{base}?symbol={self.symbol.upper()}&limit=1000"
-        weight = 20 if self.stream_type == "f" else 10
         data = await async_fetch(url, weight=weight)
         
         async with self._lock:
@@ -709,9 +720,12 @@ class MarkPriceState:
 
 # ─── Global State ─────────────────────────────────────────────────────────────
 OB_STATE = {
-    "btcusdt":   FuturesDepthBook("btcusdt",   "f"),
-    "btcusdc":   FuturesDepthBook("btcusdc",   "f"),
-    "btcusd_perp": FuturesDepthBook("btcusd_perp", "d"),
+    "btcusdt":       FuturesDepthBook("btcusdt",       "f"),
+    "btcusdc":       FuturesDepthBook("btcusdc",       "f"),
+    "btcusd_perp":   FuturesDepthBook("btcusd_perp",   "d"),
+    "spot_btcusdt":  FuturesDepthBook("btcusdt",       "s"),
+    "spot_btcusdc":  FuturesDepthBook("btcusdc",       "s"),
+    "spot_btcfdusd": FuturesDepthBook("btcfdusd",      "s"),
 }
 LIQ_STATE    = LiquidationState()
 AGG_STATE    = AggTradeState()
@@ -810,8 +824,15 @@ async def _retry_bootstrap(name, operation):
 async def start_ob_stream(symbol):
     book = OB_STATE[symbol]
     await _retry_bootstrap(f"OB_{symbol}", book.sync_snapshot)
-    base = "wss://fstream.binance.com/ws" if book.stream_type == "f" else "wss://dstream.binance.com/ws"
-    await stream_supervisor(f"{base}/{symbol}@depth", lambda d: _ob_handler(book, d), f"OB_{symbol}")
+    if book.stream_type == "f":
+        base = f"wss://fstream.binance.com/ws/{book.symbol}@depth@100ms"
+    elif book.stream_type == "d":
+        base = f"wss://dstream.binance.com/ws/{book.symbol}@depth@100ms"
+    elif book.stream_type == "s":
+        base = f"wss://stream.binance.com:9443/ws/{book.symbol}@depth@100ms"
+    else:
+        base = f"wss://fstream.binance.com/ws/{book.symbol}@depth@100ms"
+    await stream_supervisor(base, lambda d: _ob_handler(book, d), f"OB_{symbol}")
 
 
 async def _agg_handler(data):
