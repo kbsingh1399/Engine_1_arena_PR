@@ -616,7 +616,8 @@ async def stream_supervisor(url, handler, name, on_connect=None):
                         continue
         except asyncio.CancelledError:
             break
-        except Exception:
+        except Exception as e:
+            print(f"[WS ERR] {name}: {e}")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30.0)
 
