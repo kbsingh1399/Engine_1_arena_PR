@@ -17054,3 +17054,10 @@ what is source of coinglass data
 ### Assistant Response
 Provided complete breakdown of CoinGlass data sources across Pure Binance endpoints and Aggregated multi-exchange feeds.
 
+
+### User Prompt
+what is this data? (Screenshot of /futures/data/topLongShortPositionRatio)
+
+### Assistant Response
+Explained Binance Futures Top Trader Long/Short Position Ratio API payload and its role as the Whale Index in CoinGlass.
+
