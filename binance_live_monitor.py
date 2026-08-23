@@ -46,6 +46,67 @@ class FeatureSnapshot:
     receive_timestamp_ms: int
     features: Dict[str, FeatureValue]
 
+# ─── V3 Atomic Immutable Snapshots ───────────────────────────────────────────
+@dataclass(frozen=True)
+class OBSnapshot:
+    quality: DataQuality
+    ready: bool
+    stream_type: str
+    bids: Dict[float, float]
+    asks: Dict[float, float]
+
+@dataclass(frozen=True)
+class LiqSnapshot:
+    quality: DataQuality
+    long_usd: float
+    short_usd: float
+
+@dataclass(frozen=True)
+class AggTradeSnapshot:
+    quality: DataQuality
+    session_cvd: float
+    fp_delta: float
+    fp_poc: Optional[float]
+
+@dataclass(frozen=True)
+class SpotAggTradeSnapshot:
+    quality: DataQuality
+    session_cvd: float
+
+@dataclass(frozen=True)
+class KlineSnapshot:
+    quality: DataQuality
+    ready: bool
+    close: float
+    volume: float
+    taker_buy: float
+    taker_sell: float
+    ema8: Optional[float]
+    ema21: Optional[float]
+    ema50: Optional[float]
+    ema200: Optional[float]
+    ema800: Optional[float]
+    atr14: Optional[float]
+    atr100: Optional[float]
+    rsi: Optional[float]
+
+@dataclass(frozen=True)
+class MarkPriceSnapshot:
+    quality: DataQuality
+    mark_price: float
+    index_price: float
+    funding_rate: float
+
+@dataclass(frozen=True)
+class RestSnapshot:
+    oi_k: Optional[float]
+    ls_ratio: Optional[float]
+    whale: str
+    usdc_tb: float
+    usdc_ts: float
+    coinm_tb: float
+    coinm_ts: float
+
 
 # ─── Token Bucket Rate Limiter ────────────────────────────────────────────────
 class TokenBucket:
@@ -53,19 +114,24 @@ class TokenBucket:
         self.capacity = capacity
         self.fill_rate = fill_rate
         self.tokens = capacity
-        self.last_fill = time.time()
+        self.last_fill = time.monotonic()
         self.lock = asyncio.Lock()
 
     async def consume(self, tokens=1):
-        async with self.lock:
-            now = time.time()
-            self.tokens = min(self.capacity, self.tokens + (now - self.last_fill) * self.fill_rate)
-            self.last_fill = now
-            if self.tokens < tokens:
-                await asyncio.sleep((tokens - self.tokens) / self.fill_rate)
-                self.tokens = 0
-            else:
-                self.tokens -= tokens
+        """Acquire without ever sleeping while holding the shared limiter lock."""
+        while True:
+            async with self.lock:
+                now = time.monotonic()
+                self.tokens = min(
+                    self.capacity, self.tokens + (now - self.last_fill) * self.fill_rate
+                )
+                self.last_fill = now
+                if self.tokens >= tokens:
+                    self.tokens -= tokens
+                    return
+                wait_seconds = (tokens - self.tokens) / self.fill_rate
+            # Holding this lock during sleep serializes every REST caller.
+            await asyncio.sleep(wait_seconds)
 
 
 _rest_bucket = TokenBucket(capacity=200, fill_rate=20)
@@ -82,12 +148,12 @@ async def async_fetch(url, timeout=5, weight=1):
 
 # ─── Orderbook ────────────────────────────────────────────────────────────────
 class FuturesDepthBook:
-    """Sequence-correct local orderbook with snapshot+diff and self-heal."""
+    """Live Orderbook depth tracking with proper Binance sequence bridge rules."""
     def __init__(self, symbol, stream_type):
-        self.symbol = symbol.lower()
-        self.stream_type = stream_type          # "f" = USDT-M/USDC-M, "d" = COIN-M
-        self.bids: Dict[float, float] = {}
-        self.asks: Dict[float, float] = {}
+        self.symbol = symbol
+        self.stream_type = stream_type  # "f" or "d"
+        self.bids = {}
+        self.asks = {}
         self.last_update_id = 0
         self.ready = False
         self.quality = DataQuality.UNAVAILABLE
@@ -97,27 +163,36 @@ class FuturesDepthBook:
     async def sync_snapshot(self):
         self.quality = DataQuality.RECOVERING
         self.ready = False
-        self._buffer.clear()
         base = "https://fapi.binance.com/fapi/v1/depth" if self.stream_type == "f" else "https://dapi.binance.com/dapi/v1/depth"
         snap = await async_fetch(f"{base}?symbol={self.symbol.upper()}&limit=1000", weight=10)
         async with self._lock:
             self.bids = {float(p): float(q) for p, q in snap["bids"] if float(q) > 0}
             self.asks = {float(p): float(q) for p, q in snap["asks"] if float(q) > 0}
             self.last_update_id = snap["lastUpdateId"]
+            
+            bridged = False
+            for ev in self._buffer:
+                u = ev["u"]
+                if u <= self.last_update_id:
+                    continue
+                
+                if not bridged:
+                    U = ev["U"]
+                    if U <= self.last_update_id + 1 and u >= self.last_update_id + 1:
+                        self._apply_updates(ev)
+                        bridged = True
+                else:
+                    pu = ev["pu"]
+                    if pu == self.last_update_id:
+                        self._apply_updates(ev)
+                    else:
+                        break # Gap in buffer
+            
+            self._buffer.clear()
             self.ready = True
             self.quality = DataQuality.CANONICAL
-            for ev in self._buffer:
-                self._apply(ev, buffered=True)
-            self._buffer.clear()
 
-    def _apply(self, ev, buffered=False):
-        u, pu = ev["u"], ev["pu"]
-        if u <= self.last_update_id:
-            return
-        if not buffered and pu != self.last_update_id:
-            self.quality = DataQuality.STALE
-            self.ready = False
-            return
+    def _apply_updates(self, ev):
         for px_s, qty_s in ev.get("b", []):
             px, qty = float(px_s), float(qty_s)
             if qty == 0: self.bids.pop(px, None)
@@ -126,32 +201,56 @@ class FuturesDepthBook:
             px, qty = float(px_s), float(qty_s)
             if qty == 0: self.asks.pop(px, None)
             else: self.asks[px] = qty
-        self.last_update_id = u
+        self.last_update_id = ev["u"]
 
     async def handle_event(self, ev):
         async with self._lock:
             if not self.ready:
                 self._buffer.append(ev)
-                if len(self._buffer) > 100:
+                if len(self._buffer) > 1000:
                     self._buffer.pop(0)
             else:
-                self._apply(ev)
+                u, pu, U = ev["u"], ev["pu"], ev["U"]
+                if u <= self.last_update_id:
+                    return
+                if pu != self.last_update_id:
+                    # Bridge rule for first stream event if buffer was empty
+                    if U <= self.last_update_id + 1 and u >= self.last_update_id + 1:
+                        self._apply_updates(ev)
+                        return
+                    self.quality = DataQuality.STALE
+                    self.ready = False
+                    return
+                
+                self._apply_updates(ev)
 
-    def depth_within_pct(self, price, pct=0.01):
-        if not self.ready or not price:
-            return 0.0, 0.0, 0.0, 0.0
-        lo, hi = price * (1 - pct), price * (1 + pct)
-        bc = ac = bd = ad = 0.0
-        coinm = self.stream_type == "d"
-        for px, qty in self.bids.items():
-            if px >= lo:
-                q = (qty * 100 / px) if coinm else qty
-                bc += q; bd += (qty * 100) if coinm else (px * q)
-        for px, qty in self.asks.items():
-            if px <= hi:
-                q = (qty * 100 / px) if coinm else qty
-                ac += q; ad += (qty * 100) if coinm else (px * q)
-        return bc, ac, bd, ad
+    @property
+    def snapshot(self) -> OBSnapshot:
+        # Note: dicts aren't deeply immutable, but we do a shallow copy for safety
+        return OBSnapshot(
+            quality=self.quality,
+            ready=self.ready,
+            stream_type=self.stream_type,
+            bids=self.bids.copy(),
+            asks=self.asks.copy()
+        )
+
+# ─── Orderbook Utilities ──────────────────────────────────────────────────────
+def ob_depth_within_pct(snap: OBSnapshot, price: float, pct: float=0.01):
+    if not snap.ready or not price:
+        return 0.0, 0.0, 0.0, 0.0
+    lo, hi = price * (1 - pct), price * (1 + pct)
+    bc = ac = bd = ad = 0.0
+    coinm = snap.stream_type == "d"
+    for px, qty in snap.bids.items():
+        if px >= lo:
+            q = (qty * 100 / px) if coinm else qty
+            bc += q; bd += (qty * 100) if coinm else (px * q)
+    for px, qty in snap.asks.items():
+        if px <= hi:
+            q = (qty * 100 / px) if coinm else qty
+            ac += q; ad += (qty * 100) if coinm else (px * q)
+    return bc, ac, bd, ad
 
 
 # ─── Liquidation State ────────────────────────────────────────────────────────
@@ -173,6 +272,41 @@ class LiquidationState:
         if side == "SELL": self.long_usd += notional
         elif side == "BUY": self.short_usd += notional
 
+    @property
+    def snapshot(self) -> LiqSnapshot:
+        return LiqSnapshot(
+            quality=self.quality,
+            long_usd=self.long_usd,
+            short_usd=self.short_usd
+        )
+
+
+# ─── Per-bar Volume-at-Price (Footprint POC) ─────────────────────────────────
+class VolumeAtPrice:
+    """Bounded 15m volume profile keyed by integer price ticks.
+
+    The tick size must come from Binance exchangeInfo at startup.  Integer keys
+    avoid float-key fragmentation, and the map is cleared at every bar boundary.
+    """
+    def __init__(self, tick_size: float = 0.1):
+        self.tick_size = tick_size
+        self.bar_open_ms = 0
+        self._volume_by_tick: Dict[int, float] = {}
+
+    def add(self, bar_open_ms: int, price: float, quantity: float) -> None:
+        if bar_open_ms != self.bar_open_ms:
+            self.bar_open_ms = bar_open_ms
+            self._volume_by_tick.clear()
+        tick = round(price / self.tick_size)
+        self._volume_by_tick[tick] = self._volume_by_tick.get(tick, 0.0) + quantity
+
+    @property
+    def poc(self) -> Optional[float]:
+        if not self._volume_by_tick:
+            return None
+        tick = max(self._volume_by_tick, key=self._volume_by_tick.__getitem__)
+        return tick * self.tick_size
+
 
 # ─── AggTrade State (True FP Delta + Session CVD) ────────────────────────────
 class AggTradeState:
@@ -188,9 +322,11 @@ class AggTradeState:
         self.candle_sell_btc = 0.0
         self.session_cvd = 0.0       # BTC, running since service start
         self.quality = DataQuality.PARTIAL  # PARTIAL until first full candle seen
+        self.profile = VolumeAtPrice()
+        self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
 
-    async def apply(self, ts_ms, qty_str, is_buyer_maker):
+    async def apply(self, ts_ms, price_str, qty_str, is_buyer_maker, agg_id=None):
         cts = (ts_ms // 900000) * 900000
         async with self._lock:
             if cts != self.current_candle_ts:
@@ -199,16 +335,28 @@ class AggTradeState:
                 self.current_candle_ts = cts
                 self.candle_buy_btc = self.candle_sell_btc = 0.0
             qty = float(qty_str)
+            self.profile.add(cts, float(price_str), qty)
             if is_buyer_maker:
                 self.candle_sell_btc += qty
                 self.session_cvd -= qty
             else:
                 self.candle_buy_btc += qty
                 self.session_cvd += qty
+            if agg_id:
+                self.last_aggregate_trade_id = agg_id
 
     @property
     def fp_delta(self):
         return self.candle_buy_btc - self.candle_sell_btc
+
+    @property
+    def snapshot(self) -> AggTradeSnapshot:
+        return AggTradeSnapshot(
+            quality=self.quality,
+            session_cvd=self.session_cvd,
+            fp_delta=self.fp_delta,
+            fp_poc=self.profile.poc
+        )
 
 
 # ─── Kline State (Live Bar + Incremental EMA/RSI/ATR) ────────────────────────
@@ -356,6 +504,25 @@ class KlineState:
         al = self._avg_loss
         return 100.0 - 100.0 / (1 + self._avg_gain / al) if al > 0 else 100.0
 
+    @property
+    def snapshot(self) -> KlineSnapshot:
+        return KlineSnapshot(
+            quality=self.quality,
+            ready=self.ready,
+            close=self.close,
+            volume=self.volume,
+            taker_buy=self.taker_buy,
+            taker_sell=self.taker_sell,
+            ema8=self.live_ema(8),
+            ema21=self.live_ema(21),
+            ema50=self.live_ema(50),
+            ema200=self.live_ema(200),
+            ema800=self.live_ema(800),
+            atr14=self._atr14,
+            atr100=self._atr100,
+            rsi=self.rsi
+        )
+
 
 # ─── Spot AggTrade State (Running Spot CVD) ──────────────────────────────────
 class SpotAggTradeState:
@@ -366,10 +533,11 @@ class SpotAggTradeState:
     def __init__(self):
         self.session_cvd = 0.0   # BTC net (buy - sell) since session start
         self.quality = DataQuality.PARTIAL
+        self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
         self._first_trade_seen = False
 
-    async def apply(self, qty_str, is_buyer_maker):
+    async def apply(self, qty_str, is_buyer_maker, agg_id=None):
         async with self._lock:
             if not self._first_trade_seen:
                 self._first_trade_seen = True
@@ -379,6 +547,15 @@ class SpotAggTradeState:
                 self.session_cvd -= qty
             else:
                 self.session_cvd += qty
+            if agg_id:
+                self.last_aggregate_trade_id = agg_id
+
+    @property
+    def snapshot(self) -> SpotAggTradeSnapshot:
+        return SpotAggTradeSnapshot(
+            quality=self.quality,
+            session_cvd=self.session_cvd
+        )
 
 
 # ─── Mark Price State (Funding & Basis) ───────────────────────────────────────
@@ -395,8 +572,17 @@ class MarkPriceState:
         async with self._lock:
             self.mark_price = float(d.get("p", 0))
             self.index_price = float(d.get("i", 0))
-            self.funding_rate = float(d.get("r", 0)) * 100.0  # Convert to percent
+            self.funding_rate = float(d.get("r", self.funding_rate)) * 100.0  # Convert to percent
             self.quality = DataQuality.CANONICAL
+
+    @property
+    def snapshot(self) -> MarkPriceSnapshot:
+        return MarkPriceSnapshot(
+            quality=self.quality,
+            mark_price=self.mark_price,
+            index_price=self.index_price,
+            funding_rate=self.funding_rate
+        )
 
 
 # ─── Global State ─────────────────────────────────────────────────────────────
@@ -414,12 +600,14 @@ SNAPSHOT_BUS: Optional[asyncio.Queue] = None
 
 
 # ─── Stream Supervisor ────────────────────────────────────────────────────────
-async def stream_supervisor(url, handler, name):
+async def stream_supervisor(url, handler, name, on_connect=None):
     backoff = 1.0
     while True:
         try:
             async with websockets.connect(url, max_size=10*1024*1024) as ws:
                 backoff = 1.0
+                if on_connect:
+                    await on_connect()
                 while True:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
@@ -466,15 +654,31 @@ async def _agg_handler(data):
     d = data.get("data", data)
     await AGG_STATE.apply(
         ts_ms=int(d.get("T", time.time()*1000)),
+        price_str=d.get("p", "0"),
         qty_str=d.get("q","0"),
-        is_buyer_maker=d.get("m", False)
+        is_buyer_maker=d.get("m", False),
+        agg_id=d.get("a")
     )
+
+async def _recover_fut_agg():
+    last_id = AGG_STATE.last_aggregate_trade_id
+    if last_id:
+        try:
+            # Recover up to 1000 missing trades
+            trades = await async_fetch(f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000", weight=5)
+            for t in trades:
+                await AGG_STATE.apply(
+                    ts_ms=int(t["T"]), price_str=t["p"], qty_str=t["q"],
+                    is_buyer_maker=t["m"], agg_id=t["a"]
+                )
+        except Exception: pass
 
 async def start_agg_trade_stream():
     """Futures aggTrade: True FP Delta + running futures session CVD."""
     await stream_supervisor(
         "wss://fstream.binance.com/stream?streams=btcusdt@aggTrade",
-        _agg_handler, "FutAggTrade"
+        _agg_handler, "FutAggTrade",
+        on_connect=_recover_fut_agg
     )
 
 
@@ -482,14 +686,25 @@ async def _spot_agg_handler(data):
     d = data.get("data", data)
     await SPOT_AGG.apply(
         qty_str=d.get("q", "0"),
-        is_buyer_maker=d.get("m", False)
+        is_buyer_maker=d.get("m", False),
+        agg_id=d.get("a")
     )
+
+async def _recover_spot_agg():
+    last_id = SPOT_AGG.last_aggregate_trade_id
+    if last_id:
+        try:
+            trades = await async_fetch(f"https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000", weight=1)
+            for t in trades:
+                await SPOT_AGG.apply(qty_str=t["q"], is_buyer_maker=t["m"], agg_id=t["a"])
+        except Exception: pass
 
 async def start_spot_agg_stream():
     """Spot aggTrade: running spot session CVD — replaces 500-bar REST poll."""
     await stream_supervisor(
         "wss://stream.binance.com:9443/stream?streams=btcusdt@aggTrade",
-        _spot_agg_handler, "SpotAggTrade"
+        _spot_agg_handler, "SpotAggTrade",
+        on_connect=_recover_spot_agg
     )
 
 
@@ -521,68 +736,110 @@ async def start_mark_price_stream():
         _mark_price_handler, "MarkPrice"
     )
 
+# ─── Decoupled REST Pollers ───────────────────────────────────────────────────
+class RestCache:
+    def __init__(self):
+        self.oi_k = None
+        self.ls_ratio = None
+        self.whale = "N/A"
+        self.usdc_tb = 0.0
+        self.usdc_ts = 0.0
+        self.coinm_tb = 0.0
+        self.coinm_ts = 0.0
+
+    @property
+    def snapshot(self) -> RestSnapshot:
+        return RestSnapshot(
+            oi_k=self.oi_k,
+            ls_ratio=self.ls_ratio,
+            whale=self.whale,
+            usdc_tb=self.usdc_tb,
+            usdc_ts=self.usdc_ts,
+            coinm_tb=self.coinm_tb,
+            coinm_ts=self.coinm_ts
+        )
+
+REST_CACHE = RestCache()
+
+async def poll_oi_loop():
+    while True:
+        try:
+            close = KL_STATE.close
+            oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
+            oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
+            coinm_raw = float((await async_fetch("https://dapi.binance.com/dapi/v1/openInterest?symbol=BTCUSD_PERP", weight=1)).get("openInterest", 0))
+            coinm_btc = (coinm_raw * 100.0) / close if close and close > 0 else 0.0
+            REST_CACHE.oi_k = (oi_t + oi_c + coinm_btc) / 1e3
+        except Exception:
+            pass
+        await asyncio.sleep(3)
+
+async def poll_ratios_loop():
+    while True:
+        try:
+            ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            if ls_d: REST_CACHE.ls_ratio = float(ls_d[0]["longShortRatio"])
+            
+            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            if tp and ta:
+                REST_CACHE.whale = f"Pos:{tp[0]['longShortRatio']} Acc:{ta[0]['longShortRatio']}"
+        except Exception:
+            pass
+        await asyncio.sleep(60)
+
+async def poll_taker_flow_loop():
+    while True:
+        try:
+            kuc = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDC&interval=15m&limit=1", weight=1)
+            REST_CACHE.usdc_tb = float(kuc[-1][9])
+            REST_CACHE.usdc_ts = float(kuc[-1][5]) - float(kuc[-1][9])
+        except Exception: pass
+        try:
+            kcm = await async_fetch("https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=15m&limit=1", weight=1)
+            REST_CACHE.coinm_tb = float(kcm[-1][10])
+            REST_CACHE.coinm_ts = float(kcm[-1][7]) - float(kcm[-1][10])
+        except Exception: pass
+        await asyncio.sleep(10)
+
 
 # ─── Snapshot Computer ────────────────────────────────────────────────────────
 async def compute_snapshot(seq_id):
     try:
         now_ms = int(time.time() * 1000)
-        kq = KL_STATE.quality
-        close = KL_STATE.close
+        
+        # 1. Acquire Immutable Views
+        kl_snap = KL_STATE.snapshot
+        agg_snap = AGG_STATE.snapshot
+        spot_agg_snap = SPOT_AGG.snapshot
+        mp_snap = MARK_PRICE.snapshot
+        liq_snap = LIQ_STATE.snapshot
+        rest_snap = REST_CACHE.snapshot
+        ob_snaps = [book.snapshot for book in OB_STATE.values()]
 
-        # Taker buy/sell: USDT-M from live kline + USDC-M + COIN-M via REST
-        tb = KL_STATE.taker_buy
-        ts = KL_STATE.taker_sell
-        try:
-            kuc = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDC&interval=15m&limit=1", weight=1)
-            tb += float(kuc[-1][9]); ts += float(kuc[-1][5]) - float(kuc[-1][9])
-        except Exception: pass
-        try:
-            kcm = await async_fetch("https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=15m&limit=1", weight=1)
-            tb += float(kcm[-1][10]); ts += float(kcm[-1][7]) - float(kcm[-1][10])
-        except Exception: pass
+        # 2. Derive Features from Immutable Views
+        kq = kl_snap.quality
+        close = kl_snap.close
 
-        # Spot CVD — running session total from spot aggTrade WebSocket
-        scvd = SPOT_AGG.session_cvd
-        scvd_q = SPOT_AGG.quality
+        tb = kl_snap.taker_buy + rest_snap.usdc_tb + rest_snap.coinm_tb
+        ts = kl_snap.taker_sell + rest_snap.usdc_ts + rest_snap.coinm_ts
 
-        # Funding & Basis (from markPrice WS)
-        funding = MARK_PRICE.funding_rate
-        basis = MARK_PRICE.mark_price - MARK_PRICE.index_price if MARK_PRICE.index_price > 0 else 0.0
-        mp_q = MARK_PRICE.quality
+        scvd = spot_agg_snap.session_cvd
+        scvd_q = spot_agg_snap.quality
 
-        # OI: USDT-M (BTC) + USDC-M (BTC) + COIN-M (contracts×$100÷price = BTC)
-        oi_k = 0.0
-        try:
-            oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
-            oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
-            coinm_raw = float((await async_fetch("https://dapi.binance.com/dapi/v1/openInterest?symbol=BTCUSD_PERP", weight=1)).get("openInterest", 0))
-            # COIN-M openInterest = number of contracts; 1 contract = $100 USD
-            coinm_btc = (coinm_raw * 100.0) / close if close > 0 else 0.0
-            oi_k = (oi_t + oi_c + coinm_btc) / 1e3
-        except Exception: pass
+        funding = mp_snap.funding_rate
+        basis = mp_snap.mark_price - mp_snap.index_price if mp_snap.index_price > 0 else 0.0
+        mp_q = mp_snap.quality
 
-        # L/S ratio
-        ls_ratio = None
-        try:
-            ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            ls_ratio = float(ls_d[0]["longShortRatio"]) if ls_d else None
-        except Exception: pass
+        oi_k = rest_snap.oi_k
+        ls_ratio = rest_snap.ls_ratio
+        whale = rest_snap.whale
 
-        # Whale index
-        whale = "N/A"
-        try:
-            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            if tp and ta:
-                whale = f"Pos:{tp[0]['longShortRatio']} Acc:{ta[0]['longShortRatio']}"
-        except Exception: pass
-
-        # Orderbook depth
         bc_t = ac_t = bd_t = ad_t = 0.0
         ob_q = DataQuality.CANONICAL
-        for book in OB_STATE.values():
-            if book.quality != DataQuality.CANONICAL: ob_q = DataQuality.PARTIAL
-            bc, ac, bd, ad = book.depth_within_pct(close)
+        for ob in ob_snaps:
+            if ob.quality != DataQuality.CANONICAL: ob_q = DataQuality.PARTIAL
+            bc, ac, bd, ad = ob_depth_within_pct(ob, close)
             bc_t += bc; ac_t += ac; bd_t += bd; ad_t += ad
 
         def fv(val, q=DataQuality.CANONICAL):
@@ -593,29 +850,29 @@ async def compute_snapshot(seq_id):
             receive_timestamp_ms=now_ms,
             features={
                 "price":      fv(close, kq),
-                "quote_vol":  fv(KL_STATE.volume * close, kq),
-                "rsi":        fv(KL_STATE.rsi, kq),
-                "future_cvd": fv(AGG_STATE.session_cvd, AGG_STATE.quality),
+                "quote_vol":  fv(kl_snap.volume * close, kq),
+                "rsi":        fv(kl_snap.rsi, kq),
+                "future_cvd": fv(agg_snap.session_cvd, agg_snap.quality),
                 "spot_cvd":   fv(scvd, scvd_q),
                 "funding_pct":fv(funding, mp_q),
                 "basis":      fv(basis, mp_q),
                 "oi_k":       fv(oi_k),
                 "ls_ratio":   fv(ls_ratio),
-                "fp_delta":   fv(AGG_STATE.fp_delta, AGG_STATE.quality),
-                "fp_poc":     fv((KL_STATE.high + KL_STATE.low) / 2, kq),
-                "long_liq":   fv(LIQ_STATE.long_usd, LIQ_STATE.quality),
-                "short_liq":  fv(LIQ_STATE.short_usd, LIQ_STATE.quality),
+                "fp_delta":   fv(agg_snap.fp_delta, agg_snap.quality),
+                "fp_poc":     fv(agg_snap.fp_poc, agg_snap.quality),
+                "long_liq":   fv(liq_snap.long_usd, liq_snap.quality),
+                "short_liq":  fv(liq_snap.short_usd, liq_snap.quality),
                 "bid_dollar": fv(bd_t, ob_q), "ask_dollar": fv(ad_t, ob_q),
                 "bid_coin":   fv(bc_t, ob_q), "ask_coin":   fv(ac_t, ob_q),
                 "whale_idx":  fv(whale),
                 "taker_buy":  fv(tb), "taker_sell": fv(ts),
-                "ema8":  fv(KL_STATE.live_ema(8),   kq),
-                "ema21": fv(KL_STATE.live_ema(21),  kq),
-                "ema50": fv(KL_STATE.live_ema(50),  kq),
-                "ema200":fv(KL_STATE.live_ema(200), kq),
-                "ema800":fv(KL_STATE.live_ema(800), kq),
-                "atr14": fv(KL_STATE._atr14, kq),
-                "atr100":fv(KL_STATE._atr100, kq),
+                "ema8":  fv(kl_snap.ema8,   kq),
+                "ema21": fv(kl_snap.ema21,  kq),
+                "ema50": fv(kl_snap.ema50,  kq),
+                "ema200":fv(kl_snap.ema200, kq),
+                "ema800":fv(kl_snap.ema800, kq),
+                "atr14": fv(kl_snap.atr14, kq),
+                "atr100":fv(kl_snap.atr100, kq),
             }
         )
     except Exception as e:
@@ -677,7 +934,7 @@ async def terminal_observer_loop():
         print(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "WebSocket stream"))
         print(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Global Account Ratio"))
         print(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "True aggTrade bid/ask"))
-        print(R("13","FP POC",      f"{f['fp_poc'].value:,.2f}",            f['fp_poc'].quality, "(H+L)/2 cur bar"))
+        print(R("13","FP POC",      f"{f['fp_poc'].value:,.2f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "aggTrade volume-at-price"))
         print(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% all books"))
         print(R("15","ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% all books"))
         print(R("16","BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% all books"))
@@ -717,6 +974,9 @@ async def run_live_comparison():
             asyncio.create_task(start_spot_agg_stream()),
             asyncio.create_task(start_kline_stream()),
             asyncio.create_task(start_mark_price_stream()),
+            asyncio.create_task(poll_oi_loop()),
+            asyncio.create_task(poll_ratios_loop()),
+            asyncio.create_task(poll_taker_flow_loop()),
         ]
         print("[INIT] Seeding REST + connecting 8 WebSocket streams...")
         await asyncio.sleep(4)   # Let OB snapshots seed
