@@ -620,12 +620,12 @@ async def stream_supervisor(url, handler, name, on_connect=None):
 
 # ─── Stream Handlers & Starters ───────────────────────────────────────────────
 async def _liq_handler(data):
-    o = data.get("data", {}).get("o", {})
+    o = data.get("data", {}).get("o", {}) if "data" in data else data.get("o", {})
     if o:
         LIQ_STATE.apply(
             ts_ms=int(o.get("T", time.time()*1000)),
             side=o.get("S"),
-            notional=float(o.get("q",0)) * float(o.get("p",0))
+            notional=float(o.get("q", 0)) * float(o.get("p", 0))
         )
 
 async def start_liq_stream():

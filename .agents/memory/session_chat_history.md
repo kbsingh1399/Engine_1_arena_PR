@@ -16966,3 +16966,10 @@ Verified background daemon task-1157 is continuously healthy and streaming at 2s
 ### Assistant Response
 Detailed exact architectural and mathematical code improvements made to achieve indicator convergence, distinguishing algorithmic fixes from structural session metrics.
 
+
+### User Prompt
+then in last run long liq and short didn't match with coinglass.
+
+### Assistant Response
+Clarified WebSocket real-time event-driven nature of liquidation stream vs historical 15m candle bar totals. Hardened _liq_handler to support both direct and multiplexed Binance WS payloads.
+
