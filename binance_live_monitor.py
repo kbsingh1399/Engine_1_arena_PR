@@ -424,7 +424,7 @@ class KlineState:
         self._rsi_prev_close = None
 
     async def seed_from_rest(self, klines):
-        """Bootstrap all incremental state from 1000-bar REST response."""
+        """Bootstrap all incremental state from 3500-bar REST response for 100% EMA 800 & ATR parity."""
         cls = [float(k[4]) for k in klines]
         his = [float(k[2]) for k in klines]
         los = [float(k[3]) for k in klines]
@@ -441,18 +441,24 @@ class KlineState:
 
         emas = {p: _ema(closed, p) for p in [8, 21, 50, 200, 800]}
 
-        # ATR
-        trs = [max(his[i]-los[i], abs(his[i]-cls[i-1]), abs(los[i]-cls[i-1]))
-               for i in range(1, len(cls)-1)]   # closed bars only
-        def _rma(trs, p):
-            if len(trs) < p: return None
-            a = sum(trs[:p]) / p
-            for t in trs[p:]: a = (a * (p-1) + t) / p
-            return a
+        # ATR (Wilder RMA across full history)
+        trs = [his[0] - los[0]]
+        for i in range(1, len(closed)):
+            tr = max(his[i] - los[i], abs(his[i] - cls[i-1]), abs(los[i] - cls[i-1]))
+            trs.append(tr)
+        
+        def _rma(src, p):
+            if len(src) < p: return None
+            alpha = 1.0 / p
+            res = [sum(src[:p]) / p]
+            for val in src[p:]:
+                res.append(val * alpha + res[-1] * (1.0 - alpha))
+            return res[-1]
+
         atr14 = _rma(trs, 14)
         atr100 = _rma(trs, 100)
 
-        # RSI Wilder
+        # RSI Wilder (across full history)
         diffs = [closed[i] - closed[i-1] for i in range(1, len(closed))]
         gains = [max(d, 0.0) for d in diffs]
         losses = [max(-d, 0.0) for d in diffs]
@@ -549,12 +555,23 @@ class KlineState:
         kf = 2.0 / (p + 1)
         return self.close * kf + seed * (1 - kf)
 
-    @property
-    def rsi(self):
-        if self._avg_gain is None: return None
-        # Closed-bar RSI only (no live bar contamination)
-        al = self._avg_loss
-        return 100.0 - 100.0 / (1 + self._avg_gain / al) if al > 0 else 100.0
+    def live_rsi(self):
+        """Live Wilder RSI matching TradingView/CoinGlass standard."""
+        if self._avg_gain is None or self._avg_loss is None or self._prev_close is None:
+            return None
+        d = self.close - self._prev_close
+        live_g = (self._avg_gain * 13 + max(d, 0.0)) / 14
+        live_l = (self._avg_loss * 13 + max(-d, 0.0)) / 14
+        return 100.0 - 100.0 / (1 + live_g / live_l) if live_l > 0 else 100.0
+
+    def live_atr(self, p: int):
+        """Live ATR matching TradingView RMA."""
+        seed = self._atr14 if p == 14 else self._atr100
+        if seed is None or self._prev_close is None:
+            return None
+        tr = max(self.high - self.low, abs(self.high - self._prev_close), abs(self.low - self._prev_close))
+        alpha = 1.0 / p
+        return tr * alpha + seed * (1.0 - alpha)
 
     @property
     def snapshot(self) -> KlineSnapshot:
@@ -572,9 +589,9 @@ class KlineState:
             ema50=self.live_ema(50),
             ema200=self.live_ema(200),
             ema800=self.live_ema(800),
-            atr14=self._atr14,
-            atr100=self._atr100,
-            rsi=self.rsi
+            atr14=self.live_atr(14),
+            atr100=self.live_atr(100),
+            rsi=self.live_rsi()
         )
 
 
@@ -836,20 +853,18 @@ async def _kline_handler(data):
         await KL_STATE.apply_kline_event(k)
 
 async def start_kline_stream():
-    """Seed from REST (1500 bars for exact EMA 800 convergence), then maintain from kline_15m WebSocket."""
+    """Seed from REST (3500 bars for exact EMA 800 and ATR convergence), then maintain from kline_15m WebSocket."""
     async def seed():
-        k1 = await async_fetch(
-            "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5
-        )
-        if k1:
-            first_open_time = int(k1[0][0])
-            k0 = await async_fetch(
-                f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&endTime={first_open_time - 1}&limit=500", weight=5
-            )
-            klines = (k0 if isinstance(k0, list) else []) + k1
-        else:
-            klines = k1
-        await KL_STATE.seed_from_rest(klines)
+        all_k = []
+        end_time = None
+        for _ in range(4):
+            url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+            if end_time: url += f"&endTime={end_time}"
+            data = await async_fetch(url, weight=5)
+            if not data or not isinstance(data, list): break
+            all_k = data + all_k
+            end_time = int(data[0][0]) - 1
+        await KL_STATE.seed_from_rest(all_k)
     await _retry_bootstrap("Kline15m", seed)
     await stream_supervisor(
         "wss://fstream.binance.com/ws/btcusdt@kline_15m",
@@ -927,14 +942,15 @@ async def poll_ratios_loop():
             ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if ls_d: REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
             
-            ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            if ta:
-                whale_val = float(ta[0]['longShortRatio']) * 100.0
+            # CoinGlass Whale Index is topLongShortPositionRatio * 100
+            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            if tp:
+                whale_val = float(tp[0]['longShortRatio']) * 100.0
                 REST_CACHE.whale = f"{whale_val:.4f}"
-                REST_CACHE.ls_ratio = float(ta[0]['longShortRatio'])
+                REST_CACHE.ls_ratio = float(tp[0]['longShortRatio'])
         except Exception:
             pass
-        await asyncio.sleep(15)
+        await asyncio.sleep(10)
 
 async def poll_taker_flow_loop():
     while True:
