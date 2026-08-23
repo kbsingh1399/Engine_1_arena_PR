@@ -105,17 +105,17 @@ DOM_EXTRACT_JS = r"""() => {
             }
         }
 
-        // EMAs
+        // EMAs with SMA sub-signals
         if (upper.includes('EMA')) {
-            let m8 = upper.match(/EMA\s*8[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
+            let m8 = upper.match(/EMA\s*8[^\n]*SMA\s*[0-9]*\s*([0-9,.]+)/) || upper.match(/EMA\s*8[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
             if (m8 && parseFloat(m8[1].replace(/,/g, '')) > 1000) res.ema_8 = m8[1].replace(/,/g, '');
-            let m21 = upper.match(/EMA\s*21[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
+            let m21 = upper.match(/EMA\s*21[^\n]*SMA\s*[0-9]*\s*([0-9,.]+)/) || upper.match(/EMA\s*21[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
             if (m21 && parseFloat(m21[1].replace(/,/g, '')) > 1000) res.ema_21 = m21[1].replace(/,/g, '');
-            let m50 = upper.match(/EMA\s*50[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
+            let m50 = upper.match(/EMA\s*50[^\n]*SMA\s*[0-9]*\s*([0-9,.]+)/) || upper.match(/EMA\s*50[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
             if (m50 && parseFloat(m50[1].replace(/,/g, '')) > 1000) res.ema_50 = m50[1].replace(/,/g, '');
-            let m200 = upper.match(/EMA\s*200[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
+            let m200 = upper.match(/EMA\s*200[^\n]*SMA\s*[0-9]*\s*([0-9,.]+)/) || upper.match(/EMA\s*200[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
             if (m200 && parseFloat(m200[1].replace(/,/g, '')) > 1000) res.ema_200 = m200[1].replace(/,/g, '');
-            let m800 = upper.match(/EMA\s*800[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
+            let m800 = upper.match(/EMA\s*800[^\n]*SMA\s*[0-9]*\s*([0-9,.]+)/) || upper.match(/EMA\s*800[^\n0-9]*[0-9]*[^\n0-9]*([0-9,.]+)/);
             if (m800 && parseFloat(m800[1].replace(/,/g, '')) > 1000) res.ema_800 = m800[1].replace(/,/g, '');
         }
         else if (upper.includes('VOLUME') && !upper.includes('DELTA') && !upper.includes('CVD')) {
