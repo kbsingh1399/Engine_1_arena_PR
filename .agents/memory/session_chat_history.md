@@ -17145,3 +17145,10 @@ and reagarding attached.are we calculcating since start or from which date onway
 ### Assistant Response
 Clarified exact CVD calculation origins (historical bootstrap vs 24h rolling vs 15m candle reset vs CoinGlass chart viewport) and executed an exhaustive, graph-traversal deep dive down every Binance API directory, endpoint, WebSocket channel, and execution payload to all leaf nodes.
 
+
+### User Prompt
+I want you to match each and every values with coinglass and from exhuastive research did you find anything which we are not updated about
+
+### Assistant Response
+Delivered line-by-line audit comparing all 28 indicators against CoinGlass chart values and documented the four key architectural discoveries (OI-weighted multi-exchange funding rate blending, Whale Index formula mapping, 3500-bar EMA 800 decay, and multi-exchange vs single-exchange CVD filters).
+
