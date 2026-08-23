@@ -17047,3 +17047,10 @@ Does following helpful : https://github.com/keremcozin/binance-data-fetcher, htt
 ### Assistant Response
 Evaluated all 3 external repositories: keremcozin (rudimentary Python spot wrapper), techietrader (obsolete Python 2 retail script), and JKorf/Binance.Net (C# .NET SDK useful only as API reference). Confirmed our native async pipeline in binance_live_monitor.py is far superior and tailored for quantitative futures trading.
 
+
+### User Prompt
+what is source of coinglass data
+
+### Assistant Response
+Provided complete breakdown of CoinGlass data sources across Pure Binance endpoints and Aggregated multi-exchange feeds.
+
