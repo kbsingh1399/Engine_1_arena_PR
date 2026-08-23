@@ -72,23 +72,8 @@ API_STATE = {
     "last_tick_time": time.time()
 }
 
-# Live CoinGlass DOM State (extracted from your open Chrome tab)
-CG_STATE = {}
-
 DOM_EXTRACT_JS = r"""() => {
-    let res = {
-        symbol: 'BTCUSDT',
-        timeframe: '15m',
-        price: 'N/A', open: 'N/A', high: 'N/A', low: 'N/A', close: 'N/A', volume: 'N/A',
-        rsi: 'N/A', futures_cvd: 'N/A', spot_cvd: 'N/A', funding_rate: '0.0',
-        liquidations_long: '0.0', liquidations_short: '0.0', ls_ratio: 'N/A', open_interest: 'N/A',
-        whale_index: 'N/A', taker_buy_count: 'N/A', taker_sell_count: 'N/A',
-        fp_delta: 'N/A', fp_poc: 'N/A',
-        coins_bid: 'N/A', coins_ask: 'N/A', dollars_bid: 'N/A', dollars_ask: 'N/A',
-        ema_8: 'N/A', ema_21: 'N/A', ema_50: 'N/A', ema_200: 'N/A', ema_800: 'N/A',
-        atr_14: 'N/A', atr_100: 'N/A'
-    };
-
+    let res = {};
     let panes = Array.from(document.querySelectorAll('[class*="sources-"], [data-name="legend"], [class*="pane-legend"], [class*="item-"], [class*="legend-"]'));
     let getTxt = el => el ? el.innerText.trim() : '';
 
@@ -151,8 +136,8 @@ DOM_EXTRACT_JS = r"""() => {
         else if (upper.includes('LIQUIDATION') || upper.includes('LIQ')) {
             let valid = allNums.filter(n => /[KMBkmb%]/.test(n) || parseFloat(n) > 10.0 || n.startsWith('-'));
             if (valid.length >= 2) {
-                res.liquidations_long = valid[0];
-                res.liquidations_short = valid[1];
+                res.liq_long = valid[0];
+                res.liq_short = valid[1];
             }
         }
         else if (upper.includes('LONG/SHORT') || upper.includes('L/S') || upper.includes('LSR') || upper.includes('RATIO')) {
@@ -170,21 +155,21 @@ DOM_EXTRACT_JS = r"""() => {
         else if (upper.includes('TAKER') || upper.includes('BUY/SELL')) {
             let takerNums = allNums.filter(n => /[KMBkmb]/.test(n) || parseFloat(n) > 10);
             if (takerNums.length >= 2) {
-                res.taker_buy_count = takerNums[0];
-                res.taker_sell_count = takerNums[1];
+                res.taker_buy = takerNums[0];
+                res.taker_sell = takerNums[1];
             }
         }
         else if (upper.includes('BID & ASK') || upper.includes('BID AND ASK') || upper.includes('BID/ASK')) {
             let validDepth = allNums.filter(n => /[KMBkmb]/.test(n) || Math.abs(parseFloat(n)) > 5.0);
             if (upper.includes('DOLLAR')) {
                 if (validDepth.length >= 2) {
-                    res.dollars_bid = validDepth[0];
-                    res.dollars_ask = validDepth[1];
+                    res.bid_dollar = validDepth[0];
+                    res.ask_dollar = validDepth[1];
                 }
             } else {
                 if (validDepth.length >= 2) {
-                    res.coins_bid = validDepth[0];
-                    res.coins_ask = validDepth[1];
+                    res.bid_coin = validDepth[0];
+                    res.ask_coin = validDepth[1];
                 }
             }
         }
@@ -421,7 +406,7 @@ async def main():
                             for fr in cg_page.frames:
                                 if "blob:" in fr.url or len(cg_page.frames) == 1:
                                     cg_raw = await fr.evaluate(DOM_EXTRACT_JS)
-                                    if cg_raw and cg_raw.get("price") != "N/A":
+                                    if cg_raw and cg_raw.get("price"):
                                         break
                         except Exception:
                             pass
@@ -442,16 +427,16 @@ async def main():
                         "open_interest": parse_num(cg_raw.get("open_interest"), default=API_STATE["open_interest"]),
                         "ls_ratio": parse_num(cg_raw.get("ls_ratio"), default=API_STATE["ls_ratio"]),
                         "whale_index": parse_num(cg_raw.get("whale_index"), default=API_STATE["whale_index"]),
-                        "taker_buy": parse_num(cg_raw.get("taker_buy_count"), default=float(API_STATE["taker_buy"])),
-                        "taker_sell": parse_num(cg_raw.get("taker_sell_count"), default=float(API_STATE["taker_sell"])),
+                        "taker_buy": parse_num(cg_raw.get("taker_buy"), default=float(API_STATE["taker_buy"])),
+                        "taker_sell": parse_num(cg_raw.get("taker_sell"), default=float(API_STATE["taker_sell"])),
                         "fp_delta": parse_num(cg_raw.get("fp_delta"), default=API_STATE["fp_delta"]),
                         "fp_poc": parse_num(cg_raw.get("fp_poc"), default=API_STATE["fp_poc"]),
-                        "bid_dollar": parse_num(cg_raw.get("dollars_bid"), default=API_STATE["bid_dollar"]),
-                        "ask_dollar": parse_num(cg_raw.get("dollars_ask"), default=API_STATE["ask_dollar"]),
-                        "bid_coin": parse_num(cg_raw.get("coins_bid"), default=API_STATE["bid_coin"]),
-                        "ask_coin": parse_num(cg_raw.get("coins_ask"), default=API_STATE["ask_coin"]),
-                        "liq_long": parse_num(cg_raw.get("liquidations_long"), default=API_STATE["liq_long"]),
-                        "liq_short": parse_num(cg_raw.get("liquidations_short"), default=API_STATE["liq_short"]),
+                        "bid_dollar": parse_num(cg_raw.get("bid_dollar"), default=API_STATE["bid_dollar"]),
+                        "ask_dollar": parse_num(cg_raw.get("ask_dollar"), default=API_STATE["ask_dollar"]),
+                        "bid_coin": parse_num(cg_raw.get("bid_coin"), default=API_STATE["bid_coin"]),
+                        "ask_coin": parse_num(cg_raw.get("ask_coin"), default=API_STATE["ask_coin"]),
+                        "liq_long": parse_num(cg_raw.get("liq_long"), default=API_STATE["liq_long"]),
+                        "liq_short": parse_num(cg_raw.get("liq_short"), default=API_STATE["liq_short"]),
                         "ema_8": parse_num(cg_raw.get("ema_8"), default=77017.5),
                         "ema_21": parse_num(cg_raw.get("ema_21"), default=76758.2),
                         "ema_50": parse_num(cg_raw.get("ema_50"), default=76759.7),
