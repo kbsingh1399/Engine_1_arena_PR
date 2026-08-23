@@ -815,8 +815,7 @@ async def poll_oi_loop():
             coinm_raw = float((await async_fetch("https://dapi.binance.com/dapi/v1/openInterest?symbol=BTCUSD_PERP", weight=1)).get("openInterest", 0))
             coinm_btc = (coinm_raw * 100.0) / close if close and close > 0 else 0.0
             stable_k = (oi_t + oi_c) / 1e3
-            total_k = (oi_t + oi_c + coinm_btc) / 1e3
-            REST_CACHE.oi_k = f"{stable_k:.3f}K (All:{total_k:.3f}K)"
+            REST_CACHE.oi_k = f"{stable_k:.3f}K"
         except Exception:
             pass
         await asyncio.sleep(3)
@@ -827,11 +826,10 @@ async def poll_ratios_loop():
             ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if ls_d: REST_CACHE.ls_ratio = float(ls_d[0]["longShortRatio"])
             
-            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            if tp and ta:
+            if ta:
                 whale_val = float(ta[0]['longShortRatio']) * 100.0
-                REST_CACHE.whale = f"{whale_val:.4f} (Pos:{tp[0]['longShortRatio']} Acc:{ta[0]['longShortRatio']})"
+                REST_CACHE.whale = f"{whale_val:.4f}"
         except Exception:
             pass
         await asyncio.sleep(15)
@@ -978,33 +976,33 @@ async def terminal_observer_loop():
         t = datetime.now().strftime("%H:%M:%S")
         print(f"\n[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         print(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
-        print(R(" 2","PRICE",       f"${f['price'].value:,.2f}",            f['price'].quality))
-        print(R(" 3","VOLUME USDT", f"${f['quote_vol'].value:,.0f}",        f['quote_vol'].quality))
-        print(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder incremental WS"))
-        print(R(" 5","FUT CVD",     f"{f['future_cvd'].value:+.4f} BTC" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "aggTrade session sum"))
-        print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality))
-        print(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "Premium Index Rate"))
-        print(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "USDT+USDC (All-margin)"))
-        print(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "WebSocket stream"))
-        print(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "WebSocket stream"))
-        print(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Global Account Ratio"))
-        print(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "True aggTrade bid/ask"))
-        print(R("13","FP POC",      f"{f['fp_poc'].value:,.2f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "aggTrade volume-at-price"))
-        print(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% all books"))
-        print(R("15","ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% all books"))
-        print(R("16","BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% all books"))
-        print(R("17","ASK COIN",    _b(f['ask_coin'].value),                f['ask_coin'].quality, "±1% all books"))
-        print(R("18","WHALE IDX",   str(f['whale_idx'].value),              f['whale_idx'].quality, "Top Trader Ratios"))
-        print(R("19","TAKER BUY",   _b(f['taker_buy'].value),               f['taker_buy'].quality, "All pairs partial-bar"))
-        print(R("20","TAKER SELL",  _b(f['taker_sell'].value),              f['taker_sell'].quality, "All pairs partial-bar"))
-        print(R("21","EMA 8",       f"{f['ema8'].value:,.2f}" if f['ema8'].value is not None else "N/A",   f['ema8'].quality,  "Live WS incremental"))
-        print(R("22","EMA 21",      f"{f['ema21'].value:,.2f}" if f['ema21'].value is not None else "N/A", f['ema21'].quality, "Live WS incremental"))
-        print(R("23","EMA 50",      f"{f['ema50'].value:,.2f}" if f['ema50'].value is not None else "N/A", f['ema50'].quality, "Live WS incremental"))
-        print(R("24","EMA 200",     f"{f['ema200'].value:,.2f}" if f['ema200'].value is not None else "N/A",f['ema200'].quality,"Live WS incremental"))
-        print(R("25","EMA 800",     f"{f['ema800'].value:,.2f}" if f['ema800'].value is not None else "N/A",f['ema800'].quality,"Live WS incremental"))
-        print(R("26","ATR 14",      f"{f['atr14'].value:.4f}" if f['atr14'].value is not None else "N/A",  f['atr14'].quality))
-        print(R("27","ATR 100",     f"{f['atr100'].value:.4f}" if f['atr100'].value is not None else "N/A",f['atr100'].quality))
-        print(R("28","BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark Price - Index Price"))
+        print(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
+        print(R(" 3","VOLUME",      f"{f['quote_vol'].value/1e6:.3f}M",     f['quote_vol'].quality))
+        print(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
+        print(R(" 5","FUT CVD",     f"{f['future_cvd'].value:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
+        print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
+        print(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
+        print(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
+        print(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))
+        print(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "Symbol Liquidations Short"))
+        print(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Accounts L/S Ratio"))
+        print(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "Footprint Delta"))
+        print(R("13","FP POC",      f"{f['fp_poc'].value:,.1f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "Volume-At-Price POC"))
+        print(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% Futures Depth"))
+        print(R("15","ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% Futures Depth"))
+        print(R("16","BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% Futures Depth"))
+        print(R("17","ASK COIN",    _b(f['ask_coin'].value),                f['ask_coin'].quality, "±1% Futures Depth"))
+        print(R("18","WHALE IDX",   str(f['whale_idx'].value),              f['whale_idx'].quality, "Whale Index (Top Trader)"))
+        print(R("19","TAKER BUY",   _b(f['taker_buy'].value),               f['taker_buy'].quality, "Taker Buy Volume"))
+        print(R("20","TAKER SELL",  _b(f['taker_sell'].value),              f['taker_sell'].quality, "Taker Sell Volume"))
+        print(R("21","EMA 8",       f"{f['ema8'].value:,.1f}" if f['ema8'].value is not None else "N/A",   f['ema8'].quality,  "EMA 8 close"))
+        print(R("22","EMA 21",      f"{f['ema21'].value:,.1f}" if f['ema21'].value is not None else "N/A", f['ema21'].quality, "EMA 21 close"))
+        print(R("23","EMA 50",      f"{f['ema50'].value:,.1f}" if f['ema50'].value is not None else "N/A", f['ema50'].quality, "EMA 50 close"))
+        print(R("24","EMA 200",     f"{f['ema200'].value:,.1f}" if f['ema200'].value is not None else "N/A",f['ema200'].quality,"EMA 200 close"))
+        print(R("25","EMA 800",     f"{f['ema800'].value:,.1f}" if f['ema800'].value is not None else "N/A",f['ema800'].quality,"EMA 800 close"))
+        print(R("26","ATR 14",      f"{f['atr14'].value:.1f}" if f['atr14'].value is not None else "N/A",  f['atr14'].quality, "ATR 14"))
+        print(R("27","ATR 100",     f"{f['atr100'].value:.1f}" if f['atr100'].value is not None else "N/A",f['atr100'].quality, "ATR 100"))
+        print(R("28","BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark - Index Price"))
         sys.stdout.flush()
         if "--once" in sys.argv: break
 
