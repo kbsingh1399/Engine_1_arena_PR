@@ -17026,3 +17026,10 @@ FYI : ### Liquidation Cascade Mathematical Framework...
 ### Assistant Response
 Reviewed and internalized the 4-part Liquidation Cascade Mathematical Framework (CPI, DLR, and S1 Absorption Trigger). Verified that all prerequisite feeds (forceOrder stream, L1/L2 resting depth, delta OI, and tick CVD) are streaming in real-time.
 
+
+### User Prompt
+@[TerminalName: Python, ProcessId: 14388] I think values are stale...like volume is not moving at all
+
+### Assistant Response
+Resolved display latency by directly piping sub-millisecond aggTrade execution ticks into KlineState (apply_trade_tick), increasing volume display precision to 3 decimals (.706M), and accelerating terminal refresh to 2 seconds.
+

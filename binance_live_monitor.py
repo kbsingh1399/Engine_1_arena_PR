@@ -330,6 +330,10 @@ class AggTradeState:
 
     async def apply(self, ts_ms, price_str, qty_str, is_buyer_maker, agg_id=None):
         cts = (ts_ms // 900000) * 900000
+        qty = float(qty_str)
+        price = float(price_str)
+        if KL_STATE.ready:
+            await KL_STATE.apply_trade_tick(price, qty)
         async with self._lock:
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
@@ -338,8 +342,6 @@ class AggTradeState:
                 self.candle_buy_btc = self.candle_sell_btc = 0.0
             
             self.quality = DataQuality.CANONICAL
-            qty = float(qty_str)
-            price = float(price_str)
             self.profile.add(cts, price, qty)
             if is_buyer_maker:
                 self.candle_sell_btc += qty
@@ -506,6 +508,17 @@ class KlineState:
             self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0 if len(self._past_q_vols) >= 8 else self.quote_volume
             self.quality = DataQuality.CANONICAL
 
+    async def apply_trade_tick(self, price: float, qty: float):
+        """Ultra-fast sub-millisecond trade tick update for live price and volume."""
+        async with self._lock:
+            self.close = price
+            if price > self.high: self.high = price
+            if self.low == 0.0 or price < self.low: self.low = price
+            self.volume += qty
+            self.quote_volume += price * qty
+            if len(self._past_q_vols) >= 8:
+                self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0
+
     def live_ema(self, p):
         """EMA incorporating current open bar's close (not yet committed)."""
         seed = self._ema[p]
@@ -624,7 +637,7 @@ MARK_PRICE   = MarkPriceState()
 KL_STATE     = KlineState()
 SNAPSHOT_BUS: Optional[asyncio.Queue] = None
 LATEST_SNAPSHOT: Optional[FeatureSnapshot] = None
-TERMINAL_PRINT_INTERVAL_SEC = 5
+TERMINAL_PRINT_INTERVAL_SEC = 2
 
 
 # ─── Stream Supervisor ────────────────────────────────────────────────────────
@@ -1027,7 +1040,7 @@ async def terminal_observer_loop():
         lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        bar_vol = f"${f['quote_vol'].value/1e6:.2f}M" if f['quote_vol'].value else "$0.00M"
+        bar_vol = f"${f['quote_vol'].value/1e6:.3f}M" if f['quote_vol'].value else "$0.000M"
         sma9 = f"{f['volume_sma9'].value/1e6:.2f}M" if f['volume_sma9'].value else "N/A"
         vol_str = f"{bar_vol} (SMA9:{sma9})"
         lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
