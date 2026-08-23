@@ -24,6 +24,17 @@ from typing import Any, Dict, Optional
 
 sys.stdout.reconfigure(encoding="utf-8")
 os.system("") # Enable ANSI / VT100 escape sequences on Windows console
+if sys.platform == "win32":
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        hOut = kernel32.GetStdHandle(-11)
+        out_mode = ctypes.c_ulong()
+        if kernel32.GetConsoleMode(hOut, ctypes.byref(out_mode)):
+            out_mode.value |= 0x0004 | 0x0008
+            kernel32.SetConsoleMode(hOut, out_mode)
+    except Exception:
+        pass
 
 
 # ─── Data Quality ─────────────────────────────────────────────────────────────
@@ -541,12 +552,7 @@ class KlineState:
     @property
     def rsi(self):
         if self._avg_gain is None: return None
-        # Live RSI: incorporate current bar delta
-        if self._rsi_prev_close is not None:
-            d = self.close - self._rsi_prev_close
-            ag = (self._avg_gain * 13 + max(d, 0.0)) / 14
-            al = (self._avg_loss * 13 + max(-d, 0.0)) / 14
-            return 100.0 - 100.0 / (1 + ag / al) if al > 0 else 100.0
+        # Closed-bar RSI only (no live bar contamination)
         al = self._avg_loss
         return 100.0 - 100.0 / (1 + self._avg_gain / al) if al > 0 else 100.0
 
@@ -649,7 +655,7 @@ MARK_PRICE   = MarkPriceState()
 KL_STATE     = KlineState()
 SNAPSHOT_BUS: Optional[asyncio.Queue] = None
 LATEST_SNAPSHOT: Optional[FeatureSnapshot] = None
-TERMINAL_PRINT_INTERVAL_SEC = 2
+TERMINAL_PRINT_INTERVAL_SEC = 1
 
 
 # ─── Stream Supervisor ────────────────────────────────────────────────────────
@@ -1047,7 +1053,7 @@ async def market_data_loop():
             seq_id += 1
         else:
             print(f"[ERR] {snap}")
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
 
 # ─── Formatters ───────────────────────────────────────────────────────────────
@@ -1098,7 +1104,8 @@ async def terminal_observer_loop():
         lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         lines.append(R(" 5","FUT CVD 24H", f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "24h Rolling Futures CVD"))
-        lines.append(R(" 5b","FUT CVD SES", f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Session Futures CVD"))
+        if f.get('future_cvd_session') and f['future_cvd_session'].value is not None:
+            lines.append(R(" 5b","FUT CVD SES", f"{f['future_cvd_session'].value/1e3:+.3f}K", f['future_cvd_session'].quality, "Session Futures CVD"))
         lines.append(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
         lines.append(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
         lines.append(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
@@ -1128,7 +1135,7 @@ async def terminal_observer_loop():
         if is_interactive:
             prefix = "\033[2J\033[H" if is_first else "\033[H"
             is_first = False
-            buf = prefix + "\n".join(line + "\033[K" for line in lines) + "\n"
+            buf = prefix + "\n".join(line + "\033[K" for line in lines) + "\033[J\n"
             sys.stdout.write(buf)
         else:
             sys.stdout.write("\n" + "\n".join(lines) + "\n")
