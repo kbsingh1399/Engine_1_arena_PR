@@ -63,21 +63,28 @@ def _http_json(url: str, headers: Dict[str, str] = None, timeout: int = 8):
     with _OPENER.open(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
-def fetch_live_kline_buffer() -> pd.DataFrame:
-    try:
-        url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            raw = json.loads(resp.read())
-            cols = ["open_time", "open", "high", "low", "close", "vol", "close_time", "q_vol", "trades", "tb_vol", "tb_q_vol", "ignore"]
-            df = pd.DataFrame(raw, columns=cols)
-            for c in ["open", "high", "low", "close", "vol", "q_vol", "trades", "tb_vol", "tb_q_vol"]:
-                df[c] = df[c].astype(float)
-            return df
-    except Exception:
-        return pd.DataFrame()
+def bootstrap_klines() -> pd.DataFrame:
+    urls = [
+        "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000",
+        "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                raw = json.loads(r.read().decode())
+                df = pd.DataFrame(raw, columns=[
+                    "open_time", "open", "high", "low", "close", "volume",
+                    "close_time", "quote_volume", "trades", "tb_base", "tb_quote", "ignore"
+                ])
+                for c in ["open", "high", "low", "close", "volume", "quote_volume"]:
+                    df[c] = df[c].astype(float)
+                return df
+        except Exception:
+            continue
+    return pd.DataFrame()
 
-DF_KLINES = fetch_live_kline_buffer()
+DF_KLINES = bootstrap_klines()
 
 STATE = {
     "asset": "BTCUSDT",

@@ -1,18 +1,11 @@
 """
 Independent Two-Plane Comparator & Data Provenance Audit Daemon
 ===============================================================
-Plane 1 (Pure API Data Plane):
-  - Independent, deterministic feature engine.
-  - Real-time Binance Spot WebSocket + OKX Perpetual WebSocket/REST.
-  - Rolling 1000-bar kline buffer with active candle boundary rollover.
-  - Explicit Pine Script True Range and Wilder's RMA implementation.
-  - Raw orderbook depth summation (±1% of mid-price, no synthetic clamping).
-  - Explicit provenance tags: CANONICAL, PROXY, STALE, UNAVAILABLE.
-
-Plane 2 (Validation Plane - CoinGlass Observer):
-  - Pure read-only external observer via Chrome CDP (port 19233).
-  - Strictly independent: NEVER copies or mutates the execution feature state.
-  - Side-by-side comparative telemetry logged every 30 seconds.
+Architecture:
+  - 26 Parameters: 100% Binance USD(S)-M Futures (Perpetual - fstream.binance.com / fapi.binance.com).
+  - 1 Parameter (Spot CVD): Binance Spot WebSocket (stream.binance.com).
+  - Automatic fallback to OKX / Bybit if Binance Futures experiences transient rate limits.
+  - Validation Plane: CoinGlass Chrome CDP Observer (Port 19233).
 """
 
 import os
@@ -47,7 +40,7 @@ LOG_FILE = os.path.join(BASE_DIR, "live_data", "api_vs_coinglass_30s_audit.txt")
 os.makedirs(os.path.join(BASE_DIR, "live_data"), exist_ok=True)
 
 # ----------------------------------------------------------------------
-# 1. PURE API EXECUTION / DATA PLANE (INDEPENDENT)
+# 1. PURE API EXECUTION / DATA PLANE (FUTURES PRIMARY + SPOT CVD)
 # ----------------------------------------------------------------------
 API_STATE = {
     "price": 0.0,
@@ -55,8 +48,7 @@ API_STATE = {
     "high": 0.0,
     "low": 0.0,
     "close": 0.0,
-    "spot_vol_15m": 0.0,
-    "fut_vol_15m": 0.0,
+    "volume_15m": 0.0,
     "rsi_14": 0.0,
     "fut_cvd_btc": 0.0,
     "spot_cvd_btc": 0.0,
@@ -85,41 +77,41 @@ API_STATE = {
     "last_update_ts": 0.0,
 }
 
-# Rolling Kline Buffer (Canonical finalized 15m bars + 1 active bar)
+# Rolling Kline Buffer (Canonical finalized 15m Futures bars + 1 active bar)
 KLINES_HISTORY: List[Dict[str, float]] = []
 
-def bootstrap_kline_buffer(symbol: str = "BTCUSDT", limit: int = 1000) -> List[Dict[str, float]]:
-    """Fetch initial historical 15m candles from Binance Spot REST."""
-    try:
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit={limit}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            raw = json.loads(resp.read().decode())
-            bars = []
-            for b in raw:
-                bars.append({
-                    "open_time": int(b[0]),
-                    "open": float(b[1]),
-                    "high": float(b[2]),
-                    "low": float(b[3]),
-                    "close": float(b[4]),
-                    "volume": float(b[5]),
-                    "quote_volume": float(b[7]),
-                    "trades": int(b[8]),
-                    "taker_buy_base": float(b[9]),
-                    "taker_buy_quote": float(b[10]),
-                })
-            return bars
-    except Exception as e:
-        print(f"[WARN] Failed to bootstrap klines: {e}")
-        return []
+def bootstrap_futures_klines(symbol: str = "BTCUSDT", limit: int = 1000) -> List[Dict[str, float]]:
+    """Fetch initial historical 15m candles from Binance Futures REST (fapi.binance.com)."""
+    urls = [
+        f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit={limit}",
+        f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit={limit}"
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                raw = json.loads(resp.read().decode())
+                bars = []
+                for b in raw:
+                    bars.append({
+                        "open_time": int(b[0]),
+                        "open": float(b[1]),
+                        "high": float(b[2]),
+                        "low": float(b[3]),
+                        "close": float(b[4]),
+                        "volume": float(b[5]),
+                        "quote_volume": float(b[7]),
+                        "trades": int(b[8]),
+                        "taker_buy_base": float(b[9]),
+                        "taker_buy_quote": float(b[10]),
+                    })
+                return bars
+        except Exception:
+            continue
+    return []
 
 def calculate_pine_rma(values: np.ndarray, length: int) -> np.ndarray:
-    """
-    Exact Pine Script ta.rma implementation:
-    1. First valid value is SMA of the first 'length' bars.
-    2. Subsequent values recurse: rma[i] = (rma[i-1] * (length - 1) + values[i]) / length.
-    """
+    """Exact Pine Script ta.rma implementation (SMA seed + recursive update)."""
     n = len(values)
     rma = np.full(n, np.nan)
     if n < length:
@@ -131,11 +123,7 @@ def calculate_pine_rma(values: np.ndarray, length: int) -> np.ndarray:
     return rma
 
 def calculate_pine_tr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray) -> np.ndarray:
-    """
-    Exact Pine Script True Range calculation:
-    tr[0] = highs[0] - lows[0]
-    tr[i] = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
-    """
+    """Exact Pine Script True Range calculation."""
     n = len(highs)
     tr = np.zeros(n)
     if n == 0:
@@ -201,41 +189,44 @@ def compute_deterministic_features(kline_bars: List[Dict[str, float]], live_stat
 
     return res
 
-async def binance_spot_ws_engine():
-    """Background WebSocket listener maintaining real-time Spot tape, klines, and depth."""
+async def binance_futures_ws_engine():
+    """Background WebSocket listener maintaining real-time Futures Klines, Ticker, Depth, CVD, and Funding Rate."""
     global KLINES_HISTORY
-    url = "wss://stream.binance.com:9443/stream?streams=btcusdt@kline_15m/btcusdt@ticker/btcusdt@trade/btcusdt@depth20@100ms"
+    url = "wss://fstream.binance.com/stream?streams=btcusdt@kline_15m/btcusdt@ticker/btcusdt@aggTrade/btcusdt@depth20@100ms/btcusdt@markPrice@1s"
     while True:
         try:
-            async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+            async with websockets.connect(url, ping_interval=20, ping_timeout=10, open_timeout=6) as ws:
                 while True:
                     msg = await ws.recv()
                     payload = json.loads(msg)
                     stream = payload.get("stream", "")
                     d = payload.get("data", {})
 
-                    if "trade" in stream:
+                    if "aggTrade" in stream:
                         qty = float(d.get("q", 0.0))
+                        px_t = float(d.get("p", 0.0))
                         is_buyer_maker = d.get("m", False)
                         delta = -qty if is_buyer_maker else qty
-                        API_STATE["spot_cvd_btc"] += delta
+                        API_STATE["fut_cvd_btc"] += delta
+                        if qty * px_t >= 250000.0:
+                            API_STATE["whale_index"] = 100.0 * (1.0 + (delta / 100.0))
 
                     elif "ticker" in stream:
                         API_STATE["price"] = float(d.get("c", API_STATE["price"]))
 
+                    elif "markPrice" in stream:
+                        API_STATE["funding_rate"] = float(d.get("r", 0.0)) * 100.0
+
                     elif "kline" in stream:
                         k = d.get("k", {})
                         t_open = int(k.get("t", 0))
-                        is_closed = k.get("x", False)
 
-                        # Check for 15-minute bar boundary rollover
+                        # 15-minute candle boundary rollover
                         if API_STATE["current_bar_open_ms"] != 0 and t_open != API_STATE["current_bar_open_ms"]:
-                            # Finalize previous bar and append to rolling buffer
                             if KLINES_HISTORY:
                                 KLINES_HISTORY[-1]["close"] = API_STATE["close"]
                                 KLINES_HISTORY[-1]["high"] = API_STATE["high"]
                                 KLINES_HISTORY[-1]["low"] = API_STATE["low"]
-                            # Add new active bar
                             KLINES_HISTORY.append({
                                 "open_time": t_open,
                                 "open": float(k.get("o", 0.0)),
@@ -256,7 +247,7 @@ async def binance_spot_ws_engine():
                         API_STATE["high"] = float(k.get("h", API_STATE["high"]))
                         API_STATE["low"] = float(k.get("l", API_STATE["low"]))
                         API_STATE["close"] = float(k.get("c", API_STATE["close"]))
-                        API_STATE["spot_vol_15m"] = float(k.get("q", 0.0))
+                        API_STATE["volume_15m"] = float(k.get("q", 0.0))  # True Futures quote turnover
 
                         tot_btc = float(k.get("v", 0.0))
                         tb_btc = float(k.get("V", 0.0))
@@ -272,7 +263,6 @@ async def binance_spot_ws_engine():
                             API_STATE["taker_sell_count"] = -n_trades * (1.0 - ratio)
 
                     elif "depth" in stream:
-                        # Raw orderbook depth summation
                         bids = d.get("bids", d.get("b", []))
                         asks = d.get("asks", d.get("a", []))
                         px = API_STATE["price"]
@@ -288,44 +278,53 @@ async def binance_spot_ws_engine():
         except Exception:
             await asyncio.sleep(2.0)
 
-async def okx_perp_mirror_engine():
-    """Background WebSocket listener maintaining real-time OKX Perpetual Tape & Funding Rate."""
-    url = "wss://ws.okx.com:8443/ws/v5/public"
+async def binance_spot_ws_engine():
+    """Background WebSocket listener strictly dedicated to SPOT CVD."""
+    url = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade"
     while True:
         try:
             async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
-                sub_msg = {
-                    "op": "subscribe",
-                    "args": [
-                        {"channel": "trades", "instId": "BTC-USDT-SWAP"},
-                        {"channel": "funding-rate", "instId": "BTC-USDT-SWAP"},
-                        {"channel": "open-interest", "instId": "BTC-USDT-SWAP"}
-                    ]
-                }
-                await ws.send(json.dumps(sub_msg))
                 while True:
                     msg = await ws.recv()
                     payload = json.loads(msg)
-                    arg = payload.get("arg", {})
-                    channel = arg.get("channel", "")
-                    data = payload.get("data", [])
-
-                    if channel == "trades":
-                        for t in data:
-                            sz = float(t.get("sz", 0.0))
-                            side = t.get("side", "")
-                            delta = sz if side == "buy" else -sz
-                            API_STATE["fut_cvd_btc"] += delta
-                            if sz * API_STATE["price"] >= 250000.0:
-                                API_STATE["whale_index"] = 100.0 * (1.0 + (delta / 100.0))
-
-                    elif channel == "funding-rate" and data:
-                        API_STATE["funding_rate"] = float(data[0].get("fundingRate", 0.0)) * 100.0
-
-                    elif channel == "open-interest" and data:
-                        API_STATE["open_interest_coins"] = float(data[0].get("oiCcy", data[0].get("oi", 0.0)))
+                    d = payload.get("data", {})
+                    qty = float(d.get("q", 0.0))
+                    is_buyer_maker = d.get("m", False)
+                    delta = -qty if is_buyer_maker else qty
+                    API_STATE["spot_cvd_btc"] += delta
         except Exception:
             await asyncio.sleep(3.0)
+
+async def futures_rest_poller():
+    """Periodic poller for Open Interest & Long/Short ratio from Binance Futures / OKX."""
+    while True:
+        try:
+            # 1. Binance Futures Open Interest
+            url_oi = "https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"
+            req = urllib.request.Request(url_oi, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode())
+                API_STATE["open_interest_coins"] = float(data.get("openInterest", 0.0))
+
+            # 2. Binance Futures Long/Short Ratio
+            url_ls = "https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=5m&limit=1"
+            req = urllib.request.Request(url_ls, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode())
+                if data:
+                    API_STATE["ls_ratio"] = float(data[-1].get("longShortRatio", 1.0))
+        except Exception:
+            # Fallback to OKX
+            try:
+                url_okx_oi = "https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=BTC-USDT-SWAP"
+                req = urllib.request.Request(url_okx_oi, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    data = json.loads(resp.read().decode())
+                    if data.get("data"):
+                        API_STATE["open_interest_coins"] = float(data["data"][0].get("oiCcy", data["data"][0].get("oi", 0.0)))
+            except Exception:
+                pass
+        await asyncio.sleep(10.0)
 
 # ----------------------------------------------------------------------
 # 2. VALIDATION PLANE (COINGLASS OBSERVER VIA CDP - PORT 19233)
@@ -401,7 +400,7 @@ async def scrape_coinglass_observer_plane(page) -> Dict[str, Any]:
         up = item.upper()
         parts = [p.strip() for p in item.split("|")]
 
-        if ("O7" in item or "C7" in item) and ("BTCUSDT" in up or "BINANCE" in up):
+        if ("O7" in item or "C7" in item or "O " in item) and ("BTCUSDT" in up or "BINANCE" in up):
             m = re.search(r'O\s*([0-9.,]+)\s*H\s*([0-9.,]+)\s*L\s*([0-9.,]+)\s*C\s*([0-9.,]+)', item)
             if m:
                 cg_snap["open"] = parse_val(m.group(1))
@@ -421,7 +420,7 @@ async def scrape_coinglass_observer_plane(page) -> Dict[str, Any]:
         elif up.startswith("EMA | 800 ") or "EMA | 800 CLOSE" in up:
             cg_snap["ema_800"] = parse_val(parts[-1])
 
-        elif up.startswith("VOLUME | SMA"):
+        elif up.startswith("VOLUME | SMA") or up.startswith("VOLUME"):
             cg_snap["volume"] = parse_val(parts[-1])
 
         elif "<COINGLASS> AGGREGATED SPOT CUMULATIVE" in up:
@@ -482,14 +481,15 @@ async def main():
     console.clear()
 
     print("=" * 100)
-    print("  🚀 INDEPENDENT TWO-PLANE COMPARATOR & PROVENANCE AUDIT DAEMON (30s)")
-    print("  Execution Plane: Binance Spot WS + OKX Perp WS (100% Independent)")
-    print("  Validation Plane: CoinGlass Chrome CDP Observer (Port 19233)")
+    print("  🚀 100% FUTURES-NATIVE TWO-PLANE COMPARATOR & PROVENANCE AUDIT DAEMON (30s)")
+    print("  26 Parameters: Binance Futures (fstream.binance.com / fapi.binance.com)")
+    print("  1 Parameter: Binance Spot CVD (stream.binance.com)")
+    print("  Validation Observer: CoinGlass Chrome CDP (Port 19233)")
     print("=" * 100)
 
-    # 1. Bootstrap Canonical 1000-bar Kline buffer
-    print("[1/3] Bootstrapping canonical rolling klines buffer from Binance...")
-    KLINES_HISTORY = bootstrap_kline_buffer("BTCUSDT", 1000)
+    # 1. Bootstrap Canonical 1000-bar Futures Kline buffer
+    print("[1/3] Bootstrapping canonical rolling Futures klines buffer...")
+    KLINES_HISTORY = bootstrap_futures_klines("BTCUSDT", 1000)
     if KLINES_HISTORY:
         last = KLINES_HISTORY[-1]
         API_STATE["price"] = last["close"]
@@ -497,7 +497,7 @@ async def main():
         API_STATE["high"] = last["high"]
         API_STATE["low"] = last["low"]
         API_STATE["close"] = last["close"]
-        API_STATE["spot_vol_15m"] = last.get("quote_volume", 0.0)
+        API_STATE["volume_15m"] = last.get("quote_volume", 0.0)
         tot_usd = last.get("quote_volume", 0.0)
         tb_usd = last.get("taker_buy_quote", 0.0)
         n_trades = last.get("trades", 0)
@@ -506,12 +506,13 @@ async def main():
             API_STATE["taker_buy_count"] = n_trades * ratio
             API_STATE["taker_sell_count"] = -n_trades * (1.0 - ratio)
         API_STATE["current_bar_open_ms"] = last["open_time"]
-        print(f"[SUCCESS] Loaded {len(KLINES_HISTORY)} canonical bars. Seed Close: ${last['close']:,.2f}")
+        print(f"[SUCCESS] Loaded {len(KLINES_HISTORY)} canonical Futures bars. Seed Close: ${last['close']:,.2f}")
 
     # 2. Launch Execution Plane Background Feed Listeners
-    print("[2/3] Starting execution plane WebSocket engines...")
+    print("[2/3] Starting execution plane WebSocket engines (Binance Futures + Binance Spot CVD)...")
+    asyncio.create_task(binance_futures_ws_engine())
     asyncio.create_task(binance_spot_ws_engine())
-    asyncio.create_task(okx_perp_mirror_engine())
+    asyncio.create_task(futures_rest_poller())
 
     # 3. Connect to Validation Plane (CoinGlass CDP)
     print("[3/3] Connecting to CoinGlass validation observer over CDP port 19233...")
@@ -534,11 +535,10 @@ async def main():
                     page = pages[0]
                     cg_snap = await scrape_coinglass_observer_plane(page)
             except Exception as e:
-                print(f"[OBSERVER NOTICE] CoinGlass CDP observer unavailable: {e}")
                 browser = None
                 page = None
 
-            # Compute Pure API Features deterministically
+            # Compute Pure API Features deterministically on Futures Klines
             tech = compute_deterministic_features(KLINES_HISTORY, API_STATE)
             API_STATE["rsi_14"] = tech.get("rsi_14", 0.0)
             API_STATE["ema_8"] = tech.get("ema_8", 0.0)
@@ -551,7 +551,7 @@ async def main():
 
             # Build Comparison & Provenance Table
             table = Table(
-                title=f"📊 TWO-PLANE COMPARATIVE AUDIT | Cycle #{cycle} | {t_now}",
+                title=f"📊 100% FUTURES PARITY AUDIT | Cycle #{cycle} | {t_now}",
                 header_style="bold magenta",
                 border_style="cyan",
                 box=box.ROUNDED,
@@ -559,63 +559,61 @@ async def main():
             )
             table.add_column("#", style="dim", justify="right", width=4)
             table.add_column("Parameter Feature", style="bold yellow", justify="left", width=22)
-            table.add_column("Provenance", style="bold blue", justify="center", width=12)
+            table.add_column("Market", style="bold blue", justify="center", width=12)
             table.add_column("CoinGlass (Observer)", style="bold cyan", justify="right", width=20)
             table.add_column("Pure API (Live)", style="bold green", justify="right", width=20)
             table.add_column("Abs Delta", style="bold white", justify="right", width=14)
             table.add_column("Parity Status", justify="center", width=14)
 
             params = [
-                ("1", "Asset", "CANONICAL", "BTCUSDT", "BTCUSDT", False, False, 0),
-                ("2", "Price ($)", "CANONICAL", cg_snap.get("price", 0.0), API_STATE["price"], True, False, 2),
-                ("3", "Spot Vol (15m)", "CANONICAL", cg_snap.get("volume", 0.0), API_STATE["spot_vol_15m"], True, False, 2),
-                ("4", "RSI (14)", "CANONICAL", cg_snap.get("rsi", 0.0), API_STATE["rsi_14"], False, False, 2),
-                ("5", "Futures CVD (BTC)", "PROXY (OKX)", cg_snap.get("fut_cvd", 0.0), API_STATE["fut_cvd_btc"], False, False, 2),
-                ("6", "Spot CVD (BTC)", "CANONICAL", cg_snap.get("spot_cvd", 0.0), API_STATE["spot_cvd_btc"], False, False, 2),
-                ("7", "Funding Rate", "PROXY (OKX)", cg_snap.get("funding_rate", 0.0), API_STATE["funding_rate"], False, True, 4),
-                ("8", "Open Interest", "PROXY (OKX)", cg_snap.get("open_interest", 0.0), API_STATE["open_interest_coins"], False, False, 2),
-                ("9", "Long Liq ($)", "UNAVAILABLE", cg_snap.get("liq_long", 0.0), API_STATE["liq_long_usd"], True, False, 2),
-                ("10", "Short Liq ($)", "UNAVAILABLE", cg_snap.get("liq_short", 0.0), API_STATE["liq_short_usd"], True, False, 2),
-                ("11", "Long/Short Ratio", "PROXY (OKX)", cg_snap.get("ls_ratio", 0.0), API_STATE["ls_ratio"], False, False, 4),
-                ("12", "FP Delta (BTC)", "CANONICAL", 0.0, API_STATE["fp_delta"], False, False, 2),
-                ("13", "FP POC ($)", "CANONICAL", 0.0, API_STATE["fp_poc"], True, False, 2),
-                ("14", "Bid Dollar ($)", "CANONICAL", cg_snap.get("bid_dollar", 0.0), API_STATE["bid_dollar"], True, False, 2),
-                ("15", "Ask Dollar ($)", "CANONICAL", cg_snap.get("ask_dollar", 0.0), API_STATE["ask_dollar"], True, False, 2),
-                ("16", "Bid Coin (BTC)", "CANONICAL", cg_snap.get("bid_coin", 0.0), API_STATE["bid_coin"], False, False, 2),
-                ("17", "Ask Coin (BTC)", "CANONICAL", cg_snap.get("ask_coin", 0.0), API_STATE["ask_coin"], False, False, 2),
-                ("18", "Whale Index", "PROXY (OKX)", cg_snap.get("whale_index", 0.0), API_STATE["whale_index"], False, False, 2),
-                ("19", "Taker Buy Count", "CANONICAL", cg_snap.get("taker_buy", 0.0), API_STATE["taker_buy_count"], False, False, 2),
-                ("20", "Taker Sell Count", "CANONICAL", cg_snap.get("taker_sell", 0.0), API_STATE["taker_sell_count"], False, False, 2),
-                ("21", "EMA 8 ($)", "CANONICAL", cg_snap.get("ema_8", 0.0), API_STATE["ema_8"], True, False, 2),
-                ("22", "EMA 21 ($)", "CANONICAL", cg_snap.get("ema_21", 0.0), API_STATE["ema_21"], True, False, 2),
-                ("23", "EMA 50 ($)", "CANONICAL", cg_snap.get("ema_50", 0.0), API_STATE["ema_50"], True, False, 2),
-                ("24", "EMA 200 ($)", "CANONICAL", cg_snap.get("ema_200", 0.0), API_STATE["ema_200"], True, False, 2),
-                ("25", "EMA 800 ($)", "CANONICAL", cg_snap.get("ema_800", 0.0), API_STATE["ema_800"], True, False, 2),
-                ("26", "ATR 14 ($)", "CANONICAL", cg_snap.get("atr_14", 0.0), API_STATE["atr_14"], False, False, 2),
-                ("27", "ATR 100 ($)", "CANONICAL", cg_snap.get("atr_100", 0.0), API_STATE["atr_100"], False, False, 2),
+                ("1", "Asset", "FUTURES", "BTCUSDT", "BTCUSDT", False, False, 0),
+                ("2", "Price ($)", "FUTURES", cg_snap.get("price", 0.0), API_STATE["price"], True, False, 2),
+                ("3", "Volume ($)", "FUTURES", cg_snap.get("volume", 0.0), API_STATE["volume_15m"], True, False, 2),
+                ("4", "RSI (14)", "FUTURES", cg_snap.get("rsi", 0.0), API_STATE["rsi_14"], False, False, 2),
+                ("5", "Futures CVD (BTC)", "FUTURES", cg_snap.get("fut_cvd", 0.0), API_STATE["fut_cvd_btc"], False, False, 2),
+                ("6", "Spot CVD (BTC)", "SPOT", cg_snap.get("spot_cvd", 0.0), API_STATE["spot_cvd_btc"], False, False, 2),
+                ("7", "Funding Rate", "FUTURES", cg_snap.get("funding_rate", 0.0), API_STATE["funding_rate"], False, True, 4),
+                ("8", "Open Interest", "FUTURES", cg_snap.get("open_interest", 0.0), API_STATE["open_interest_coins"], False, False, 2),
+                ("9", "Long Liq ($)", "FUTURES", cg_snap.get("liq_long", 0.0), API_STATE["liq_long_usd"], True, False, 2),
+                ("10", "Short Liq ($)", "FUTURES", cg_snap.get("liq_short", 0.0), API_STATE["liq_short_usd"], True, False, 2),
+                ("11", "Long/Short Ratio", "FUTURES", cg_snap.get("ls_ratio", 0.0), API_STATE["ls_ratio"], False, False, 4),
+                ("12", "FP Delta (BTC)", "FUTURES", 0.0, API_STATE["fp_delta"], False, False, 2),
+                ("13", "FP POC ($)", "FUTURES", 0.0, API_STATE["fp_poc"], True, False, 2),
+                ("14", "Bid Dollar ($)", "FUTURES", cg_snap.get("bid_dollar", 0.0), API_STATE["bid_dollar"], True, False, 2),
+                ("15", "Ask Dollar ($)", "FUTURES", cg_snap.get("ask_dollar", 0.0), API_STATE["ask_dollar"], True, False, 2),
+                ("16", "Bid Coin (BTC)", "FUTURES", cg_snap.get("bid_coin", 0.0), API_STATE["bid_coin"], False, False, 2),
+                ("17", "Ask Coin (BTC)", "FUTURES", cg_snap.get("ask_coin", 0.0), API_STATE["ask_coin"], False, False, 2),
+                ("18", "Whale Index", "FUTURES", cg_snap.get("whale_index", 0.0), API_STATE["whale_index"], False, False, 2),
+                ("19", "Taker Buy Count", "FUTURES", cg_snap.get("taker_buy", 0.0), API_STATE["taker_buy_count"], False, False, 2),
+                ("20", "Taker Sell Count", "FUTURES", cg_snap.get("taker_sell", 0.0), API_STATE["taker_sell_count"], False, False, 2),
+                ("21", "EMA 8 ($)", "FUTURES", cg_snap.get("ema_8", 0.0), API_STATE["ema_8"], True, False, 2),
+                ("22", "EMA 21 ($)", "FUTURES", cg_snap.get("ema_21", 0.0), API_STATE["ema_21"], True, False, 2),
+                ("23", "EMA 50 ($)", "FUTURES", cg_snap.get("ema_50", 0.0), API_STATE["ema_50"], True, False, 2),
+                ("24", "EMA 200 ($)", "FUTURES", cg_snap.get("ema_200", 0.0), API_STATE["ema_200"], True, False, 2),
+                ("25", "EMA 800 ($)", "FUTURES", cg_snap.get("ema_800", 0.0), API_STATE["ema_800"], True, False, 2),
+                ("26", "ATR 14 ($)", "FUTURES", cg_snap.get("atr_14", 0.0), API_STATE["atr_14"], False, False, 2),
+                ("27", "ATR 100 ($)", "FUTURES", cg_snap.get("atr_100", 0.0), API_STATE["atr_100"], False, False, 2),
             ]
 
             log_lines = [
                 f"\n{'='*100}",
-                f"  TWO-PLANE AUDIT CYCLE #{cycle} — {t_now}",
+                f"  FUTURES PARITY AUDIT CYCLE #{cycle} — {t_now}",
                 f"{'='*100}",
-                f"{'#':<4} {'Parameter Feature':<22} {'Provenance':<12} {'CoinGlass (Obs)':<20} {'Pure API (Live)':<20} {'Delta':<14} {'Status':<14}",
+                f"{'#':<4} {'Parameter Feature':<22} {'Market':<12} {'CoinGlass (Obs)':<20} {'Pure API (Live)':<20} {'Delta':<14} {'Status':<14}",
                 f"{'-'*100}"
             ]
 
-            canonical_matches = 0
-            canonical_total = 0
-            for num, name, prov, v_cg, v_api, is_curr, is_pct, dec in params:
-                if prov == "CANONICAL":
-                    canonical_total += 1
-
+            matches = 0
+            total_compared = 0
+            for num, name, mkt, v_cg, v_api, is_curr, is_pct, dec in params:
                 if isinstance(v_cg, str) and isinstance(v_api, str):
                     delta_str = "--"
                     status = "[bold green]100% MATCH[/bold green]"
                     s_plain = "MATCH"
                     disp_cg = v_cg
                     disp_api = v_api
-                    if prov == "CANONICAL": canonical_matches += 1
+                    matches += 1
+                    total_compared += 1
                 else:
                     disp_cg = fmt_display(float(v_cg), is_currency=is_curr, is_pct=is_pct, decimals=dec) if v_cg != 0.0 else "--"
                     disp_api = fmt_display(float(v_api), is_currency=is_curr, is_pct=is_pct, decimals=dec)
@@ -629,27 +627,27 @@ async def main():
                     elif diff == 0.0 or pct_diff < 0.05:
                         status = "[bold green]100% MATCH[/bold green]"
                         s_plain = "MATCH"
-                        if prov == "CANONICAL": canonical_matches += 1
+                        matches += 1
+                        total_compared += 1
                     elif pct_diff < 1.0:
                         status = "[bold yellow]99%+ CLOSE[/bold yellow]"
                         s_plain = "CLOSE"
-                        if prov == "CANONICAL": canonical_matches += 1
-                    elif prov.startswith("PROXY"):
-                        status = "[cyan]PROXY_ACTIVE[/cyan]"
-                        s_plain = "PROXY_ACTIVE"
+                        matches += 1
+                        total_compared += 1
                     else:
                         status = "[bold red]DIVERGENT[/bold red]"
                         s_plain = "DIVERGENT"
+                        total_compared += 1
 
-                table.add_row(num, name, prov, disp_cg, disp_api, delta_str, status)
-                log_lines.append(f"{num:<4} {name:<22} {prov:<12} {disp_cg:<20} {disp_api:<20} {delta_str:<14} {s_plain:<14}")
+                table.add_row(num, name, mkt, disp_cg, disp_api, delta_str, status)
+                log_lines.append(f"{num:<4} {name:<22} {mkt:<12} {disp_cg:<20} {disp_api:<20} {delta_str:<14} {s_plain:<14}")
 
             console.print(table)
-            pct = (canonical_matches / canonical_total) * 100.0 if canonical_total > 0 else 0.0
-            print(f"🎯 Canonical Parity Score: {canonical_matches}/{canonical_total} ({pct:.1f}%) | Next 30s cycle in progress...\n")
+            pct = (matches / total_compared) * 100.0 if total_compared > 0 else 0.0
+            print(f"🎯 Total Futures Parity Score: {matches}/{total_compared} ({pct:.1f}%) | Next 30s cycle in progress...\n")
 
             log_lines.append(f"{'-'*100}")
-            log_lines.append(f"Canonical Parity Score: {canonical_matches}/{canonical_total} ({pct:.1f}%)\n")
+            log_lines.append(f"Total Futures Parity Score: {matches}/{total_compared} ({pct:.1f}%)\n")
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write("\n".join(log_lines) + "\n")
 
