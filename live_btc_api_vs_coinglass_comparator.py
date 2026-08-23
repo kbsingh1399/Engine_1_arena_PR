@@ -43,19 +43,47 @@ AUDIT_MD_PATH = os.path.join(BASE_DIR, "live_data", "api_vs_coinglass_report.md"
 
 os.makedirs(os.path.join(BASE_DIR, "live_data"), exist_ok=True)
 
-# Global accumulator for live Binance WebSocket liquidations
+# Global state updated via Binance WebSockets
+WS_STATE = {
+    "price": 0.0, "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0,
+    "volume": 0.0, "quote_volume": 0.0, "trades": 0,
+    "taker_buy_vol": 0.0, "taker_sell_vol": 0.0,
+    "liq_long": 0.0, "liq_short": 0.0,
+    "bid_depth_usd": 0.0, "ask_depth_usd": 0.0,
+    "bid_depth_coins": 0.0, "ask_depth_coins": 0.0,
+    "last_update": 0.0
+}
 LIVE_LIQ_EVENTS = []
 
-async def binance_force_order_listener(symbol: str = "BTCUSDT"):
-    """Background listener for Binance WebSocket forceOrder events."""
-    url = f"wss://fstream.binance.com/ws/{symbol.lower()}@forceOrder"
+async def binance_multistream_listener(symbol: str = "btcusdt"):
+    """
+    Continuous WebSocket listener for Kline, Trade, Depth, and ForceOrder streams.
+    Zero REST rate limits, instant microsecond updates.
+    """
+    stream_url = f"wss://fstream.binance.com/stream?streams={symbol}@kline_1h/{symbol}@forceOrder/{symbol}@depth20@100ms/{symbol}@ticker"
     while True:
         try:
-            async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+            async with websockets.connect(stream_url, ping_interval=20, ping_timeout=10) as ws:
                 while True:
                     msg = await ws.recv()
-                    data = json.loads(msg)
-                    if data.get("e") == "forceOrder":
+                    payload = json.loads(msg)
+                    stream = payload.get("stream", "")
+                    data = payload.get("data", {})
+                    
+                    if "kline" in stream:
+                        k = data.get("k", {})
+                        WS_STATE["open"] = float(k.get("o", 0.0))
+                        WS_STATE["high"] = float(k.get("h", 0.0))
+                        WS_STATE["low"] = float(k.get("l", 0.0))
+                        WS_STATE["close"] = float(k.get("c", 0.0))
+                        WS_STATE["price"] = float(k.get("c", 0.0))
+                        WS_STATE["volume"] = float(k.get("v", 0.0))
+                        WS_STATE["quote_volume"] = float(k.get("q", 0.0))
+                        WS_STATE["trades"] = int(k.get("n", 0))
+                        WS_STATE["taker_buy_vol"] = float(k.get("V", 0.0))
+                        WS_STATE["last_update"] = time.time()
+                        
+                    elif "forceOrder" in stream:
                         o = data.get("o", {})
                         ts = o.get("T", int(time.time() * 1000))
                         side = o.get("S", "")
@@ -63,6 +91,21 @@ async def binance_force_order_listener(symbol: str = "BTCUSDT"):
                         qty = float(o.get("q", 0.0))
                         usd = px * qty
                         LIVE_LIQ_EVENTS.append({"time": ts, "side": side, "usd": usd})
+                        if side == "SELL":
+                            WS_STATE["liq_long"] += usd
+                        elif side == "BUY":
+                            WS_STATE["liq_short"] += usd
+                            
+                    elif "depth" in stream:
+                        bids = data.get("b", [])
+                        asks = data.get("a", [])
+                        px = WS_STATE["price"] if WS_STATE["price"] > 0 else 77000.0
+                        b_c = sum(float(b[1]) for b in bids if float(b[0]) >= px * 0.99)
+                        a_c = sum(float(a[1]) for a in asks if float(a[0]) <= px * 1.01)
+                        WS_STATE["bid_depth_coins"] = b_c
+                        WS_STATE["ask_depth_coins"] = a_c
+                        WS_STATE["bid_depth_usd"] = b_c * px
+                        WS_STATE["ask_depth_usd"] = a_c * px
         except Exception:
             await asyncio.sleep(2.0)
 
@@ -393,13 +436,26 @@ async def fetch_binance_pure_api(session: aiohttp.ClientSession, symbol: str = "
         result["dollars_bid"] = bid_c * px
         result["dollars_ask"] = -ask_c * px
 
-    # WebSocket Liquidations (last 15m)
-    now_ms = time.time() * 1000
-    cutoff = now_ms - (15 * 60 * 1000)
-    l_long = sum(ev["usd"] for ev in LIVE_LIQ_EVENTS if ev["time"] >= cutoff and ev["side"] == "SELL")
-    l_short = sum(ev["usd"] for ev in LIVE_LIQ_EVENTS if ev["time"] >= cutoff and ev["side"] == "BUY")
-    result["liq_long"] = l_long
-    result["liq_short"] = -l_short
+    # WebSocket Liquidations & Metrics from Multistream
+    if WS_STATE["price"] > 0:
+        result["price"] = WS_STATE["price"]
+        result["close"] = WS_STATE["close"]
+        if WS_STATE["open"] > 0: result["open"] = WS_STATE["open"]
+        if WS_STATE["high"] > 0: result["high"] = WS_STATE["high"]
+        if WS_STATE["low"] > 0: result["low"] = WS_STATE["low"]
+        if WS_STATE["quote_volume"] > 0: result["volume"] = WS_STATE["quote_volume"]
+        if WS_STATE["bid_depth_usd"] > 0:
+            result["coins_bid"] = WS_STATE["bid_depth_coins"]
+            result["coins_ask"] = -WS_STATE["ask_depth_coins"]
+            result["dollars_bid"] = WS_STATE["bid_depth_usd"]
+            result["dollars_ask"] = -WS_STATE["ask_depth_usd"]
+
+    candle_open_ms = df_k["open_time"].iloc[-1] if klines and len(klines) > 0 else (time.time() * 1000 - 3600000)
+    l_long = sum(ev["usd"] for ev in LIVE_LIQ_EVENTS if ev["time"] >= candle_open_ms and ev["side"] == "SELL")
+    l_short = sum(ev["usd"] for ev in LIVE_LIQ_EVENTS if ev["time"] >= candle_open_ms and ev["side"] == "BUY")
+    
+    result["liq_long"] = l_long if l_long > 0 else WS_STATE["liq_long"]
+    result["liq_short"] = -l_short if l_short > 0 else -WS_STATE["liq_short"]
 
     return result
 
@@ -409,8 +465,8 @@ async def run_live_comparator_daemon():
     print("  Port: 19233 | Destination: live_data/api_vs_coinglass_live.txt")
     print("=" * 80)
 
-    # Spawn background WebSocket liquidation stream
-    asyncio.create_task(binance_force_order_listener("BTCUSDT"))
+    # Spawn background multi-stream WebSocket listener (Kline, Trade, Depth, ForceOrder)
+    asyncio.create_task(binance_multistream_listener("btcusdt"))
 
     async with async_playwright() as p:
         try:
@@ -419,17 +475,20 @@ async def run_live_comparator_daemon():
             print(f"[FATAL] Could not connect to Chrome CDP on port 19233: {e}")
             return
 
-        pages = [pg for ctx in browser.contexts for pg in ctx.pages if "coinglass" in pg.url.lower()]
+        pages = [pg for ctx in browser.contexts for pg in ctx.pages if "tv/binance_btcusdt" in pg.url.lower()]
+        if not pages:
+            pages = [pg for ctx in browser.contexts for pg in ctx.pages if "coinglass" in pg.url.lower()]
         if not pages:
             print("[FATAL] No active CoinGlass tab found in Chrome.")
             return
         
         page = pages[0]
-        print(f"[OK] Hooked to CoinGlass tab: {await page.title()}")
+        print(f"[OK] Hooked to CoinGlass tab: {await page.title()} ({page.url})")
 
         connector = aiohttp.TCPConnector(limit=20, ttl_dns_cache=300)
         async with aiohttp.ClientSession(connector=connector) as session:
             cycle = 0
+            b_raw_cached = {}
             while True:
                 cycle += 1
                 t0 = time.time()
@@ -445,9 +504,33 @@ async def run_live_comparator_daemon():
                         except Exception:
                             pass
 
-                # 2. Fetch Binance Pure API in parallel
+                # 2. Fetch Binance REST every 10 cycles (avoid rate limits) and merge live WebSocket
                 tf = cg_raw.get("timeframe", "15m")
-                b_raw = await fetch_binance_pure_api(session, symbol="BTCUSDT", interval=tf if tf in ["1m","5m","15m","1h","4h"] else "15m")
+                if cycle % 10 == 1 or not b_raw_cached:
+                    try:
+                        b_raw_cached = await fetch_binance_pure_api(session, symbol="BTCUSDT", interval=tf if tf in ["1m","5m","15m","1h","4h"] else "15m")
+                    except Exception:
+                        pass
+                
+                b_raw = dict(b_raw_cached)
+                # Overlay real-time WebSocket state
+                if WS_STATE["price"] > 0:
+                    b_raw["price"] = WS_STATE["price"]
+                    b_raw["close"] = WS_STATE["close"]
+                    if WS_STATE["open"] > 0: b_raw["open"] = WS_STATE["open"]
+                    if WS_STATE["high"] > 0: b_raw["high"] = WS_STATE["high"]
+                    if WS_STATE["low"] > 0: b_raw["low"] = WS_STATE["low"]
+                    if WS_STATE["quote_volume"] > 0: b_raw["volume"] = WS_STATE["quote_volume"]
+                    if WS_STATE["bid_depth_usd"] > 0:
+                        b_raw["coins_bid"] = WS_STATE["bid_depth_coins"]
+                        b_raw["coins_ask"] = -WS_STATE["ask_depth_coins"]
+                        b_raw["dollars_bid"] = WS_STATE["bid_depth_usd"]
+                        b_raw["dollars_ask"] = -WS_STATE["ask_depth_usd"]
+                if WS_STATE["liq_long"] > 0:
+                    b_raw["liq_long"] = WS_STATE["liq_long"]
+                if WS_STATE["liq_short"] > 0:
+                    b_raw["liq_short"] = -WS_STATE["liq_short"]
+
                 t1 = time.time()
                 elapsed_ms = (t1 - t0) * 1000
 
