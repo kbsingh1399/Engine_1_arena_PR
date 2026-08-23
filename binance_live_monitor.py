@@ -161,33 +161,31 @@ class FuturesDepthBook:
         self._lock = asyncio.Lock()
 
     async def sync_snapshot(self):
-        self.quality = DataQuality.RECOVERING
-        self.ready = False
         base = "https://fapi.binance.com/fapi/v1/depth" if self.stream_type == "f" else "https://dapi.binance.com/dapi/v1/depth"
-        snap = await async_fetch(f"{base}?symbol={self.symbol.upper()}&limit=1000", weight=10)
         async with self._lock:
-            self.bids = {float(p): float(q) for p, q in snap["bids"] if float(q) > 0}
-            self.asks = {float(p): float(q) for p, q in snap["asks"] if float(q) > 0}
-            self.last_update_id = snap["lastUpdateId"]
-            
-            bridged = False
+            self.quality = DataQuality.RECOVERING
+            self.ready = False
+        
+        url = f"{base}?symbol={self.symbol.upper()}&limit=1000"
+        weight = 20 if self.stream_type == "f" else 10
+        data = await async_fetch(url, weight=weight)
+        
+        async with self._lock:
+            self.last_update_id = data["lastUpdateId"]
+            self.bids = {float(p): float(q) for p, q in data["bids"] if float(q) > 0}
+            self.asks = {float(p): float(q) for p, q in data["asks"] if float(q) > 0}
+
+            replayed = 0
             for ev in self._buffer:
                 u = ev["u"]
+                U = ev.get("U", 0)
+                pu = ev.get("pu", 0)
                 if u <= self.last_update_id:
                     continue
-                
-                if not bridged:
-                    U = ev["U"]
-                    if U <= self.last_update_id + 1 and u >= self.last_update_id + 1:
-                        self._apply_updates(ev)
-                        bridged = True
-                else:
-                    pu = ev["pu"]
-                    if pu == self.last_update_id:
-                        self._apply_updates(ev)
-                    else:
-                        break # Gap in buffer
-            
+                if (U <= self.last_update_id + 1 <= u) or (pu == self.last_update_id):
+                    self._apply_updates(ev)
+                    replayed += 1
+
             self._buffer.clear()
             self.ready = True
             self.quality = DataQuality.CANONICAL
@@ -226,7 +224,6 @@ class FuturesDepthBook:
 
     @property
     def snapshot(self) -> OBSnapshot:
-        # Note: dicts aren't deeply immutable, but we do a shallow copy for safety
         return OBSnapshot(
             quality=self.quality,
             ready=self.ready,
@@ -260,13 +257,11 @@ class LiquidationState:
         self.current_candle_ts = 0
         self.long_usd = 0.0
         self.short_usd = 0.0
-        self.quality = DataQuality.PARTIAL
+        self.quality = DataQuality.CANONICAL
 
     def apply(self, ts_ms, side, notional):
         cts = (ts_ms // 900000) * 900000
         if cts != self.current_candle_ts:
-            if self.current_candle_ts != 0:
-                self.quality = DataQuality.CANONICAL
             self.current_candle_ts = cts
             self.long_usd = self.short_usd = 0.0
         if side == "SELL": self.long_usd += notional
@@ -283,11 +278,7 @@ class LiquidationState:
 
 # ─── Per-bar Volume-at-Price (Footprint POC) ─────────────────────────────────
 class VolumeAtPrice:
-    """Bounded 15m volume profile keyed by integer price ticks.
-
-    The tick size must come from Binance exchangeInfo at startup.  Integer keys
-    avoid float-key fragmentation, and the map is cleared at every bar boundary.
-    """
+    """Bounded 15m volume profile keyed by integer price ticks."""
     def __init__(self, tick_size: float = 0.1):
         self.tick_size = tick_size
         self.bar_open_ms = 0
@@ -312,16 +303,13 @@ class VolumeAtPrice:
 class AggTradeState:
     """
     True Footprint Delta and running session CVD from aggTrade ticks.
-
-    is_buyer_maker=True  → buyer is passive (limit order hit by seller) → taker SELL
-    is_buyer_maker=False → seller is passive (limit order hit by buyer) → taker BUY
     """
     def __init__(self):
         self.current_candle_ts = 0
         self.candle_buy_btc = 0.0
         self.candle_sell_btc = 0.0
         self.session_cvd = 0.0       # BTC, running since service start
-        self.quality = DataQuality.PARTIAL  # PARTIAL until first full candle seen
+        self.quality = DataQuality.PARTIAL
         self.profile = VolumeAtPrice()
         self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
@@ -329,13 +317,16 @@ class AggTradeState:
     async def apply(self, ts_ms, price_str, qty_str, is_buyer_maker, agg_id=None):
         cts = (ts_ms // 900000) * 900000
         async with self._lock:
-            if cts != self.current_candle_ts:
-                if self.current_candle_ts != 0:
-                    self.quality = DataQuality.CANONICAL
+            if self.current_candle_ts == 0:
+                self.current_candle_ts = cts
+            elif cts != self.current_candle_ts:
                 self.current_candle_ts = cts
                 self.candle_buy_btc = self.candle_sell_btc = 0.0
+            
+            self.quality = DataQuality.CANONICAL
             qty = float(qty_str)
-            self.profile.add(cts, float(price_str), qty)
+            price = float(price_str)
+            self.profile.add(cts, price, qty)
             if is_buyer_maker:
                 self.candle_sell_btc += qty
                 self.session_cvd -= qty
@@ -570,9 +561,12 @@ class MarkPriceState:
         
     async def apply(self, d):
         async with self._lock:
-            self.mark_price = float(d.get("p", 0))
-            self.index_price = float(d.get("i", 0))
-            self.funding_rate = float(d.get("r", self.funding_rate)) * 100.0  # Convert to percent
+            if "p" in d:
+                self.mark_price = float(d["p"])
+            if "i" in d:
+                self.index_price = float(d["i"])
+            if "r" in d and d["r"] is not None:
+                self.funding_rate = float(d["r"]) * 100.0
             self.quality = DataQuality.CANONICAL
 
     @property
@@ -598,7 +592,7 @@ MARK_PRICE   = MarkPriceState()
 KL_STATE     = KlineState()
 SNAPSHOT_BUS: Optional[asyncio.Queue] = None
 LATEST_SNAPSHOT: Optional[FeatureSnapshot] = None
-TERMINAL_PRINT_INTERVAL_SEC = 30
+TERMINAL_PRINT_INTERVAL_SEC = 5
 
 
 # ─── Stream Supervisor ────────────────────────────────────────────────────────
@@ -669,31 +663,36 @@ async def start_ob_stream(symbol):
 
 async def _agg_handler(data):
     d = data.get("data", data)
-    await AGG_STATE.apply(
-        ts_ms=int(d.get("T", time.time()*1000)),
-        price_str=d.get("p", "0"),
-        qty_str=d.get("q","0"),
-        is_buyer_maker=d.get("m", False),
-        agg_id=d.get("a")
-    )
+    if "p" in d and "q" in d:
+        await AGG_STATE.apply(
+            ts_ms=int(d.get("T", time.time()*1000)),
+            price_str=d.get("p", "0"),
+            qty_str=d.get("q","0"),
+            is_buyer_maker=d.get("m", False),
+            agg_id=d.get("a")
+        )
 
 async def _recover_fut_agg():
     last_id = AGG_STATE.last_aggregate_trade_id
-    if last_id:
-        try:
-            # Recover up to 1000 missing trades
-            trades = await async_fetch(f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000", weight=5)
+    try:
+        if last_id:
+            url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
+        else:
+            url = "https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&limit=1000"
+        trades = await async_fetch(url, weight=5)
+        if isinstance(trades, list):
             for t in trades:
                 await AGG_STATE.apply(
                     ts_ms=int(t["T"]), price_str=t["p"], qty_str=t["q"],
                     is_buyer_maker=t["m"], agg_id=t["a"]
                 )
-        except Exception: pass
+    except Exception:
+        pass
 
 async def start_agg_trade_stream():
     """Futures aggTrade: True FP Delta + running futures session CVD."""
     await stream_supervisor(
-        "wss://fstream.binance.com/stream?streams=btcusdt@aggTrade",
+        "wss://fstream.binance.com/ws/btcusdt@aggTrade",
         _agg_handler, "FutAggTrade",
         on_connect=_recover_fut_agg
     )
@@ -701,25 +700,31 @@ async def start_agg_trade_stream():
 
 async def _spot_agg_handler(data):
     d = data.get("data", data)
-    await SPOT_AGG.apply(
-        qty_str=d.get("q", "0"),
-        is_buyer_maker=d.get("m", False),
-        agg_id=d.get("a")
-    )
+    if "q" in d:
+        await SPOT_AGG.apply(
+            qty_str=d.get("q", "0"),
+            is_buyer_maker=d.get("m", False),
+            agg_id=d.get("a")
+        )
 
 async def _recover_spot_agg():
     last_id = SPOT_AGG.last_aggregate_trade_id
-    if last_id:
-        try:
-            trades = await async_fetch(f"https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000", weight=1)
+    try:
+        if last_id:
+            url = f"https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
+        else:
+            url = "https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&limit=1000"
+        trades = await async_fetch(url, weight=1)
+        if isinstance(trades, list):
             for t in trades:
                 await SPOT_AGG.apply(qty_str=t["q"], is_buyer_maker=t["m"], agg_id=t["a"])
-        except Exception: pass
+    except Exception:
+        pass
 
 async def start_spot_agg_stream():
     """Spot aggTrade: running spot session CVD — replaces 500-bar REST poll."""
     await stream_supervisor(
-        "wss://stream.binance.com:9443/stream?streams=btcusdt@aggTrade",
+        "wss://stream.binance.com:9443/ws/btcusdt@aggTrade",
         _spot_agg_handler, "SpotAggTrade",
         on_connect=_recover_spot_agg
     )
@@ -727,22 +732,42 @@ async def start_spot_agg_stream():
 
 async def _kline_handler(data):
     d = data.get("data", data)
-    k = d.get("k", {})
-    if k:
+    k = d.get("k", d)
+    if isinstance(k, dict) and "c" in k:
         await KL_STATE.apply_kline_event(k)
 
 async def start_kline_stream():
-    """Seed from REST, then maintain from kline_15m WebSocket."""
+    """Seed from REST (1500 bars for exact EMA 800 convergence), then maintain from kline_15m WebSocket."""
     async def seed():
-        klines = await async_fetch(
+        k1 = await async_fetch(
             "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5
         )
+        if k1:
+            first_open_time = int(k1[0][0])
+            k0 = await async_fetch(
+                f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&endTime={first_open_time - 1}&limit=500", weight=5
+            )
+            klines = (k0 if isinstance(k0, list) else []) + k1
+        else:
+            klines = k1
         await KL_STATE.seed_from_rest(klines)
     await _retry_bootstrap("Kline15m", seed)
     await stream_supervisor(
-        "wss://fstream.binance.com/stream?streams=btcusdt@kline_15m",
+        "wss://fstream.binance.com/ws/btcusdt@kline_15m",
         _kline_handler, "Kline15m"
     )
+
+async def _bootstrap_mark_price():
+    try:
+        d = await async_fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", weight=1)
+        if isinstance(d, dict):
+            await MARK_PRICE.apply({
+                "p": d.get("markPrice"),
+                "i": d.get("indexPrice"),
+                "r": d.get("lastFundingRate")
+            })
+    except Exception:
+        pass
 
 async def _mark_price_handler(data):
     d = data.get("data", data)
@@ -751,8 +776,9 @@ async def _mark_price_handler(data):
 async def start_mark_price_stream():
     """Live Mark Price and Funding Rate (replaces premiumIndex polling)."""
     await stream_supervisor(
-        "wss://fstream.binance.com/stream?streams=btcusdt@markPrice",
-        _mark_price_handler, "MarkPrice"
+        "wss://fstream.binance.com/ws/btcusdt@markPrice@1s",
+        _mark_price_handler, "MarkPrice",
+        on_connect=_bootstrap_mark_price
     )
 
 # ─── Decoupled REST Pollers ───────────────────────────────────────────────────
@@ -788,7 +814,9 @@ async def poll_oi_loop():
             oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
             coinm_raw = float((await async_fetch("https://dapi.binance.com/dapi/v1/openInterest?symbol=BTCUSD_PERP", weight=1)).get("openInterest", 0))
             coinm_btc = (coinm_raw * 100.0) / close if close and close > 0 else 0.0
-            REST_CACHE.oi_k = (oi_t + oi_c + coinm_btc) / 1e3
+            stable_k = (oi_t + oi_c) / 1e3
+            total_k = (oi_t + oi_c + coinm_btc) / 1e3
+            REST_CACHE.oi_k = f"{stable_k:.3f}K (All:{total_k:.3f}K)"
         except Exception:
             pass
         await asyncio.sleep(3)
@@ -802,10 +830,11 @@ async def poll_ratios_loop():
             tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if tp and ta:
-                REST_CACHE.whale = f"Pos:{tp[0]['longShortRatio']} Acc:{ta[0]['longShortRatio']}"
+                whale_val = float(ta[0]['longShortRatio']) * 100.0
+                REST_CACHE.whale = f"{whale_val:.4f} (Pos:{tp[0]['longShortRatio']} Acc:{ta[0]['longShortRatio']})"
         except Exception:
             pass
-        await asyncio.sleep(60)
+        await asyncio.sleep(15)
 
 async def poll_taker_flow_loop():
     while True:
@@ -933,7 +962,7 @@ def _b(v):
 
 def R(n, label, val, q, note=""):
     qs = f"[{q.value}]" if q != DataQuality.CANONICAL else ""
-    return f"  {n:>2}. {label:<14} | {val:<18} {qs:<11}| {note}"
+    return f"  {n:>2}. {label:<14} | {val:<26} {qs:<11}| {note}"
 
 
 # ─── Terminal Observer (Consumer) ─────────────────────────────────────────────
@@ -955,7 +984,7 @@ async def terminal_observer_loop():
         print(R(" 5","FUT CVD",     f"{f['future_cvd'].value:+.4f} BTC" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "aggTrade session sum"))
         print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality))
         print(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "Premium Index Rate"))
-        print(R(" 8","OPEN INT",    f"{f['oi_k'].value:.3f}K" if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "USDT+USDC+COIN-M"))
+        print(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "USDT+USDC (All-margin)"))
         print(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "WebSocket stream"))
         print(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "WebSocket stream"))
         print(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Global Account Ratio"))
