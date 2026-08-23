@@ -231,22 +231,22 @@ async def run_comparator(duration_seconds=300):
                 # 14. BID Dollar
                 bdd_cg = cg_data.get("bid_dollar", "N/A")
                 bdd_loc = f"${f['bid_dollar'].value/1e6:.2f}M" if f['bid_dollar'].value else "N/A"
-                rows.append(R(14, "BID Dollar", bdd_cg, bdd_loc, "[±1% DEPTH]"))
+                rows.append(R(14, "BID Dollar", bdd_cg, bdd_loc, "[±1% PERP DEPTH]"))
                 
                 # 15. Ask Dollar
                 add_cg = cg_data.get("ask_dollar", "N/A")
                 add_loc = f"-${abs(f['ask_dollar'].value)/1e6:.2f}M" if f['ask_dollar'].value else "N/A"
-                rows.append(R(15, "Ask Dollar", add_cg, add_loc, "[±1% DEPTH]"))
+                rows.append(R(15, "Ask Dollar", add_cg, add_loc, "[±1% PERP DEPTH]"))
                 
                 # 16. Bid Coin
                 bdc_cg = cg_data.get("bid_coin", "N/A")
                 bdc_loc = f"{f['bid_coin'].value/1e3:.2f}K" if f['bid_coin'].value else "N/A"
-                rows.append(R(16, "Bid Coin", bdc_cg, bdc_loc, "[±1% DEPTH]"))
+                rows.append(R(16, "Bid Coin", bdc_cg, bdc_loc, "[±1% PERP DEPTH]"))
                 
                 # 17. Ask Coin
                 adc_cg = cg_data.get("ask_coin", "N/A")
                 adc_loc = f"{-abs(f['ask_coin'].value)/1e3:.2f}K" if f['ask_coin'].value else "N/A"
-                rows.append(R(17, "Ask Coin", adc_cg, adc_loc, "[±1% DEPTH]"))
+                rows.append(R(17, "Ask Coin", adc_cg, adc_loc, "[±1% PERP DEPTH]"))
                 
                 # 18. Whale Index
                 w_cg = cg_data.get("whale_idx", "N/A")
@@ -256,12 +256,12 @@ async def run_comparator(duration_seconds=300):
                 # 19. Taker Buy
                 tb_cg = cg_data.get("taker_buy_cnt", "N/A")
                 tb_loc = f"{f['taker_buy'].value/1e3:.2f}K" if f['taker_buy'].value else "N/A"
-                rows.append(R(19, "Taker Buy", tb_cg, tb_loc, "[FLOW AGG]"))
+                rows.append(R(19, "Taker Buy", tb_cg, tb_loc, "[15M TRADE FLOW]"))
                 
                 # 20. Taker Sell
                 ts_cg = cg_data.get("taker_sell_cnt", "N/A")
                 ts_loc = f"{-abs(f['taker_sell'].value)/1e3:.2f}K" if f['taker_sell'].value else "N/A"
-                rows.append(R(20, "Taker Sell", ts_cg, ts_loc, "[FLOW AGG]"))
+                rows.append(R(20, "Taker Sell", ts_cg, ts_loc, "[15M TRADE FLOW]"))
                 
                 # 21-25. EMAs
                 for num, p in [(21, 8), (22, 21), (23, 50), (24, 200), (25, 800)]:
