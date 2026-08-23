@@ -256,7 +256,7 @@ def ob_depth_within_pct(snap: OBSnapshot, price: float, pct: float=0.01):
 
 # ─── Liquidation State ────────────────────────────────────────────────────────
 class LiquidationState:
-    """Per-candle liq volumes. PARTIAL until a full 15m boundary is crossed."""
+    """Per-candle liq volumes. Resets at every 15m candle boundary (IST/UTC :00, :15, :30, :45)."""
     def __init__(self):
         self.current_candle_ts = 0
         self.long_usd = 0.0
@@ -273,6 +273,13 @@ class LiquidationState:
 
     @property
     def snapshot(self) -> LiqSnapshot:
+        now_cts = (int(time.time() * 1000) // 900000) * 900000
+        if self.current_candle_ts != 0 and now_cts != self.current_candle_ts:
+            return LiqSnapshot(
+                quality=self.quality,
+                long_usd=0.0,
+                short_usd=0.0
+            )
         return LiqSnapshot(
             quality=self.quality,
             long_usd=self.long_usd,
@@ -297,6 +304,9 @@ class VolumeAtPrice:
 
     @property
     def poc(self) -> Optional[float]:
+        now_cts = (int(time.time() * 1000) // 900000) * 900000
+        if self.bar_open_ms != 0 and now_cts != self.bar_open_ms:
+            return None
         if not self._volume_by_tick:
             return None
         tick = max(self._volume_by_tick, key=self._volume_by_tick.__getitem__)
@@ -342,6 +352,9 @@ class AggTradeState:
 
     @property
     def fp_delta(self):
+        now_cts = (int(time.time() * 1000) // 900000) * 900000
+        if self.current_candle_ts != 0 and now_cts != self.current_candle_ts:
+            return 0.0
         return self.candle_buy_btc - self.candle_sell_btc
 
     @property
@@ -1014,8 +1027,10 @@ async def terminal_observer_loop():
         lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        vol_str = f"{f['volume_sma9'].value/1e6:.3f}M" if f['volume_sma9'].value else f"{f['quote_vol'].value/1e6:.3f}M"
-        lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "Volume SMA 9"))
+        bar_vol = f"${f['quote_vol'].value/1e6:.2f}M" if f['quote_vol'].value else "$0.00M"
+        sma9 = f"{f['volume_sma9'].value/1e6:.2f}M" if f['volume_sma9'].value else "N/A"
+        vol_str = f"{bar_vol} (SMA9:{sma9})"
+        lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         lines.append(R(" 5","FUT CVD",     f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
         lines.append(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))

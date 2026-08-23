@@ -17001,3 +17001,14 @@ Explained full self-contained execution inside Antigravity IDE and outlined road
 ### Assistant Response
 Updated binance_live_monitor.py with non-repeating and flicker-free ANSI VT100 in-place table rendering via sys.stdout.write buffer.
 
+
+### User Prompt
+I think following reset at 15 minute candle as per IST :
+3. Vol
+4. RSI
+9. Long Liquidation
+10. Short Liquidation
+
+### Assistant Response
+Confirmed 15m candle rollover mechanics (IST :00, :15, :30, :45). Hardened LiquidationState, VolumeAtPrice POC, Footprint Delta, and Volume displays to auto-reset per 15m candle boundary.
+
