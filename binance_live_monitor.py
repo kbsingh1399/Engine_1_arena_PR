@@ -597,6 +597,8 @@ SPOT_AGG     = SpotAggTradeState()
 MARK_PRICE   = MarkPriceState()
 KL_STATE     = KlineState()
 SNAPSHOT_BUS: Optional[asyncio.Queue] = None
+LATEST_SNAPSHOT: Optional[FeatureSnapshot] = None
+TERMINAL_PRINT_INTERVAL_SEC = 30
 
 
 # ─── Stream Supervisor ────────────────────────────────────────────────────────
@@ -644,9 +646,23 @@ async def _ob_handler(book, data):
     if book.quality == DataQuality.STALE:
         await book.sync_snapshot()
 
+async def _retry_bootstrap(name, operation):
+    """Retry REST bootstrap without letting one blocked endpoint kill the service."""
+    delay = 1.0
+    while True:
+        try:
+            return await operation()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(f"[BOOTSTRAP ERR] {name}: {type(exc).__name__}: {exc}; retrying in {delay:.0f}s")
+            await asyncio.sleep(delay)
+            delay = min(delay * 2.0, 30.0)
+
+
 async def start_ob_stream(symbol):
     book = OB_STATE[symbol]
-    await book.sync_snapshot()
+    await _retry_bootstrap(f"OB_{symbol}", book.sync_snapshot)
     base = "wss://fstream.binance.com/ws" if book.stream_type == "f" else "wss://dstream.binance.com/ws"
     await stream_supervisor(f"{base}/{symbol}@depth", lambda d: _ob_handler(book, d), f"OB_{symbol}")
 
@@ -717,10 +733,12 @@ async def _kline_handler(data):
 
 async def start_kline_stream():
     """Seed from REST, then maintain from kline_15m WebSocket."""
-    klines = await async_fetch(
-        "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5
-    )
-    await KL_STATE.seed_from_rest(klines)
+    async def seed():
+        klines = await async_fetch(
+            "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5
+        )
+        await KL_STATE.seed_from_rest(klines)
+    await _retry_bootstrap("Kline15m", seed)
     await stream_supervisor(
         "wss://fstream.binance.com/stream?streams=btcusdt@kline_15m",
         _kline_handler, "Kline15m"
@@ -888,6 +906,8 @@ async def market_data_loop():
     while True:
         snap = await compute_snapshot(seq_id)
         if isinstance(snap, FeatureSnapshot):
+            global LATEST_SNAPSHOT
+            LATEST_SNAPSHOT = snap
             if SNAPSHOT_BUS.full():
                 SNAPSHOT_BUS.get_nowait()
             SNAPSHOT_BUS.put_nowait(snap)
@@ -918,8 +938,13 @@ def R(n, label, val, q, note=""):
 
 # ─── Terminal Observer (Consumer) ─────────────────────────────────────────────
 async def terminal_observer_loop():
+    """Human observer only; execution consumers can continue using SNAPSHOT_BUS."""
     while True:
-        snap = await SNAPSHOT_BUS.get()
+        await asyncio.sleep(TERMINAL_PRINT_INTERVAL_SEC)
+        snap = LATEST_SNAPSHOT
+        if snap is None:
+            print("[WAITING] No canonical snapshot has been published yet.")
+            continue
         f = snap.features
         t = datetime.now().strftime("%H:%M:%S")
         print(f"\n[{t}] SEQ:{snap.sequence_id} " + "─"*60)
