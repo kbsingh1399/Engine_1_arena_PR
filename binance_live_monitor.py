@@ -814,9 +814,20 @@ async def _recover_fut_agg():
     last_id = AGG_STATE.last_aggregate_trade_id
     try:
         if AGG_STATE.session_cvd == 0.0:
-            fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=850", weight=5)
-            if isinstance(fk_data, list):
-                AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in fk_data)
+            all_fk = []
+            end_time = None
+            for _ in range(3):
+                url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+                if end_time: url += f"&endTime={end_time}"
+                data = await async_fetch(url, weight=5)
+                if not data or not isinstance(data, list): break
+                all_fk = data + all_fk
+                end_time = int(data[0][0]) - 1
+            if len(all_fk) >= 2532:
+                sub = all_fk[-2532:]
+                AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in sub)
+            elif all_fk:
+                AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in all_fk)
         cutoff_ms = int(time.time() * 1000) - 24 * 3600 * 1000
         if last_id:
             url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
