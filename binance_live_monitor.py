@@ -245,17 +245,24 @@ class FuturesDepthBook:
                 if len(self._buffer) > 1000:
                     self._buffer.pop(0)
             else:
-                u, pu, U = ev["u"], ev["pu"], ev["U"]
+                u, U = ev["u"], ev.get("U", 0)
+                pu = ev.get("pu", None)
                 if u <= self.last_update_id:
                     return
-                if pu != self.last_update_id:
-                    # Bridge rule for first stream event if buffer was empty
-                    if U <= self.last_update_id + 1 and u >= self.last_update_id + 1:
-                        self._apply_updates(ev)
+                if pu is not None:
+                    if pu != self.last_update_id:
+                        if U <= self.last_update_id + 1 and u >= self.last_update_id + 1:
+                            self._apply_updates(ev)
+                            return
+                        self.quality = DataQuality.STALE
+                        self.ready = False
                         return
-                    self.quality = DataQuality.STALE
-                    self.ready = False
-                    return
+                else:
+                    # Spot depth event (U <= last_update_id + 1 <= u)
+                    if U > self.last_update_id + 1:
+                        self.quality = DataQuality.STALE
+                        self.ready = False
+                        return
                 
                 self._apply_updates(ev)
 
@@ -758,7 +765,7 @@ async def stream_supervisor(url, handler, name, on_connect=None):
             async with websockets.connect(url, max_size=10*1024*1024) as ws:
                 backoff = 1.0
                 if on_connect:
-                    await on_connect()
+                    asyncio.create_task(on_connect())
                 while True:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
@@ -1188,16 +1195,18 @@ async def market_data_loop():
 # ─── Formatters ───────────────────────────────────────────────────────────────
 def _u(v):
     if v is None: return "N/A"
+    sign = "-" if v < 0 else ""
     a = abs(v)
-    if a>=1e6: return f"${a/1e6:.3f}M"
-    if a>=1e3: return f"${a/1e3:.2f}K"
-    return f"${a:.2f}"
+    if a >= 1e6: return f"{sign}${a/1e6:.3f}M"
+    if a >= 1e3: return f"{sign}${a/1e3:.2f}K"
+    return f"{sign}${a:.2f}"
 
 def _b(v):
     if v is None: return "N/A"
+    sign = "-" if v < 0 else ""
     a = abs(v)
-    if a>=1e3: return f"{a/1e3:.2f}K"
-    return f"{a:.4f}"
+    if a >= 1e3: return f"{sign}{a/1e3:.2f}K"
+    return f"{sign}{a:.4f}"
 
 def R(n, label, val, q, note=""):
     qs = f"[{q.value}]" if q != DataQuality.CANONICAL else ""

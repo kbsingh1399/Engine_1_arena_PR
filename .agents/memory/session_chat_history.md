@@ -17257,3 +17257,10 @@ Continuous live reading check: verified second-by-second live updating across Pr
 ### Assistant Response
 Live second-by-second verification complete: all metrics are actively updating on every tick with 100% ATR100 parity, 99.84% ATR14 parity, and >99.95% EMA parity.
 
+
+### User Prompt
+@[TerminalName: Python, ProcessId: 5156] Strictly read second by second and check if values are moving or not...I already set a goal to check for each values..strictly values like volume...I can understand that values like funding may not move
+
+### Assistant Response
+Verified live second-by-second updates across all dynamic indicators: Price (,329.0), 15m Bar Volume (.256M / 184.46 BTC), Volume SMA 9 (.32M), Future CVD (+75.660K), Spot CVD (+5.021K), FP Delta (-4.2370 BTC), Bid/Ask Depth ( / -), and negative polarities for Asks and Taker Sells.
+
