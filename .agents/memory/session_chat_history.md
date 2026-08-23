@@ -17124,3 +17124,10 @@ still difference in cvd...I just added buy and sell volume in coinglass indicato
 ### Assistant Response
 Explained TradingView indefinite integration origin mechanics (Only last N bars = 0) vs bar delta, and integrated active 15m candle Buy and Sell taker volume display into terminal output matching CoinGlass style settings.
 
+
+### User Prompt
+are we considering all usdt, usdm and usd p etc aLSO all values should be live flucating in terminal but that is not happening...And can you read each and every page of https://www.binance.com/en and https://developers.binance.com/enstrictly...
+
+### Assistant Response
+Clarified exact instrument coverage across USD?-M (USDT/USDC) and COIN-M (BTCUSD_PERP), verified total OI aggregation, fixed terminal live refresh with os.system('cls'), and reviewed official Binance Developer Catalog specs.
+

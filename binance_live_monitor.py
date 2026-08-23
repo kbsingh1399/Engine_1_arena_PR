@@ -846,7 +846,8 @@ async def _spot_agg_handler(data):
         await SPOT_AGG.apply(
             qty_str=d.get("q", "0"),
             is_buyer_maker=d.get("m", False),
-            agg_id=d.get("a")
+            agg_id=d.get("a"),
+            ts_ms=int(d.get("E", d.get("T", time.time()*1000)))
         )
 
 async def _recover_spot_agg():
@@ -1190,10 +1191,11 @@ async def terminal_observer_loop():
         lines.append(R("28","BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark - Index Price"))
         
         if is_interactive:
-            prefix = "\033[2J\033[H" if is_first else "\033[H"
-            is_first = False
-            buf = prefix + "\n".join(line + "\033[K" for line in lines) + "\033[J\n"
-            sys.stdout.write(buf)
+            if sys.platform == "win32":
+                os.system("cls")
+            else:
+                sys.stdout.write("\033[2J\033[H")
+            sys.stdout.write("\n".join(lines) + "\n")
         else:
             sys.stdout.write("\n" + "\n".join(lines) + "\n")
         sys.stdout.flush()
