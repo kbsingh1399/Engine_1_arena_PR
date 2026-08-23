@@ -142,6 +142,31 @@ def fmt_val(v: float, is_currency: bool = False, is_pct: bool = False, decimals:
     else:
         return f"{prefix}{v:,.{decimals}f}{suffix}"
 
+def calculate_pine_rma(values: np.ndarray, length: int) -> np.ndarray:
+    n = len(values)
+    rma = np.full(n, np.nan)
+    if n < length:
+        return rma
+    rma[length - 1] = np.mean(values[:length])
+    alpha = 1.0 / float(length)
+    for i in range(length, n):
+        rma[i] = rma[i - 1] * (1.0 - alpha) + values[i] * alpha
+    return rma
+
+def calculate_pine_tr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray) -> np.ndarray:
+    n = len(highs)
+    tr = np.zeros(n)
+    if n == 0:
+        return tr
+    tr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        tr[i] = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1])
+        )
+    return tr
+
 def compute_indicators(df: pd.DataFrame, live_price: float, live_high: float, live_low: float) -> Dict[str, float]:
     if df.empty or live_price == 0:
         return {"ema_8": 0.0, "ema_21": 0.0, "ema_50": 0.0, "ema_200": 0.0, "ema_800": 0.0, "rsi": 0.0, "atr_14": 0.0, "atr_100": 0.0}
@@ -162,21 +187,24 @@ def compute_indicators(df: pd.DataFrame, live_price: float, live_high: float, li
     res["ema_800"] = float(s_c.ewm(span=800, adjust=False).mean().iloc[-1])
 
     deltas = np.diff(c)
-    gains = np.maximum(deltas, 0)
-    losses = np.maximum(-deltas, 0)
-    ag = np.mean(gains[:14])
-    al = np.mean(losses[:14])
-    for i in range(14, len(deltas)):
-        ag = (ag * 13 + gains[i]) / 14
-        al = (al * 13 + losses[i]) / 14
-    rs = ag / al if al > 0 else 1.0
-    res["rsi"] = float(100.0 - (100.0 / (1.0 + rs)))
+    gains = np.maximum(deltas, 0.0)
+    losses = np.maximum(-deltas, 0.0)
+    if len(gains) >= 14:
+        rma_g = calculate_pine_rma(gains, 14)
+        rma_l = calculate_pine_rma(losses, 14)
+        if rma_l[-1] == 0:
+            res["rsi"] = 100.0
+        else:
+            rs = rma_g[-1] / rma_l[-1]
+            res["rsi"] = float(100.0 - (100.0 / (1.0 + rs)))
+    else:
+        res["rsi"] = 50.0
 
-    tr = [max(h[i] - l[i], abs(h[i] - c[i-1]), abs(l[i] - c[i-1])) for i in range(1, len(c))]
-    s_tr = pd.Series(tr)
-    # TradingView ATR strictly uses Wilder's Smoothing (RMA with span = 2*N - 1)
-    res["atr_14"] = float(s_tr.ewm(span=27, adjust=False).mean().iloc[-1])
-    res["atr_100"] = float(s_tr.ewm(span=199, adjust=False).mean().iloc[-1])
+    tr = calculate_pine_tr(h, l, c)
+    rma_14 = calculate_pine_rma(tr, 14)
+    rma_100 = calculate_pine_rma(tr, 100)
+    res["atr_14"] = float(rma_14[-1]) if not np.isnan(rma_14[-1]) else 0.0
+    res["atr_100"] = float(rma_100[-1]) if not np.isnan(rma_100[-1]) else 0.0
 
     return res
 
