@@ -272,13 +272,13 @@ async def binance_spot_ws_engine():
                             API_STATE["taker_sell_count"] = -n_trades * (1.0 - ratio)
 
                     elif "depth" in stream:
-                        # Raw orderbook summation strictly within ±1% of mid-price
-                        bids = d.get("b", [])
-                        asks = d.get("a", [])
+                        # Raw orderbook depth summation
+                        bids = d.get("bids", d.get("b", []))
+                        asks = d.get("asks", d.get("a", []))
                         px = API_STATE["price"]
-                        if px > 0:
-                            b_c = sum(float(b[1]) for b in bids if float(b[0]) >= px * 0.99)
-                            a_c = sum(float(a[1]) for a in asks if float(a[0]) <= px * 1.01)
+                        if px > 0 and bids and asks:
+                            b_c = sum(float(b[1]) for b in bids)
+                            a_c = sum(float(a[1]) for a in asks)
                             API_STATE["bid_coin"] = b_c
                             API_STATE["ask_coin"] = -a_c
                             API_STATE["bid_dollar"] = b_c * px
@@ -497,6 +497,14 @@ async def main():
         API_STATE["high"] = last["high"]
         API_STATE["low"] = last["low"]
         API_STATE["close"] = last["close"]
+        API_STATE["spot_vol_15m"] = last.get("quote_volume", 0.0)
+        tot_usd = last.get("quote_volume", 0.0)
+        tb_usd = last.get("taker_buy_quote", 0.0)
+        n_trades = last.get("trades", 0)
+        if tot_usd > 0 and n_trades > 0:
+            ratio = tb_usd / tot_usd
+            API_STATE["taker_buy_count"] = n_trades * ratio
+            API_STATE["taker_sell_count"] = -n_trades * (1.0 - ratio)
         API_STATE["current_bar_open_ms"] = last["open_time"]
         print(f"[SUCCESS] Loaded {len(KLINES_HISTORY)} canonical bars. Seed Close: ${last['close']:,.2f}")
 
