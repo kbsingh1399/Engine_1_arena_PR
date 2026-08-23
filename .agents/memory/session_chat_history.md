@@ -17019,3 +17019,10 @@ FYI : ### Mathematical Taxonomy & Feature Feasibility Matrix...
 ### Assistant Response
 Audited Mathematical Taxonomy & Feature Feasibility Matrix against binance_live_monitor.py implementation. Verified 100% mathematical formula parity across all 28 canonical feature extractors.
 
+
+### User Prompt
+FYI : ### Liquidation Cascade Mathematical Framework...
+
+### Assistant Response
+Reviewed and internalized the 4-part Liquidation Cascade Mathematical Framework (CPI, DLR, and S1 Absorption Trigger). Verified that all prerequisite feeds (forceOrder stream, L1/L2 resting depth, delta OI, and tick CVD) are streaming in real-time.
+
