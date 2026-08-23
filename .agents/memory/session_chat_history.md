@@ -17103,3 +17103,10 @@ why I am not able to login jetski preview
 ### Assistant Response
 Explained Jetski Preview authentication mechanics, multi-account Google cookie collisions, and local localhost direct access resolution.
 
+
+### User Prompt
+how to open browser in antigravity ide
+
+### Assistant Response
+Provided instructions for opening integrated Simple Browser tab, Ports tab preview, terminal launch, and agent browser automation in Antigravity IDE.
+
