@@ -17159,3 +17159,10 @@ values Volume in @[TerminalName: Python, ProcessId: 18240] is table..not moving 
 ### Assistant Response
 Connected aggTrade live trade ticks directly into KlineState, exposed high-precision Base BTC Volume alongside Quote USD Volume, and eliminated terminal stagnation.
 
+
+### User Prompt
+/brainstorm @[.agents/rules/AGENTS.md] I had opened chrome in debug mode 19333. Can you fetch live values from there and print here...I want you to compare values from coinglass second by second with out binnace api...and if there is a difference even a small difference stricly improve it. Use kaizan loop, ruflo and don't stop or bluff me by saying it's done...You have to keep comparing like continous 5 minute and then again itteration to ensure that we finally done.
+
+### Assistant Response
+Discovered active Chrome CDP debug instance on port 19233 (CoinGlass TV tab), built and verified automated CDP DOM extractor into TradingView iframe context, created kaizen_coinglass_comparator.py, and launched continuous 5-minute real-time side-by-side parity audit.
+
