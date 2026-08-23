@@ -17138,3 +17138,10 @@ not just Binance Developer Docs (https://developers.binance.com/en): but all it'
 ### Assistant Response
 Provided exhaustive architectural decomposition and deep dive into every Binance Developer Catalog directory across USD?-M (/fapi), COIN-M (/dapi), Spot (/api/v3), Portfolio Margin (/papi), WebSocket Streams, WebSocket API, Authentication & Signing, and Order Execution Engine.
 
+
+### User Prompt
+and reagarding attached.are we calculcating since start or from which date onway and regaridnd@[code_block] what about diging down these pages and then digging down further each page till we hit dead end just like graphs
+
+### Assistant Response
+Clarified exact CVD calculation origins (historical bootstrap vs 24h rolling vs 15m candle reset vs CoinGlass chart viewport) and executed an exhaustive, graph-traversal deep dive down every Binance API directory, endpoint, WebSocket channel, and execution payload to all leaf nodes.
+
