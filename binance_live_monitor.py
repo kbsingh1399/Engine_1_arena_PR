@@ -67,6 +67,7 @@ class LiqSnapshot:
 class AggTradeSnapshot:
     quality: DataQuality
     session_cvd: float
+    cvd_24h: float
     fp_delta: float
     fp_poc: Optional[float]
 
@@ -105,6 +106,7 @@ class MarkPriceSnapshot:
 class RestSnapshot:
     oi_k: Optional[float]
     ls_ratio: Optional[float]
+    ls_ratio_global: Optional[float]
     whale: str
     usdc_tb: float
     usdc_ts: float
@@ -313,16 +315,18 @@ class VolumeAtPrice:
         return tick * self.tick_size
 
 
-# ─── AggTrade State (True FP Delta + Session CVD) ────────────────────────────
+# ─── AggTrade State (True FP Delta + 24h Rolling CVD) ─────────────────────────
 class AggTradeState:
     """
-    True Footprint Delta and running session CVD from aggTrade ticks.
+    True Footprint Delta and 24h rolling CVD from aggTrade ticks.
     """
     def __init__(self):
         self.current_candle_ts = 0
         self.candle_buy_btc = 0.0
         self.candle_sell_btc = 0.0
-        self.session_cvd = 0.0       # BTC, running since service start
+        self.session_cvd = 0.0       # BTC, running since service start (legacy)
+        self.cvd_24h = 0.0           # BTC, 24h rolling window
+        self._trade_history = deque(maxlen=100000)  # (ts_ms, signed_qty_btc)
         self.quality = DataQuality.PARTIAL
         self.profile = VolumeAtPrice()
         self.last_aggregate_trade_id = None
@@ -343,14 +347,21 @@ class AggTradeState:
             
             self.quality = DataQuality.CANONICAL
             self.profile.add(cts, price, qty)
-            if is_buyer_maker:
-                self.candle_sell_btc += qty
-                self.session_cvd -= qty
-            else:
-                self.candle_buy_btc += qty
-                self.session_cvd += qty
+            signed_qty = qty if not is_buyer_maker else -qty
+            self.candle_buy_btc += qty if not is_buyer_maker else 0.0
+            self.candle_sell_btc += qty if is_buyer_maker else 0.0
+            self.session_cvd += signed_qty
+            self.cvd_24h += signed_qty
+            self._trade_history.append((ts_ms, signed_qty))
+            self._prune_old_trades(ts_ms)
             if agg_id:
                 self.last_aggregate_trade_id = agg_id
+
+    def _prune_old_trades(self, current_ts_ms: int):
+        cutoff = current_ts_ms - 24 * 3600 * 1000
+        while self._trade_history and self._trade_history[0][0] < cutoff:
+            _, old_qty = self._trade_history.popleft()
+            self.cvd_24h -= old_qty
 
     @property
     def fp_delta(self):
@@ -364,6 +375,7 @@ class AggTradeState:
         return AggTradeSnapshot(
             quality=self.quality,
             session_cvd=self.session_cvd,
+            cvd_24h=self.cvd_24h,
             fp_delta=self.fp_delta,
             fp_poc=self.profile.poc
         )
@@ -673,10 +685,35 @@ async def _liq_handler(data):
             notional=float(o.get("q", 0)) * float(o.get("p", 0))
         )
 
+async def _bootstrap_liq():
+    try:
+        now_ms = int(time.time() * 1000)
+        cts = (now_ms // 900000) * 900000
+        url = "https://fapi.binance.com/fapi/v1/allForceOrders?symbol=BTCUSDT&limit=100"
+        data = await async_fetch(url, weight=20)
+        if isinstance(data, list):
+            long_tot = 0.0
+            short_tot = 0.0
+            for item in data:
+                t = int(item.get("time", 0))
+                if t >= cts:
+                    side = item.get("side")
+                    notional = float(item.get("executedQty", 0)) * float(item.get("avgPrice", 0))
+                    if side == "SELL":
+                        long_tot += notional
+                    elif side == "BUY":
+                        short_tot += notional
+            LIQ_STATE.long_usd = long_tot
+            LIQ_STATE.short_usd = short_tot
+            LIQ_STATE.current_candle_ts = cts
+    except Exception:
+        pass
+
 async def start_liq_stream():
     await stream_supervisor(
         "wss://fstream.binance.com/stream?streams=btcusdt@forceOrder/btcusdc@forceOrder",
-        _liq_handler, "LiqStream"
+        _liq_handler, "LiqStream",
+        on_connect=_bootstrap_liq
     )
 
 
@@ -724,6 +761,7 @@ async def _recover_fut_agg():
             fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=850", weight=5)
             if isinstance(fk_data, list):
                 AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in fk_data)
+        cutoff_ms = int(time.time() * 1000) - 24 * 3600 * 1000
         if last_id:
             url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
         else:
@@ -731,10 +769,12 @@ async def _recover_fut_agg():
         trades = await async_fetch(url, weight=5)
         if isinstance(trades, list):
             for t in trades:
-                await AGG_STATE.apply(
-                    ts_ms=int(t["T"]), price_str=t["p"], qty_str=t["q"],
-                    is_buyer_maker=t["m"], agg_id=t["a"]
-                )
+                ts_ms = int(t["T"])
+                if ts_ms >= cutoff_ms:
+                    await AGG_STATE.apply(
+                        ts_ms=ts_ms, price_str=t["p"], qty_str=t["q"],
+                        is_buyer_maker=t["m"], agg_id=t["a"]
+                    )
     except Exception:
         pass
 
@@ -839,6 +879,7 @@ class RestCache:
     def __init__(self):
         self.oi_k = None
         self.ls_ratio = None
+        self.ls_ratio_global = None
         self.whale = "N/A"
         self.usdc_tb = 0.0
         self.usdc_ts = 0.0
@@ -850,6 +891,7 @@ class RestCache:
         return RestSnapshot(
             oi_k=self.oi_k,
             ls_ratio=self.ls_ratio,
+            ls_ratio_global=self.ls_ratio_global,
             whale=self.whale,
             usdc_tb=self.usdc_tb,
             usdc_ts=self.usdc_ts,
@@ -877,12 +919,13 @@ async def poll_ratios_loop():
     while True:
         try:
             ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
-            if ls_d: REST_CACHE.ls_ratio = float(ls_d[0]["longShortRatio"])
+            if ls_d: REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
             
             ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if ta:
                 whale_val = float(ta[0]['longShortRatio']) * 100.0
                 REST_CACHE.whale = f"{whale_val:.4f}"
+                REST_CACHE.ls_ratio = float(ta[0]['longShortRatio'])
         except Exception:
             pass
         await asyncio.sleep(15)
@@ -920,18 +963,25 @@ async def compute_snapshot(seq_id):
         kq = kl_snap.quality
         close = kl_snap.close
 
-        tb = kl_snap.taker_buy + rest_snap.usdc_tb + rest_snap.coinm_tb
-        ts = kl_snap.taker_sell + rest_snap.usdc_ts + rest_snap.coinm_ts
+        mark_price = mp_snap.mark_price if mp_snap.mark_price > 0 else close
+        coinm_tb_usdt = rest_snap.coinm_tb * mark_price / 100.0 if mark_price > 0 else 0.0
+        coinm_ts_usdt = rest_snap.coinm_ts * mark_price / 100.0 if mark_price > 0 else 0.0
+        tb = kl_snap.taker_buy + rest_snap.usdc_tb + coinm_tb_usdt
+        ts = kl_snap.taker_sell + rest_snap.usdc_ts + coinm_ts_usdt
 
         scvd = spot_agg_snap.session_cvd
         scvd_q = spot_agg_snap.quality
+
+        fcv_24h = agg_snap.cvd_24h
+        fcvd_q = agg_snap.quality
 
         funding = mp_snap.funding_rate
         basis = mp_snap.mark_price - mp_snap.index_price if mp_snap.index_price > 0 else 0.0
         mp_q = mp_snap.quality
 
         oi_k = rest_snap.oi_k
-        ls_ratio = rest_snap.ls_ratio
+        ls_ratio = rest_snap.ls_ratio_global if rest_snap.ls_ratio_global is not None else rest_snap.ls_ratio
+        ls_ratio_top = rest_snap.ls_ratio
         whale = rest_snap.whale
 
         bc_t = ac_t = bd_t = ad_t = 0.0
@@ -952,12 +1002,14 @@ async def compute_snapshot(seq_id):
                 "quote_vol":  fv(kl_snap.quote_volume if kl_snap.quote_volume else kl_snap.volume * close, kq),
                 "volume_sma9":fv(kl_snap.volume_sma9, kq),
                 "rsi":        fv(kl_snap.rsi, kq),
-                "future_cvd": fv(agg_snap.session_cvd, agg_snap.quality),
+                "future_cvd": fv(fcv_24h, fcvd_q),
+                "future_cvd_session": fv(agg_snap.session_cvd, fcvd_q),
                 "spot_cvd":   fv(scvd, scvd_q),
                 "funding_pct":fv(funding, mp_q),
                 "basis":      fv(basis, mp_q),
                 "oi_k":       fv(oi_k),
                 "ls_ratio":   fv(ls_ratio),
+                "ls_ratio_top": fv(ls_ratio_top),
                 "fp_delta":   fv(agg_snap.fp_delta, agg_snap.quality),
                 "fp_poc":     fv(agg_snap.fp_poc, agg_snap.quality),
                 "long_liq":   fv(liq_snap.long_usd, liq_snap.quality),
@@ -1045,13 +1097,16 @@ async def terminal_observer_loop():
         vol_str = f"{bar_vol} (SMA9:{sma9})"
         lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
-        lines.append(R(" 5","FUT CVD",     f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
+        lines.append(R(" 5","FUT CVD 24H", f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "24h Rolling Futures CVD"))
+        lines.append(R(" 5b","FUT CVD SES", f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Session Futures CVD"))
         lines.append(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
         lines.append(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
         lines.append(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
         lines.append(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))
         lines.append(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "Symbol Liquidations Short"))
-        lines.append(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Accounts L/S Ratio"))
+        lines.append(R("11","L/S GLOBAL",  f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Global Accounts L/S"))
+        if f.get('ls_ratio_top') and f['ls_ratio_top'].value is not None:
+            lines.append(R("11b","L/S TOP",     f"{f['ls_ratio_top'].value:.4f}", f['ls_ratio_top'].quality, "Top Trader L/S"))
         lines.append(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "Footprint Delta"))
         lines.append(R("13","FP POC",      f"{f['fp_poc'].value:,.1f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "Volume-At-Price POC"))
         lines.append(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% Futures Depth"))
