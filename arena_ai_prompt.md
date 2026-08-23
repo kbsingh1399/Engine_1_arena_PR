@@ -26,4 +26,8 @@ Do NOT ask for code pasting. Fetch the files directly from the repository using 
 # Execution & Verification
 Before proposing architectural changes, you MUST run the code locally and monitor the live terminal output. Check the output second-by-second to verify that all 28 indicators are updating correctly, no streams are stalling, and there are no hidden race conditions or state desyncs in the live feed.
 
+# Git Workflow
+1. Pull the latest `main` branch to ensure you have the v2.1 WebSocket architecture.
+2. After making and verifying your improvements, push all your changes directly to your active branch: `arena/01a02eb1-engine-1-arena-pr`.
+
 Analyze the architecture and propose a "v3" direction. Focus strictly on institutional-grade performance and exact precision. Provide actionable architecture diagrams or code snippets for the next iteration.
