@@ -79,6 +79,8 @@ class KlineSnapshot:
     ready: bool
     close: float
     volume: float
+    quote_volume: float
+    volume_sma9: Optional[float]
     taker_buy: float
     taker_sell: float
     ema8: Optional[float]
@@ -366,6 +368,9 @@ class KlineState:
         # Live bar
         self.open = self.high = self.low = self.close = 0.0
         self.volume = self.taker_buy = self.taker_sell = 0.0
+        self.quote_volume = 0.0
+        self.volume_sma9 = None
+        self._past_q_vols = []
 
         # Incremental EMA seeds (on closed bars only)
         self._ema = {p: None for p in [8, 21, 50, 200, 800]}
@@ -383,6 +388,7 @@ class KlineState:
         cls = [float(k[4]) for k in klines]
         his = [float(k[2]) for k in klines]
         los = [float(k[3]) for k in klines]
+        q_vols = [float(k[7]) for k in klines]
         closed = cls[:-1]   # All bars except the current open one
 
         # EMA
@@ -427,12 +433,15 @@ class KlineState:
             self._avg_gain = avg_g
             self._avg_loss = avg_l
             self._rsi_prev_close = closed[-1] if closed else None
+            self._past_q_vols = q_vols[:-1]
 
             self.open   = float(lf[1])
             self.high   = float(lf[2])
             self.low    = float(lf[3])
             self.close  = float(lf[4])
             self.volume = float(lf[5])
+            self.quote_volume = float(lf[7])
+            self.volume_sma9 = sum(q_vols[-9:]) / 9.0 if len(q_vols) >= 9 else self.quote_volume
             self.taker_buy  = float(lf[9])
             self.taker_sell = float(lf[5]) - float(lf[9])
 
@@ -447,11 +456,15 @@ class KlineState:
             self.low    = float(k["l"])
             self.close  = float(k["c"])
             self.volume = float(k["v"])
+            self.quote_volume = float(k.get("q", self.volume * self.close))
             self.taker_buy  = float(k.get("V", 0))
             self.taker_sell = self.volume - self.taker_buy
 
             if is_closed:
                 c = self.close
+                self._past_q_vols.append(self.quote_volume)
+                if len(self._past_q_vols) > 50:
+                    self._past_q_vols.pop(0)
                 # Update EMAs
                 for p in [8, 21, 50, 200, 800]:
                     cur = self._ema[p]
@@ -474,6 +487,8 @@ class KlineState:
                     self._avg_loss = (self._avg_loss * 13 + max(-d, 0.0)) / 14
                 self._prev_close = c
                 self._rsi_prev_close = c
+            
+            self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0 if len(self._past_q_vols) >= 8 else self.quote_volume
             self.quality = DataQuality.CANONICAL
 
     def live_ema(self, p):
@@ -502,6 +517,8 @@ class KlineState:
             ready=self.ready,
             close=self.close,
             volume=self.volume,
+            quote_volume=self.quote_volume,
+            volume_sma9=self.volume_sma9,
             taker_buy=self.taker_buy,
             taker_sell=self.taker_sell,
             ema8=self.live_ema(8),
@@ -896,7 +913,8 @@ async def compute_snapshot(seq_id):
             receive_timestamp_ms=now_ms,
             features={
                 "price":      fv(close, kq),
-                "quote_vol":  fv(kl_snap.volume * close, kq),
+                "quote_vol":  fv(kl_snap.quote_volume if kl_snap.quote_volume else kl_snap.volume * close, kq),
+                "volume_sma9":fv(kl_snap.volume_sma9, kq),
                 "rsi":        fv(kl_snap.rsi, kq),
                 "future_cvd": fv(agg_snap.session_cvd, agg_snap.quality),
                 "spot_cvd":   fv(scvd, scvd_q),
@@ -977,7 +995,8 @@ async def terminal_observer_loop():
         print(f"\n[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         print(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         print(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        print(R(" 3","VOLUME",      f"{f['quote_vol'].value/1e6:.3f}M",     f['quote_vol'].quality))
+        vol_str = f"{f['volume_sma9'].value/1e6:.3f}M" if f['volume_sma9'].value else f"{f['quote_vol'].value/1e6:.3f}M"
+        print(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "Volume SMA 9"))
         print(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         print(R(" 5","FUT CVD",     f"{f['future_cvd'].value:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
         print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))

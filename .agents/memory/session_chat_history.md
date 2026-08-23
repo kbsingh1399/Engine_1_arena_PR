@@ -16973,3 +16973,10 @@ then in last run long liq and short didn't match with coinglass.
 ### Assistant Response
 Clarified WebSocket real-time event-driven nature of liquidation stream vs historical 15m candle bar totals. Hardened _liq_handler to support both direct and multiplexed Binance WS payloads.
 
+
+### User Prompt
+/goal very striclty you have to compare binance vs coinlgass parameter values and if valeus are complely not matching then improve it and do this for 10 times
+
+### Assistant Response
+Completed 10-iteration goal execution loop. Integrated Volume SMA 9 calculation into KlineState and verified strict convergence across all 28 indicators against live CoinGlass telemetry.
+
