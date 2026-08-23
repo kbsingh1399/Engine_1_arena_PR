@@ -1227,10 +1227,11 @@ async def terminal_observer_loop():
         lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        sma9_usd = f"${f['volume_sma9'].value/1e6:.3f}M" if f.get('volume_sma9') and f['volume_sma9'].value else "$0.000M"
-        sma9_btc = f"{f['base_volume_sma9'].value:.2f} BTC" if f.get('base_volume_sma9') and f['base_volume_sma9'].value else "0.00 BTC"
-        vol_str = f"{sma9_usd} ({sma9_btc})"
-        lines.append(R(" 3","VOLUME (SMA 9)",vol_str,                                f['quote_vol'].quality, "9-Bar Moving Average (SMA 9)"))
+        bar_vol_usd = f"${f['quote_vol'].value/1e6:.3f}M" if f.get('quote_vol') and f['quote_vol'].value else "$0.000M"
+        bar_vol_btc = f"{f['base_vol'].value:.2f} BTC" if f.get('base_vol') and f['base_vol'].value else "0.00 BTC"
+        sma9_usd = f"${f['volume_sma9'].value/1e6:.2f}M" if f.get('volume_sma9') and f['volume_sma9'].value else "$0.00M"
+        vol_str = f"{bar_vol_usd} ({bar_vol_btc}) [SMA 9: {sma9_usd}]"
+        lines.append(R(" 3","VOLUME",        vol_str,                                f['quote_vol'].quality, "15m Bar Vol & SMA 9"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         
         fut_ses = f"{f['future_cvd_session'].value/1e3:+.3f}K" if f.get('future_cvd_session') and f['future_cvd_session'].value is not None else "N/A"
