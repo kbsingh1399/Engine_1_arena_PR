@@ -178,10 +178,12 @@ async def run_comparator(duration_seconds=300):
                 p_loc = f"${f['price'].value:,.1f}" if f['price'].value else "N/A"
                 rows.append(R(2, "Price", p_cg, p_loc, "[LIVE TICK]"))
                 
-                # 3. Volume
-                v_cg = cg_data.get("volume", "N/A")
-                v_loc = f"${f['quote_vol'].value/1e6:.3f}M" if f['quote_vol'].value else "N/A"
-                rows.append(R(3, "Volume", v_cg, v_loc, "[EXACT 15M BAR]"))
+                # 3. Volume (SMA 9)
+                v_cg = cg_data.get("volume", "SMA 9")
+                sma9_usd = f"${f['volume_sma9'].value/1e6:.3f}M" if f.get('volume_sma9') and f['volume_sma9'].value else "$0.000M"
+                sma9_btc = f"{f['base_volume_sma9'].value:.2f} BTC" if f.get('base_volume_sma9') and f['base_volume_sma9'].value else "0.00 BTC"
+                v_loc = f"{sma9_usd} ({sma9_btc})"
+                rows.append(R(3, "Volume (SMA 9)", v_cg, v_loc, "[9-BAR SMA ONLY]"))
                 
                 # 4. RSI (14)
                 r_cg = cg_data.get("rsi", "N/A")

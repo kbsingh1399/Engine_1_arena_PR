@@ -103,6 +103,7 @@ class KlineSnapshot:
     quote_volume: float
     trade_count: float
     volume_sma9: Optional[float]
+    base_volume_sma9: Optional[float]
     taker_buy: float
     taker_sell: float
     ema8: Optional[float]
@@ -445,7 +446,9 @@ class KlineState:
         self.volume = self.taker_buy = self.taker_sell = 0.0
         self.quote_volume = 0.0
         self.volume_sma9 = None
+        self.base_volume_sma9 = None
         self._past_q_vols = []
+        self._past_base_vols = []
 
         # Incremental EMA seeds (on closed bars only)
         self._ema = {p: None for p in [8, 21, 50, 200, 800]}
@@ -463,6 +466,7 @@ class KlineState:
         cls = [float(k[4]) for k in klines]
         his = [float(k[2]) for k in klines]
         los = [float(k[3]) for k in klines]
+        base_vols = [float(k[5]) for k in klines]
         q_vols = [float(k[7]) for k in klines]
         closed = cls[:-1]   # All bars except the current open one
 
@@ -515,6 +519,7 @@ class KlineState:
             self._avg_loss = avg_l
             self._rsi_prev_close = closed[-1] if closed else None
             self._past_q_vols = q_vols[:-1]
+            self._past_base_vols = base_vols[:-1]
 
             self.open   = float(lf[1])
             self.high   = float(lf[2])
@@ -524,6 +529,7 @@ class KlineState:
             self.quote_volume = float(lf[7])
             self.trade_count = float(lf[8])
             self.volume_sma9 = sum(q_vols[-9:]) / 9.0 if len(q_vols) >= 9 else self.quote_volume
+            self.base_volume_sma9 = sum(base_vols[-9:]) / 9.0 if len(base_vols) >= 9 else self.volume
             self.taker_buy  = float(lf[9])
             self.taker_sell = float(lf[5]) - float(lf[9])
 
@@ -546,8 +552,11 @@ class KlineState:
             if is_closed:
                 c = self.close
                 self._past_q_vols.append(self.quote_volume)
+                self._past_base_vols.append(self.volume)
                 if len(self._past_q_vols) > 50:
                     self._past_q_vols.pop(0)
+                if len(self._past_base_vols) > 50:
+                    self._past_base_vols.pop(0)
                 # Update EMAs
                 for p in [8, 21, 50, 200, 800]:
                     cur = self._ema[p]
@@ -572,6 +581,7 @@ class KlineState:
                 self._rsi_prev_close = c
             
             self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0 if len(self._past_q_vols) >= 8 else self.quote_volume
+            self.base_volume_sma9 = (sum(self._past_base_vols[-8:]) + self.volume) / 9.0 if len(self._past_base_vols) >= 8 else self.volume
             self.quality = DataQuality.CANONICAL
 
     async def apply_trade_tick(self, price: float, qty: float):
@@ -585,6 +595,8 @@ class KlineState:
             self.trade_count += 1
             if len(self._past_q_vols) >= 8:
                 self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0
+            if len(self._past_base_vols) >= 8:
+                self.base_volume_sma9 = (sum(self._past_base_vols[-8:]) + self.volume) / 9.0
 
     def live_ema(self, p):
         """EMA incorporating current open bar's close (not yet committed)."""
@@ -621,6 +633,7 @@ class KlineState:
             quote_volume=self.quote_volume,
             trade_count=self.trade_count,
             volume_sma9=self.volume_sma9,
+            base_volume_sma9=self.base_volume_sma9,
             taker_buy=self.taker_buy,
             taker_sell=self.taker_sell,
             ema8=self.live_ema(8),
@@ -1117,6 +1130,7 @@ async def compute_snapshot(seq_id):
                 "base_vol":   fv(kl_snap.volume, kq),
                 "quote_vol":  fv(kl_snap.quote_volume if kl_snap.quote_volume else kl_snap.volume * close, kq),
                 "volume_sma9":fv(kl_snap.volume_sma9, kq),
+                "base_volume_sma9": fv(kl_snap.base_volume_sma9, kq),
                 "rsi":        fv(kl_snap.rsi, kq),
                 "future_cvd": fv(fcv_24h, fcvd_q),
                 "future_cvd_session": fv(agg_snap.session_cvd, fcvd_q),
@@ -1213,11 +1227,10 @@ async def terminal_observer_loop():
         lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        bar_vol_btc = f"{f['base_vol'].value:.2f} BTC" if f.get('base_vol') and f['base_vol'].value else f"{f['quote_vol'].value/close:.2f} BTC" if f['quote_vol'].value and close>0 else "0.00 BTC"
-        bar_vol_usd = f"${f['quote_vol'].value/1e6:.3f}M" if f['quote_vol'].value else "$0.000M"
-        sma9 = f"${f['volume_sma9'].value/1e6:.2f}M" if f['volume_sma9'].value else "N/A"
-        vol_str = f"{bar_vol_btc} ({bar_vol_usd}) [SMA9:{sma9}]"
-        lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
+        sma9_usd = f"${f['volume_sma9'].value/1e6:.3f}M" if f.get('volume_sma9') and f['volume_sma9'].value else "$0.000M"
+        sma9_btc = f"{f['base_volume_sma9'].value:.2f} BTC" if f.get('base_volume_sma9') and f['base_volume_sma9'].value else "0.00 BTC"
+        vol_str = f"{sma9_usd} ({sma9_btc})"
+        lines.append(R(" 3","VOLUME (SMA 9)",vol_str,                                f['quote_vol'].quality, "9-Bar Moving Average (SMA 9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         
         fut_ses = f"{f['future_cvd_session'].value/1e3:+.3f}K" if f.get('future_cvd_session') and f['future_cvd_session'].value is not None else "N/A"
