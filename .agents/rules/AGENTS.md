@@ -61,6 +61,7 @@ To ensure the system continuously learns and updates its protocols without blowi
 1. **Evaluate Outcome**: After completing a task or applying a code fix, explicitly evaluate if it succeeded or failed (e.g. did the script crash? Did the CDP connection fail?).
 2. **Identify Pattern**: If the failure or success reveals a new architectural constraint, Windows PowerShell quirk, or API limitation not currently documented, you MUST formulate a new rule.
 3. **Persist the Rule**: Use the `replace_file_content` or `run_command` tool to safely append the new rule into `C:\Users\SIGMA\Documents\Project - Coinglass Trading\Engine_1_arena_PR\.agents\rules\FABLE5_CHECKLIST.md` under the appropriate section. 
+4. **Data Provenance Gate**: Never evaluate data or indicator alignment by column names or UI labels alone. You MUST trace the data pipeline source script end-to-end (Part 9 of `FABLE5_CHECKLIST.md`). 
 
 This Kaizen loop ensures that `AGENTS.md` remains a lightweight router, while the `FABLE5_CHECKLIST.md` acts as the infinitely scalable, dynamically read rulebook.
 

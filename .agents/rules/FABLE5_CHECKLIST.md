@@ -158,5 +158,24 @@ Scan available skills in `.agents/skills/` before coding.
 Use fresh isolated profile dir `C:\ChromeDebugFresh`, launch with `--user-data-dir=$profileDir --remote-debugging-port=19333`. Never copy `Default\` dir. User logs in manually. Use `websocket-client` directly for raw CDP connection if Playwright fails.
 
 ### 2.4 OMNI Protocol & Kaizen Enforcement
-- [ ] Did the agent maintain the strict OMNI dual-response format ([??CLASSIC] / [??OMNI]) as mandated by GEMINI.md?
+- [ ] Did the agent maintain the strict OMNI single/dual-response format as mandated by GEMINI.md?
 - [ ] Was the Kaizen Verification Loop executed at the end of the task, regardless of whether it was a code edit or a chat response?
+
+---
+
+## PART 9: DATA PROVENANCE & MULTI-ANGLE REFLECTION PROTOCOL (ANTI-SUPERFICIALITY GATE)
+
+### 9.1 Mandatory Data Provenance Tracing
+Never evaluate data alignment, schema parity, or indicator validity by string labels or UI headers alone. Always trace the complete data pipeline:
+1. **Physical Source Verification**: Trace exact URL/API endpoint (e.g. `data.binance.vision` vs `api.coinglass.com`).
+2. **Transformation Audit**: Inspect the consolidation script to understand how column names and resampled aggregations were constructed.
+3. **Execution Parity**: Compare against live WebSocket broker feeds (e.g. `@forceOrder`) to ensure 1:1 venue alignment.
+4. **Feature Impact**: Evaluate how rolling windows, rolling means, and thresholds behave under single-venue vs cross-venue distributions.
+
+### 9.2 The 4-Angle Self-Interrogation Checklist
+Before delivering any data architecture verdict, explicitly answer:
+- [ ] **Angle 1 (Origin)**: Where did the raw historical bytes come from?
+- [ ] **Angle 2 (Transformation)**: Did local code rename or resample the source columns?
+- [ ] **Angle 3 (Live Execution)**: Which exchange does the live execution broker actually trade on?
+- [ ] **Angle 4 (Statistical Distribution)**: Does the candidate live feed match the mathematical magnitude expected by the ML model?
+
