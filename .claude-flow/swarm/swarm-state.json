@@ -1,0 +1,23 @@
+{
+  "swarms": {
+    "swarm-1787428655429-gkrmz4": {
+      "swarmId": "swarm-1787428655429-gkrmz4",
+      "topology": "hierarchical",
+      "maxAgents": 15,
+      "status": "running",
+      "agents": [],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical",
+        "maxAgents": 15,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-08-22T19:57:35.429Z",
+      "updatedAt": "2026-08-22T19:57:35.429Z"
+    }
+  },
+  "version": "3.0.0"
+}

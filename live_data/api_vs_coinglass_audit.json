@@ -1,0 +1,255 @@
+{
+  "timestamp": "2026-08-23T17:01:30.325786",
+  "cycle": 1952,
+  "symbol": "BTCUSDT",
+  "timeframe": "15m",
+  "latency_ms": 177.03,
+  "parity_score_pct": 40.7,
+  "matched_features": 11,
+  "total_features": 27,
+  "features": [
+    {
+      "feature": "Price ($)",
+      "key": "price",
+      "coinglass_scraped": 77195.4,
+      "binance_api": 77202.5,
+      "difference": 7.100000000005821,
+      "drift_pct": 0.01,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Open ($)",
+      "key": "open",
+      "coinglass_scraped": 77161.2,
+      "binance_api": 77161.2,
+      "difference": 0.0,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "High ($)",
+      "key": "high",
+      "coinglass_scraped": 77207.7,
+      "binance_api": 77207.7,
+      "difference": 0.0,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Low ($)",
+      "key": "low",
+      "coinglass_scraped": 77127.4,
+      "binance_api": 77127.4,
+      "difference": 0.0,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Bar Volume ($)",
+      "key": "volume",
+      "coinglass_scraped": 14219000.0,
+      "binance_api": 170.827,
+      "difference": 14218829.173,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "RSI (14)",
+      "key": "rsi",
+      "coinglass_scraped": 68.24,
+      "binance_api": 68.37671765136938,
+      "difference": 0.13671765136938063,
+      "drift_pct": 0.2,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Futures CVD (Coins)",
+      "key": "fut_cvd",
+      "coinglass_scraped": 67949.0,
+      "binance_api": -3709.2340000000027,
+      "difference": 71658.234,
+      "drift_pct": 105.46,
+      "status": "\u0394 DRIFT (105.5%)"
+    },
+    {
+      "feature": "Spot CVD (Coins)",
+      "key": "spot_cvd",
+      "coinglass_scraped": 7500.0,
+      "binance_api": 804.6598600000005,
+      "difference": 6695.340139999999,
+      "drift_pct": 89.27,
+      "status": "\u0394 DRIFT (89.3%)"
+    },
+    {
+      "feature": "Funding Rate (%)",
+      "key": "funding_rate",
+      "coinglass_scraped": 0.009583,
+      "binance_api": 0.0,
+      "difference": 0.009583,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "Open Interest (Coins)",
+      "key": "open_interest",
+      "coinglass_scraped": 126754.0,
+      "binance_api": 0.0,
+      "difference": 126754.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "Long/Short Ratio",
+      "key": "ls_ratio",
+      "coinglass_scraped": 1.041,
+      "binance_api": 1.0408,
+      "difference": 0.00019999999999997797,
+      "drift_pct": 0.02,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Whale Index",
+      "key": "whale_index",
+      "coinglass_scraped": 107.745,
+      "binance_api": 0.0,
+      "difference": 107.745,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "Taker Buy Trades",
+      "key": "taker_buy_count",
+      "coinglass_scraped": 2617.0,
+      "binance_api": 2495.2280377223738,
+      "difference": 121.77196227762624,
+      "drift_pct": 4.65,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "Taker Sell Trades",
+      "key": "taker_sell_count",
+      "coinglass_scraped": -1753.0,
+      "binance_api": -1544.771962277626,
+      "difference": 208.22803772237398,
+      "drift_pct": 11.88,
+      "status": "~ ALIGNED (\u039411.9%)"
+    },
+    {
+      "feature": "\u00b11% Depth Bids (Coins)",
+      "key": "coins_bid",
+      "coinglass_scraped": 1972.0,
+      "binance_api": 0.0,
+      "difference": 1972.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "\u00b11% Depth Asks (Coins)",
+      "key": "coins_ask",
+      "coinglass_scraped": -1816.0,
+      "binance_api": 0.0,
+      "difference": 1816.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "\u00b11% Depth Bids ($)",
+      "key": "dollars_bid",
+      "coinglass_scraped": 151409000.0,
+      "binance_api": 0.0,
+      "difference": 151409000.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "\u00b11% Depth Asks ($)",
+      "key": "dollars_ask",
+      "coinglass_scraped": -140880000.0,
+      "binance_api": 0.0,
+      "difference": 140880000.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "Liq Longs ($)",
+      "key": "liq_long",
+      "coinglass_scraped": 10491.0,
+      "binance_api": 0.0,
+      "difference": 10491.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "Liq Shorts ($)",
+      "key": "liq_short",
+      "coinglass_scraped": -4628.0,
+      "binance_api": 0.0,
+      "difference": 4628.0,
+      "drift_pct": 100.0,
+      "status": "\u0394 DRIFT (100.0%)"
+    },
+    {
+      "feature": "EMA 8",
+      "key": "ema_8",
+      "coinglass_scraped": 76896.4,
+      "binance_api": 76898.92647849422,
+      "difference": 2.526478494226467,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "EMA 21",
+      "key": "ema_21",
+      "coinglass_scraped": 76688.7,
+      "binance_api": 76689.85647697275,
+      "difference": 1.1564769727556268,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "EMA 50",
+      "key": "ema_50",
+      "coinglass_scraped": 76731.2,
+      "binance_api": 76727.72722759696,
+      "difference": 3.472772403038107,
+      "drift_pct": 0.0,
+      "status": "\u2713 100% PARITY"
+    },
+    {
+      "feature": "EMA 200",
+      "key": "ema_200",
+      "coinglass_scraped": 76308.3,
+      "binance_api": 77001.05083333334,
+      "difference": 692.750833333339,
+      "drift_pct": 0.91,
+      "status": "\u0394 DRIFT (0.9%)"
+    },
+    {
+      "feature": "EMA 800",
+      "key": "ema_800",
+      "coinglass_scraped": 70840.0,
+      "binance_api": 77001.05083333334,
+      "difference": 6161.050833333342,
+      "drift_pct": 8.7,
+      "status": "\u0394 DRIFT (8.7%)"
+    },
+    {
+      "feature": "ATR 14",
+      "key": "atr_14",
+      "coinglass_scraped": 226.8,
+      "binance_api": 217.6633024583288,
+      "difference": 9.136697541671225,
+      "drift_pct": 4.03,
+      "status": "\u0394 DRIFT (4.0%)"
+    },
+    {
+      "feature": "ATR 100",
+      "key": "atr_100",
+      "coinglass_scraped": 277.0,
+      "binance_api": 221.3920423122077,
+      "difference": 55.60795768779229,
+      "drift_pct": 20.08,
+      "status": "\u0394 DRIFT (20.1%)"
+    }
+  ]
+}

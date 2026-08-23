@@ -1,0 +1,1872 @@
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #1 — 2026-08-23 18:18:27
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.20K                $0.00                  $77.20K          DIVERGENT     
+3    Volume ($)                 $14.80M                $0.00                  $14.80M          DIVERGENT     
+4    RSI (14)                   62.76                  0.00                   62.76            DIVERGENT     
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.48K                  0.00                   7.48K            DIVERGENT     
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.05K                127.05K                0.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0400                 1.0400                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   0.00                   0.00             MATCH         
+13   FP POC ($)                 $0.00                  $0.00                  $0.00            MATCH         
+14   Bid Dollar ($)             $173.92M               $0.00                  $173.92M         DIVERGENT     
+15   Ask Dollar ($)             $-154.77M              $0.00                  $154.77M         DIVERGENT     
+16   Bid Coin (BTC)             2.26K                  0.00                   2.26K            DIVERGENT     
+17   Ask Coin (BTC)             -2.00K                 0.00                   2.00K            DIVERGENT     
+18   Whale Index                107.86                 107.86                 0.00             MATCH         
+19   Taker Buy                  2.60K                  0.00                   2.60K            DIVERGENT     
+20   Taker Sell                 -2.96K                 0.00                   2.96K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $0.00                  $77.10K          DIVERGENT     
+22   EMA 21 ($)                 $76.88K                $0.00                  $76.88K          DIVERGENT     
+23   EMA 50 ($)                 $76.81K                $0.00                  $76.81K          DIVERGENT     
+24   EMA 200 ($)                $76.35K                $0.00                  $76.35K          DIVERGENT     
+25   EMA 800 ($)                $70.92K                $0.00                  $70.92K          DIVERGENT     
+26   ATR 14 ($)                 222.00                 0.00                   222.00           DIVERGENT     
+27   ATR 100 ($)                274.40                 0.00                   274.40           DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 10/27 (37.0%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #2 — 2026-08-23 18:18:57
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.19K                $77.21K                $13.01           MATCH         
+3    Volume ($)                 $11.93M                $1.11M                 $10.82M          DIVERGENT     
+4    RSI (14)                   62.40                  63.08                  0.68             DIVERGENT     
+5    Futures CVD                68.06K                 68.08K                 22.00            MATCH         
+6    Spot CVD                   7.48K                  -0.000082              7.48K            DIVERGENT     
+7    Funding Rate               0.0096%                0.0096%                0.000005%        CLOSE         
+8    Open Interest (OI)         127.04K                127.05K                4.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0400                 1.0400                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   4.47                   4.47             MATCH         
+13   FP POC ($)                 $0.00                  $77.22K                $77.22K          MATCH         
+14   Bid Dollar ($)             $176.37M               $183.60M               $7.23M           DIVERGENT     
+15   Ask Dollar ($)             $-153.32M              $-148.39M              $4.93M           DIVERGENT     
+16   Bid Coin (BTC)             2.30K                  2.38K                  82.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.98K                 -1.92K                 55.00            DIVERGENT     
+18   Whale Index                108.02                 107.86                 0.16             CLOSE         
+19   Taker Buy                  2.25K                  3.87K                  1.63K            DIVERGENT     
+20   Taker Sell                 -2.35K                 -2.04K                 310.40           DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.10K                $7.18            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.57            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.33            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.14            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.39           MATCH         
+26   ATR 14 ($)                 222.30                 198.60                 23.70            DIVERGENT     
+27   ATR 100 ($)                274.40                 228.06                 46.34            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 16/27 (59.3%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #1 — 2026-08-23 18:19:23
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.19K                $77.20K                $14.00           MATCH         
+3    Volume ($)                 $15.94M                $1.15M                 $14.79M          DIVERGENT     
+4    RSI (14)                   62.21                  62.92                  0.71             DIVERGENT     
+5    Futures CVD                68.06K                 68.06K                 0.00             MATCH         
+6    Spot CVD                   7.48K                  7.48K                  0.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.04K                127.04K                0.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0000                 0.0420           DIVERGENT     
+12   FP Delta (BTC)             0.00                   0.00                   0.00             MATCH         
+13   FP POC ($)                 $0.00                  $0.00                  $0.00            MATCH         
+14   Bid Dollar ($)             $176.37M               $176.37M               $0.00            MATCH         
+15   Ask Dollar ($)             $-153.32M              $-153.32M              $0.00            MATCH         
+16   Bid Coin (BTC)             2.30K                  2.30K                  0.00             MATCH         
+17   Ask Coin (BTC)             -1.98K                 -1.98K                 0.00             MATCH         
+18   Whale Index                108.02                 108.02                 0.00             MATCH         
+19   Taker Buy                  2.74K                  2.74K                  0.00             MATCH         
+20   Taker Sell                 -3.43K                 -3.43K                 0.00             MATCH         
+21   EMA 8 ($)                  $77.10K                $77.10K                $7.39            MATCH         
+22   EMA 21 ($)                 $76.87K                $76.88K                $2.61            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.28            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.10            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.40           MATCH         
+26   ATR 14 ($)                 222.70                 199.13                 23.57            DIVERGENT     
+27   ATR 100 ($)                274.50                 228.13                 46.37            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 22/27 (81.5%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #2 — 2026-08-23 18:19:53
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.20K                $77.21K                $9.34            MATCH         
+3    Volume ($)                 $17.45M                $1.27M                 $16.18M          DIVERGENT     
+4    RSI (14)                   62.76                  63.30                  0.54             CLOSE         
+5    Futures CVD                68.07K                 68.06K                 7.00             MATCH         
+6    Spot CVD                   7.49K                  7.48K                  1.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000002%        MATCH         
+8    Open Interest (OI)         127.04K                127.04K                2.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0000                 0.0420           DIVERGENT     
+12   FP Delta (BTC)             0.00                   6.01                   6.01             MATCH         
+13   FP POC ($)                 $0.00                  $77.22K                $77.22K          MATCH         
+14   Bid Dollar ($)             $175.02M               $183.61M               $8.59M           DIVERGENT     
+15   Ask Dollar ($)             $-150.34M              $-148.40M              $1.94M           DIVERGENT     
+16   Bid Coin (BTC)             2.28K                  2.38K                  100.00           DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 16.00            CLOSE         
+18   Whale Index                108.02                 108.02                 0.00             MATCH         
+19   Taker Buy                  3.12K                  4.54K                  1.42K            DIVERGENT     
+20   Taker Sell                 -3.52K                 -2.11K                 1.41K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $6.34            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.25            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.42            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.10            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 199.13                 23.57            DIVERGENT     
+27   ATR 100 ($)                274.50                 228.13                 46.37            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #3 — 2026-08-23 18:20:23
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.21K                $77.21K                $4.38            MATCH         
+3    Volume ($)                 $17.88M                $1.32M                 $16.55M          DIVERGENT     
+4    RSI (14)                   63.10                  63.44                  0.34             CLOSE         
+5    Futures CVD                68.07K                 68.06K                 7.00             MATCH         
+6    Spot CVD                   7.49K                  7.48K                  1.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000002%        MATCH         
+8    Open Interest (OI)         127.04K                127.04K                2.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0000                 0.0420           DIVERGENT     
+12   FP Delta (BTC)             0.00                   6.61                   6.61             MATCH         
+13   FP POC ($)                 $0.00                  $77.23K                $77.23K          MATCH         
+14   Bid Dollar ($)             $175.02M               $183.62M               $8.60M           DIVERGENT     
+15   Ask Dollar ($)             $-150.34M              $-148.41M              $1.94M           DIVERGENT     
+16   Bid Coin (BTC)             2.28K                  2.38K                  100.00           DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 16.00            CLOSE         
+18   Whale Index                108.02                 108.02                 0.00             MATCH         
+19   Taker Buy                  3.33K                  4.84K                  1.51K            DIVERGENT     
+20   Taker Sell                 -3.58K                 -2.15K                 1.43K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $5.23            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $1.77            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.68            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.03            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 199.13                 23.57            DIVERGENT     
+27   ATR 100 ($)                274.50                 228.13                 46.37            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #1 — 2026-08-23 18:20:42
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.21K                $77.21K                $8.68            MATCH         
+3    Volume ($)                 $18.63M                $1.37M                 $17.25M          DIVERGENT     
+4    RSI (14)                   62.93                  63.44                  0.51             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.04K                127.04K                0.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   0.00                   0.00             MATCH         
+13   FP POC ($)                 $0.00                  $0.00                  $0.00            MATCH         
+14   Bid Dollar ($)             $175.02M               $175.02M               $0.00            MATCH         
+15   Ask Dollar ($)             $-150.34M              $-150.34M              $0.00            MATCH         
+16   Bid Coin (BTC)             2.28K                  2.28K                  0.00             MATCH         
+17   Ask Coin (BTC)             -1.94K                 -1.94K                 0.00             MATCH         
+18   Whale Index                108.02                 108.02                 0.00             MATCH         
+19   Taker Buy                  3.40K                  3.40K                  0.00             MATCH         
+20   Taker Sell                 -3.71K                 -3.71K                 0.00             MATCH         
+21   EMA 8 ($)                  $77.10K                $77.11K                $6.23            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.17            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.48            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.03            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 211.18                 11.52            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.06                 12.44            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 24/27 (88.9%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #2 — 2026-08-23 18:21:12
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.21K                $77.22K                $6.50            MATCH         
+3    Volume ($)                 $19.18M                $1.42M                 $17.76M          DIVERGENT     
+4    RSI (14)                   63.06                  63.49                  0.43             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.000423         MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000002%        MATCH         
+8    Open Interest (OI)         127.05K                127.04K                4.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   7.59                   7.59             MATCH         
+13   FP POC ($)                 $0.00                  $77.23K                $77.23K          MATCH         
+14   Bid Dollar ($)             $176.92M               $183.62M               $6.70M           DIVERGENT     
+15   Ask Dollar ($)             $-153.28M              $-148.41M              $4.87M           DIVERGENT     
+16   Bid Coin (BTC)             2.30K                  2.38K                  75.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.98K                 -1.92K                 54.00            DIVERGENT     
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  3.60K                  5.16K                  1.56K            DIVERGENT     
+20   Taker Sell                 -3.78K                 -2.14K                 1.63K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $5.70            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $1.98            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.54            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.04            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.36           MATCH         
+26   ATR 14 ($)                 222.70                 211.18                 11.52            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.06                 12.44            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #3 — 2026-08-23 18:21:42
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.20K                $77.21K                $10.88           MATCH         
+3    Volume ($)                 $19.78M                $1.48M                 $18.30M          DIVERGENT     
+4    RSI (14)                   62.84                  63.44                  0.60             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.000038         MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000002%        MATCH         
+8    Open Interest (OI)         127.05K                127.04K                4.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   7.20                   7.20             MATCH         
+13   FP POC ($)                 $0.00                  $77.23K                $77.23K          MATCH         
+14   Bid Dollar ($)             $176.92M               $183.62M               $6.70M           DIVERGENT     
+15   Ask Dollar ($)             $-153.28M              $-148.41M              $4.87M           DIVERGENT     
+16   Bid Coin (BTC)             2.30K                  2.38K                  75.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.98K                 -1.92K                 54.00            DIVERGENT     
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  3.71K                  5.19K                  1.48K            DIVERGENT     
+20   Taker Sell                 -3.99K                 -2.35K                 1.64K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $6.73            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.37            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.38            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.13            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 211.18                 11.52            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.06                 12.44            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #4 — 2026-08-23 18:22:13
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.21K                $77.21K                $8.28            MATCH         
+3    Volume ($)                 $20.21M                $1.53M                 $18.68M          DIVERGENT     
+4    RSI (14)                   62.94                  63.44                  0.50             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.000337         MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000002%        MATCH         
+8    Open Interest (OI)         127.05K                127.04K                7.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   7.50                   7.50             MATCH         
+13   FP POC ($)                 $0.00                  $77.23K                $77.23K          MATCH         
+14   Bid Dollar ($)             $177.24M               $183.62M               $6.38M           DIVERGENT     
+15   Ask Dollar ($)             $-150.42M              $-148.41M              $2.02M           DIVERGENT     
+16   Bid Coin (BTC)             2.31K                  2.38K                  71.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 17.00            CLOSE         
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  3.89K                  5.27K                  1.38K            DIVERGENT     
+20   Taker Sell                 -4.07K                 -2.38K                 1.69K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $6.13            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.07            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.48            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.03            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 211.18                 11.52            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.06                 12.44            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 19/27 (70.4%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #5 — 2026-08-23 18:22:43
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.21K                $77.21K                $8.17            MATCH         
+3    Volume ($)                 $20.66M                $1.56M                 $19.10M          DIVERGENT     
+4    RSI (14)                   62.94                  63.44                  0.50             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.000316         MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.05K                127.04K                7.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   7.48                   7.48             MATCH         
+13   FP POC ($)                 $0.00                  $77.23K                $77.23K          MATCH         
+14   Bid Dollar ($)             $177.24M               $183.62M               $6.38M           DIVERGENT     
+15   Ask Dollar ($)             $-150.42M              $-148.41M              $2.02M           DIVERGENT     
+16   Bid Coin (BTC)             2.31K                  2.38K                  71.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 17.00            CLOSE         
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  3.95K                  5.32K                  1.37K            DIVERGENT     
+20   Taker Sell                 -4.19K                 -2.44K                 1.75K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.11K                $6.11            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $2.06            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.49            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.03            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.37           MATCH         
+26   ATR 14 ($)                 222.70                 211.18                 11.52            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.06                 12.44            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 19/27 (70.4%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #6 — 2026-08-23 18:23:13
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.20K                $77.20K                $2.51            MATCH         
+3    Volume ($)                 $22.00M                $1.64M                 $20.36M          DIVERGENT     
+4    RSI (14)                   62.58                  62.84                  0.26             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.000124         MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.05K                127.04K                6.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   7.04                   7.04             MATCH         
+13   FP POC ($)                 $0.00                  $77.22K                $77.22K          MATCH         
+14   Bid Dollar ($)             $176.33M               $183.58M               $7.25M           DIVERGENT     
+15   Ask Dollar ($)             $-150.88M              $-148.38M              $2.50M           DIVERGENT     
+16   Bid Coin (BTC)             2.30K                  2.38K                  82.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.95K                 -1.92K                 23.00            DIVERGENT     
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  4.18K                  5.41K                  1.22K            DIVERGENT     
+20   Taker Sell                 -4.48K                 -2.71K                 1.77K            DIVERGENT     
+21   EMA 8 ($)                  $77.10K                $77.10K                $4.85            MATCH         
+22   EMA 21 ($)                 $76.88K                $76.88K                $1.62            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.76            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $2.98            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.40           MATCH         
+26   ATR 14 ($)                 222.70                 211.32                 11.38            DIVERGENT     
+27   ATR 100 ($)                274.50                 262.08                 12.42            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #7 — 2026-08-23 18:23:43
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.18K                $77.19K                $6.01            MATCH         
+3    Volume ($)                 $23.33M                $1.75M                 $21.58M          DIVERGENT     
+4    RSI (14)                   61.89                  62.27                  0.38             CLOSE         
+5    Futures CVD                68.08K                 68.08K                 0.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  0.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.00%            MATCH         
+8    Open Interest (OI)         127.05K                127.04K                6.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   6.03                   6.03             MATCH         
+13   FP POC ($)                 $0.00                  $77.21K                $77.21K          MATCH         
+14   Bid Dollar ($)             $176.33M               $183.55M               $7.22M           DIVERGENT     
+15   Ask Dollar ($)             $-150.88M              $-148.35M              $2.53M           DIVERGENT     
+16   Bid Coin (BTC)             2.30K                  2.38K                  82.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.95K                 -1.92K                 23.00            DIVERGENT     
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  4.34K                  5.37K                  1.02K            DIVERGENT     
+20   Taker Sell                 -4.94K                 -3.11K                 1.83K            DIVERGENT     
+21   EMA 8 ($)                  $77.09K                $77.10K                $5.64            MATCH         
+22   EMA 21 ($)                 $76.87K                $76.88K                $1.95            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.61            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.04            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.34           MATCH         
+26   ATR 14 ($)                 223.70                 212.32                 11.38            DIVERGENT     
+27   ATR 100 ($)                274.60                 262.22                 12.38            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #8 — 2026-08-23 18:24:13
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.15K                $77.17K                $13.60           MATCH         
+3    Volume ($)                 $23.72M                $2.12M                 $21.60M          DIVERGENT     
+4    RSI (14)                   60.83                  61.49                  0.66             DIVERGENT     
+5    Futures CVD                68.07K                 68.08K                 6.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  1.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000005%        CLOSE         
+8    Open Interest (OI)         127.05K                127.04K                5.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   3.40                   3.40             MATCH         
+13   FP POC ($)                 $0.00                  $77.20K                $77.20K          MATCH         
+14   Bid Dollar ($)             $176.06M               $183.50M               $7.44M           DIVERGENT     
+15   Ask Dollar ($)             $-150.30M              $-148.31M              $1.99M           DIVERGENT     
+16   Bid Coin (BTC)             2.29K                  2.38K                  85.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 16.00            CLOSE         
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  4.33K                  5.36K                  1.03K            DIVERGENT     
+20   Taker Sell                 -5.18K                 -4.18K                 1.00K            DIVERGENT     
+21   EMA 8 ($)                  $77.09K                $77.10K                $7.29            MATCH         
+22   EMA 21 ($)                 $76.87K                $76.87K                $2.63            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.30            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.15            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.39           MATCH         
+26   ATR 14 ($)                 225.20                 213.75                 11.45            DIVERGENT     
+27   ATR 100 ($)                274.80                 262.42                 12.38            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #9 — 2026-08-23 18:24:43
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.16K                $77.16K                $3.10            MATCH         
+3    Volume ($)                 $25.57M                $2.16M                 $23.41M          DIVERGENT     
+4    RSI (14)                   61.16                  61.41                  0.25             CLOSE         
+5    Futures CVD                68.07K                 68.08K                 6.00             MATCH         
+6    Spot CVD                   7.49K                  7.49K                  1.00             MATCH         
+7    Funding Rate               0.0096%                0.0096%                0.000006%        CLOSE         
+8    Open Interest (OI)         127.05K                127.04K                5.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   3.68                   3.68             MATCH         
+13   FP POC ($)                 $0.00                  $77.20K                $77.20K          MATCH         
+14   Bid Dollar ($)             $176.06M               $183.50M               $7.43M           DIVERGENT     
+15   Ask Dollar ($)             $-150.30M              $-148.31M              $1.99M           DIVERGENT     
+16   Bid Coin (BTC)             2.29K                  2.38K                  85.00            DIVERGENT     
+17   Ask Coin (BTC)             -1.94K                 -1.92K                 16.00            CLOSE         
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  4.80K                  5.48K                  687.86           DIVERGENT     
+20   Taker Sell                 -5.77K                 -4.21K                 1.56K            DIVERGENT     
+21   EMA 8 ($)                  $77.09K                $77.09K                $4.95            MATCH         
+22   EMA 21 ($)                 $76.87K                $76.87K                $1.65            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.68            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.03            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.39           MATCH         
+26   ATR 14 ($)                 225.20                 213.89                 11.31            DIVERGENT     
+27   ATR 100 ($)                274.80                 262.44                 12.36            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 19/27 (70.4%)
+
+
+====================================================================================================
+  30-SECOND COMPARATIVE AUDIT CYCLE #10 — 2026-08-23 18:25:13
+====================================================================================================
+#    Parameter Feature          CoinGlass (DOM)        Pure API (Live)        Delta            Parity Status 
+----------------------------------------------------------------------------------------------------
+1    Asset                      BTCUSDT                BTCUSDT                --               MATCH         
+2    Price ($)                  $77.18K                $77.19K                $4.50            MATCH         
+3    Volume ($)                 $26.09M                $2.24M                 $23.85M          DIVERGENT     
+4    RSI (14)                   62.06                  62.39                  0.33             CLOSE         
+5    Futures CVD                68.05K                 68.08K                 29.00            MATCH         
+6    Spot CVD                   7.48K                  7.49K                  4.00             CLOSE         
+7    Funding Rate               0.0096%                0.0096%                0.000011%        CLOSE         
+8    Open Interest (OI)         127.05K                127.04K                6.00             MATCH         
+9    Long Liquidation ($)       $0.00                  $0.00                  $0.00            MATCH         
+10   Short Liquidation ($)      $0.00                  $0.00                  $0.00            MATCH         
+11   Long/Short Ratio           1.0420                 1.0420                 0.00             MATCH         
+12   FP Delta (BTC)             0.00                   4.69                   4.69             MATCH         
+13   FP POC ($)                 $0.00                  $77.20K                $77.20K          MATCH         
+14   Bid Dollar ($)             $174.48M               $183.56M               $9.07M           DIVERGENT     
+15   Ask Dollar ($)             $-160.77M              $-148.36M              $12.42M          DIVERGENT     
+16   Bid Coin (BTC)             2.27K                  2.38K                  106.00           DIVERGENT     
+17   Ask Coin (BTC)             -2.07K                 -1.92K                 151.00           DIVERGENT     
+18   Whale Index                107.69                 108.02                 0.33             CLOSE         
+19   Taker Buy                  5.16K                  6.16K                  1.01K            DIVERGENT     
+20   Taker Sell                 -5.87K                 -4.45K                 1.42K            DIVERGENT     
+21   EMA 8 ($)                  $77.09K                $77.10K                $5.28            MATCH         
+22   EMA 21 ($)                 $76.87K                $76.88K                $1.81            MATCH         
+23   EMA 50 ($)                 $76.81K                $76.81K                $2.70            MATCH         
+24   EMA 200 ($)                $76.35K                $76.35K                $3.07            MATCH         
+25   EMA 800 ($)                $70.92K                $70.89K                $28.43           MATCH         
+26   ATR 14 ($)                 225.20                 213.89                 11.31            DIVERGENT     
+27   ATR 100 ($)                274.80                 262.44                 12.36            DIVERGENT     
+----------------------------------------------------------------------------------------------------
+Parity Score: 18/27 (66.7%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #1 — 2026-08-23 18:30:40
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.21K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $0.00                --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.24                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $0.00                --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $0.00                --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   0.00                 --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   0.00                 --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   199.06               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   259.88               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #2 — 2026-08-23 18:31:10
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.21K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $167.25K             --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.24                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   422.93               --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   0.28                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.0100%              --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   30.01K               --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   1.03                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $77.21K              --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $190.14K             --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $-69.37K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   2.46                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   -0.90                --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   74.48                --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   412.75               --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   -146.25              --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   199.06               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   259.88               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #1 — 2026-08-23 18:31:23
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $227.14K             --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.39                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $0.00                --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $0.00                --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   0.00                 --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   556.53               --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   -239.47              --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   199.47               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   259.93               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #2 — 2026-08-23 18:31:53
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $573.49K             --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.49                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   17.33                --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   4.17                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.0100%              --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   30.01K               --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   5.31                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $276.90K             --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $-47.49K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   3.59                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   -0.61                --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   88.60                --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   934.97               --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   -155.03              --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   199.77               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   259.98               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #3 — 2026-08-23 18:32:23
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.23K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $646.18K             --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.59                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   -174.78              --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   4.95                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.0100%              --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   30.01K               --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   6.00                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $55.52K              --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $-315.32K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   0.72                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   -4.08                --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   94.06                --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   1.21K                --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   -200.21              --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   200.05               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   260.01               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  TWO-PLANE AUDIT CYCLE #4 — 2026-08-23 18:32:53
+====================================================================================================
+#    Parameter Feature      Provenance   CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  CANONICAL    BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+3    Spot Vol (15m)         CANONICAL    --                   $782.93K             --             NO_OBSERVER   
+4    RSI (14)               CANONICAL    --                   63.49                --             NO_OBSERVER   
+5    Futures CVD (BTC)      PROXY (OKX)  --                   -496.78              --             NO_OBSERVER   
+6    Spot CVD (BTC)         CANONICAL    --                   3.98                 --             NO_OBSERVER   
+7    Funding Rate           PROXY (OKX)  --                   0.0100%              --             NO_OBSERVER   
+8    Open Interest          PROXY (OKX)  --                   30.01K               --             NO_OBSERVER   
+9    Long Liq ($)           UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          UNAVAILABLE  --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       PROXY (OKX)  --                   1.0000               --             NO_OBSERVER   
+12   FP Delta (BTC)         CANONICAL    --                   5.06                 --             NO_OBSERVER   
+13   FP POC ($)             CANONICAL    --                   $77.22K              --             NO_OBSERVER   
+14   Bid Dollar ($)         CANONICAL    --                   $129.11K             --             NO_OBSERVER   
+15   Ask Dollar ($)         CANONICAL    --                   $-97.54K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         CANONICAL    --                   1.67                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         CANONICAL    --                   -1.26                --             NO_OBSERVER   
+18   Whale Index            PROXY (OKX)  --                   -200.00              --             NO_OBSERVER   
+19   Taker Buy Count        CANONICAL    --                   1.41K                --             NO_OBSERVER   
+20   Taker Sell Count       CANONICAL    --                   -470.59              --             NO_OBSERVER   
+21   EMA 8 ($)              CANONICAL    --                   $77.13K              --             NO_OBSERVER   
+22   EMA 21 ($)             CANONICAL    --                   $76.91K              --             NO_OBSERVER   
+23   EMA 50 ($)             CANONICAL    --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            CANONICAL    --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            CANONICAL    --                   $70.91K              --             NO_OBSERVER   
+26   ATR 14 ($)             CANONICAL    --                   200.05               --             NO_OBSERVER   
+27   ATR 100 ($)            CANONICAL    --                   260.01               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Canonical Parity Score: 1/20 (5.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #1 — 2026-08-23 18:42:40
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   0.00                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.94K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $0.00                --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $0.00                --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #2 — 2026-08-23 18:43:10
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   0.57                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.93K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $1.89M               --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-113.05K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   24.47                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -1.46                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #3 — 2026-08-23 18:43:40
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   5.11                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.93K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $1.06M               --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-770.06K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   13.66                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -9.96                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #4 — 2026-08-23 18:44:10
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   5.98                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.93K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $967.00K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-678.98K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   12.51                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -8.78                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #5 — 2026-08-23 18:44:40
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   6.36                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.94K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $515.28K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-1.05M              --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   6.66                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -13.56               --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #6 — 2026-08-23 18:45:10
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   7.43                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.94K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $273.65K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-1.02M              --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   3.54                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -13.22               --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #7 — 2026-08-23 18:45:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   8.57                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.94K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $369.37K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-1.21M              --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   4.78                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -15.70               --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #8 — 2026-08-23 18:46:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   8.50                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.96K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $511.57K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-634.13K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   6.62                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -8.20                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #9 — 2026-08-23 18:46:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   9.68                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.96K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0682               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $122.71K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-2.35M              --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   1.59                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -30.39               --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #10 — 2026-08-23 18:47:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   9.07                 --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.96K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $1.61M               --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-279.68K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   20.77                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -3.62                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #11 — 2026-08-23 18:47:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   14.23                --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.95K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $1.73M               --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-105.55K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   22.35                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -1.36                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #12 — 2026-08-23 18:48:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   33.40                --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.95K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $442.68K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-1.01M              --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   5.72                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -13.01               --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #13 — 2026-08-23 18:48:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   113.37               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.86K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $62.32K              --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-604.05K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   0.81                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -7.81                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #14 — 2026-08-23 18:49:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   140.40               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.81K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $502.52K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-310.84K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   6.50                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -4.02                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #15 — 2026-08-23 18:49:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   139.80               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.50K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $749.03K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-256.02K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   9.69                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -3.31                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #16 — 2026-08-23 18:50:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   138.59               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.47K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $713.69K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-463.63K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   9.23                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -6.00                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #17 — 2026-08-23 18:50:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   131.39               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.39K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $332.03K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-401.54K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   4.29                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -5.19                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #18 — 2026-08-23 18:51:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   129.23               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.30K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $638.53K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-444.53K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   8.26                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -5.75                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #19 — 2026-08-23 18:51:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   128.57               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.25K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $490.00K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-87.38K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   6.34                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -1.13                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #20 — 2026-08-23 18:52:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   128.99               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.26K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $845.22K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-400.07K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   10.93                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -5.17                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #21 — 2026-08-23 18:52:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   130.20               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.27K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0673               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $690.65K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-157.43K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   8.93                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -2.04                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #22 — 2026-08-23 18:53:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   133.32               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.28K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $719.96K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-79.18K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   9.31                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -1.02                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #23 — 2026-08-23 18:53:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   134.72               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.29K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $831.30K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-230.27K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   10.75                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -2.98                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #24 — 2026-08-23 18:54:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   139.43               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.29K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $257.10K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-635.60K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   3.33                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -8.22                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #25 — 2026-08-23 18:54:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   140.41               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.29K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $295.22K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-370.92K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   3.82                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -4.80                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #26 — 2026-08-23 18:55:11
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   158.97               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.29K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $971.41K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-190.83K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   12.56                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -2.47                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #27 — 2026-08-23 18:55:41
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   157.08               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.29K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0777               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $333.26K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-363.65K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   4.31                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -4.70                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #28 — 2026-08-23 18:56:12
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   160.31               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.31K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0675               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $2.49M               --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-65.18K             --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   32.20                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -0.84                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #29 — 2026-08-23 18:56:42
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   159.18               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.31K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0675               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $690.11K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-330.63K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   8.93                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -4.28                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #30 — 2026-08-23 18:57:12
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   159.90               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.32K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0675               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $885.27K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-280.92K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   11.45                --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -3.63                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+
+
+====================================================================================================
+  FUTURES PARITY AUDIT CYCLE #31 — 2026-08-23 18:57:42
+====================================================================================================
+#    Parameter Feature      Market       CoinGlass (Obs)      Pure API (Live)      Delta          Status        
+----------------------------------------------------------------------------------------------------
+1    Asset                  FUTURES      BTCUSDT              BTCUSDT              --             MATCH         
+2    Price ($)              FUTURES      --                   $77.32K              --             NO_OBSERVER   
+3    Volume ($)             FUTURES      --                   $36.13M              --             NO_OBSERVER   
+4    RSI (14)               FUTURES      --                   65.67                --             NO_OBSERVER   
+5    Futures CVD (BTC)      FUTURES      --                   0.00                 --             NO_OBSERVER   
+6    Spot CVD (BTC)         SPOT         --                   163.52               --             NO_OBSERVER   
+7    Funding Rate           FUTURES      --                   0.00%                --             NO_OBSERVER   
+8    Open Interest          FUTURES      --                   106.31K              --             NO_OBSERVER   
+9    Long Liq ($)           FUTURES      --                   $0.00                --             NO_OBSERVER   
+10   Short Liq ($)          FUTURES      --                   $0.00                --             NO_OBSERVER   
+11   Long/Short Ratio       FUTURES      --                   2.0675               --             NO_OBSERVER   
+12   FP Delta (BTC)         FUTURES      --                   0.00                 --             NO_OBSERVER   
+13   FP POC ($)             FUTURES      --                   $0.00                --             NO_OBSERVER   
+14   Bid Dollar ($)         FUTURES      --                   $557.27K             --             NO_OBSERVER   
+15   Ask Dollar ($)         FUTURES      --                   $-514.90K            --             NO_OBSERVER   
+16   Bid Coin (BTC)         FUTURES      --                   7.21                 --             NO_OBSERVER   
+17   Ask Coin (BTC)         FUTURES      --                   -6.66                --             NO_OBSERVER   
+18   Whale Index            FUTURES      --                   0.00                 --             NO_OBSERVER   
+19   Taker Buy Count        FUTURES      --                   7.39K                --             NO_OBSERVER   
+20   Taker Sell Count       FUTURES      --                   -5.24K               --             NO_OBSERVER   
+21   EMA 8 ($)              FUTURES      --                   $77.15K              --             NO_OBSERVER   
+22   EMA 21 ($)             FUTURES      --                   $76.92K              --             NO_OBSERVER   
+23   EMA 50 ($)             FUTURES      --                   $76.83K              --             NO_OBSERVER   
+24   EMA 200 ($)            FUTURES      --                   $76.36K              --             NO_OBSERVER   
+25   EMA 800 ($)            FUTURES      --                   $70.89K              --             NO_OBSERVER   
+26   ATR 14 ($)             FUTURES      --                   219.23               --             NO_OBSERVER   
+27   ATR 100 ($)            FUTURES      --                   273.48               --             NO_OBSERVER   
+----------------------------------------------------------------------------------------------------
+Total Futures Parity Score: 1/1 (100.0%)
+

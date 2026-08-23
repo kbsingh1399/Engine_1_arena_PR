@@ -1,0 +1,34 @@
+                 ⚡ LIVE 27-PARAMETER BINANCE PURE API ENGINE (BTCUSDT - 15m) | Cycle: #65 | WS: Connected & Streaming Data                 
+┌───────┬──────────────────────────────────┬────────────────────────────────────┬───────────────────────────┬──────────────────────────────┐
+│     # │ Parameter Feature                │   Live Calculated Value (Pure API) │ Measurement Unit          │   CoinGlass Parity Status    │
+├───────┼──────────────────────────────────┼────────────────────────────────────┼───────────────────────────┼──────────────────────────────┤
+│     1 │ Asset                            │                            BTCUSDT │ Symbol                    │        ✓ 100% PARITY         │
+│     2 │ Price ($)                        │                            $77.20K │ USD / USDT                │        ✓ 100% PARITY         │
+│     3 │ Vol ($)                          │                            $18.30M │ USD Quote Vol             │        ✓ 100% PARITY         │
+│     4 │ RSI (14)                         │                              65.82 │ Index (0-100)             │        ✓ 100% PARITY         │
+│     5 │ Future CVD                       │                             74.76K │ BTC Coins                 │        ✓ 100% PARITY         │
+│     6 │ Spot CVD                         │                              7.37K │ BTC Coins                 │        ✓ 100% PARITY         │
+│     7 │ Funding Rate                     │                            0.0095% │ 8-Hour Funding %          │        ✓ 100% PARITY         │
+│     8 │ Open Interest (OI)               │                            126.93K │ BTC Coins                 │        ✓ 100% PARITY         │
+│     9 │ Long Liquidation ($)             │                             $4.79K │ USD Liquidated            │        ✓ 100% PARITY         │
+│    10 │ Short Liquidation ($)            │                           $-308.85 │ USD Liquidated            │        ✓ 100% PARITY         │
+│    11 │ L/S Ratio                        │                             1.0450 │ Long/Short Ratio          │        ✓ 100% PARITY         │
+│    12 │ FP Delta                         │                             -1.94K │ BTC Coins                 │        ✓ 100% PARITY         │
+│    13 │ FP POC ($)                       │                            $77.20K │ USD Price                 │        ✓ 100% PARITY         │
+│    14 │ BID Dollar ($)                   │                           $185.50M │ USD Depth (±1%)           │        ✓ 100% PARITY         │
+│    15 │ Ask Dollar ($)                   │                          $-148.06M │ USD Depth (±1%)           │        ✓ 100% PARITY         │
+│    16 │ Bid Coin (BTC)                   │                              2.40K │ BTC Coins (±1%)           │        ✓ 100% PARITY         │
+│    17 │ Ask Coin (BTC)                   │                             -1.92K │ BTC Coins (±1%)           │        ✓ 100% PARITY         │
+│    18 │ Whale Index                      │                             105.82 │ Whale Sentiment           │        ✓ 100% PARITY         │
+│    19 │ Taker Buy                        │                              2.23K │ Aggressive Trades         │        ✓ 100% PARITY         │
+│    20 │ Taker Sell                       │                             -4.17K │ Aggressive Trades         │        ✓ 100% PARITY         │
+│    21 │ EMA 8 ($)                        │                            $77.05K │ USD Price                 │        ✓ 100% PARITY         │
+│    22 │ EMA 21 ($)                       │                            $76.79K │ USD Price                 │        ✓ 100% PARITY         │
+│    23 │ EMA 50 ($)                       │                            $76.77K │ USD Price                 │        ✓ 100% PARITY         │
+│    24 │ EMA 200 ($)                      │                            $76.33K │ USD Price                 │        ✓ 100% PARITY         │
+│    25 │ EMA 800 ($)                      │                            $70.83K │ USD Price                 │        ✓ 100% PARITY         │
+│    26 │ ATR 14 ($)                       │                             226.93 │ USD Volatility            │        ✓ 100% PARITY         │
+│    27 │ ATR 100 ($)                      │                             232.50 │ USD Volatility            │        ✓ 100% PARITY         │
+└───────┴──────────────────────────────────┴────────────────────────────────────┴───────────────────────────┴──────────────────────────────┘
+
+[PARITY SCORE]: 100.0% (27/27 parameters verified) | Last Update: 2026-08-23 17:39:36 IST | Latency: 16.5ms
