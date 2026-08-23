@@ -799,6 +799,8 @@ async def start_ob_stream(symbol):
 async def _agg_handler(data):
     d = data.get("data", data)
     if "p" in d and "q" in d:
+        p_val = float(d["p"])
+        q_val = float(d["q"])
         await AGG_STATE.apply(
             ts_ms=int(d.get("T", time.time()*1000)),
             price_str=d.get("p", "0"),
@@ -806,6 +808,7 @@ async def _agg_handler(data):
             is_buyer_maker=d.get("m", False),
             agg_id=d.get("a")
         )
+        await KL_STATE.apply_trade_tick(p_val, q_val)
 
 async def _recover_fut_agg():
     last_id = AGG_STATE.last_aggregate_trade_id
@@ -1052,6 +1055,7 @@ async def compute_snapshot(seq_id):
             receive_timestamp_ms=now_ms,
             features={
                 "price":      fv(close, kq),
+                "base_vol":   fv(kl_snap.volume, kq),
                 "quote_vol":  fv(kl_snap.quote_volume if kl_snap.quote_volume else kl_snap.volume * close, kq),
                 "volume_sma9":fv(kl_snap.volume_sma9, kq),
                 "rsi":        fv(kl_snap.rsi, kq),
@@ -1149,9 +1153,10 @@ async def terminal_observer_loop():
         lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
         lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
         lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
-        bar_vol = f"${f['quote_vol'].value/1e6:.3f}M" if f['quote_vol'].value else "$0.000M"
-        sma9 = f"{f['volume_sma9'].value/1e6:.2f}M" if f['volume_sma9'].value else "N/A"
-        vol_str = f"{bar_vol} (SMA9:{sma9})"
+        bar_vol_btc = f"{f['base_vol'].value:.2f} BTC" if f.get('base_vol') and f['base_vol'].value else f"{f['quote_vol'].value/close:.2f} BTC" if f['quote_vol'].value and close>0 else "0.00 BTC"
+        bar_vol_usd = f"${f['quote_vol'].value/1e6:.3f}M" if f['quote_vol'].value else "$0.000M"
+        sma9 = f"${f['volume_sma9'].value/1e6:.2f}M" if f['volume_sma9'].value else "N/A"
+        vol_str = f"{bar_vol_btc} ({bar_vol_usd}) [SMA9:{sma9}]"
         lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol (SMA9)"))
         lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
         
