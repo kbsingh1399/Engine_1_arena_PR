@@ -19,7 +19,7 @@ echo  Timestamp: %DATE% %TIME%
 echo =====================================================================
 
 :: Run Engine_1 directly in visible interactive console
-"%PYTHON_EXE%" -u Engine_1.py
+"%PYTHON_EXE%" -u Engine_1.py --skip-train --skip-seed
 
 echo.
 echo =====================================================================

@@ -73,6 +73,7 @@ This Kaizen loop ensures that `AGENTS.md` remains a lightweight router, while th
 * **No Observational Verbs**: Removed "I see", "Looking at", "I notice", "Based on my memory".
 * **No Forbidden Bullets**: Is explanatory/conversational content written in prose?
 * **Arena.ai Prompt Protocol**: When generating prompts for Arena.ai, NEVER inject large source code blocks directly. You MUST strictly point to Git references (raw GitHub URLs) so the model fetches the files directly, bypassing character limits.
+* **Minimal Files & File Consolidation**: ALWAYS generate minimal files. Never spawn fragmented, single-use, or redundant duplicate scripts. Consolidate related tasks, comparators, watchers, and runners into unified single-module entrypoints. Prune and delete all temporary/scratch files immediately after their purpose is fulfilled.
 
 ---
 

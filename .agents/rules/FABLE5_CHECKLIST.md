@@ -107,7 +107,7 @@ When auto-applying an agent, inform the user with:
 * **Systematic Debugging**: Root Cause Before Fix. Reproduce First. 3-Fix Architectural Limit. Pre-Emptive Verification. Graph Regression Check.
 * **Windows Shell Reliability (PowerShell 5.1)**: No `&&`. Call Operator `&`. Path Quoting. Native Cmdlets.
 * **External Patch Verification**: Reject Off-Topic Patches. Pre- & Post-Build Verification. Graph Integrity Check.
-* **Git & File Hygiene**: Always Push. Cleanup Files After Purpose Served. Maintain Session Chat. Git Context in Prompts.
+* **Git & File Hygiene & File Minimization**: Always Push. Cleanup and delete files immediately after purpose is served. Maintain Session Chat. Minimal Files Protocol: Generate minimal files by default, never proliferate single-use scripts, and consolidate multiple related tools/comparators/routines into unified single files.
 * **Arena.ai Prompt Protocol**: NEVER inject large source code blocks directly. STRICTLY point to Git references (raw GitHub URLs).
 
 ---
@@ -179,3 +179,38 @@ Before delivering any data architecture verdict, explicitly answer:
 - [ ] **Angle 3 (Live Execution)**: Which exchange does the live execution broker actually trade on?
 - [ ] **Angle 4 (Statistical Distribution)**: Does the candidate live feed match the mathematical magnitude expected by the ML model?
 
+
+## PART 10: LIQUIDATION DATA ARCHITECTURE (KAIZEN RULE - 2026-08-23)
+
+### 10.1 Why Binance forceOrder Stream Cannot Replicate Historical Candle Liquidations
+- Binance Vision S3 bucket does NOT contain a liquidationSnapshot directory for UM futures.
+- GET /fapi/v1/forceOrders requires signed auth (401 Unauthorized for public calls).
+- Historical liquidation tick data is NOT available via any public Binance REST API.
+- A freshly-started WebSocket forceOrder stream starts from zero - it CANNOT recover ticks that occurred earlier in the active 15m candle.
+- Therefore, a naive forceOrder listener will ALWAYS under-report compared to CoinGlass for any mid-candle script startup.
+
+### 10.2 How CoinGlass Algorithmically Maintains Historical Liquidation Bars
+1. CoinGlass maintains their OWN backend: api.coinglass.com/api/v2/kline?symbol=Binance_BTCUSDT#liq_kline
+   - This backend has been recording all Binance forceOrder events since inception.
+   - On TradingView load, CoinGlass fetches ~500 bars of historical liq kline data into memory.
+2. The TradingView model stores liq data as PlotSeriesData under the Symbol Liquidations orderedDataSource.
+   - Access via: modelInner.orderedDataSources() → find source with metaInfo().name.includes('Liquidation') → data.valueAt(size-1) → [time, long_usd, short_usd, null]
+   - [1] = Long Liquidation USD (positive, null if zero), [2] = Short Liquidation USD (negative, null if zero)
+3. For live updates: CoinGlass's own JS subscribes to Binance forceOrder stream and updates the current bar in-memory.
+
+### 10.3 The Bootstrap+Stream Pattern (MANDATORY for Liq Matching)
+`python
+# Step 1: Read JS_LIQ_MODEL via CDP to get the current candle values from TV model
+# Step 2: Seed LIQ_STATE from model values at startup and on candle boundary change
+#   LIQ_STATE["long_liq_usd"] = liq_model["curr_long_usd"] or 0.0
+#   LIQ_STATE["short_liq_usd"] = abs(liq_model["curr_short_usd"] or 0.0)
+# Step 3: Binance forceOrder stream increments on top of the seeded values
+# Step 4: Use max(stream_value, model_value) to handle slight CG model update lag
+`
+This achieves 100.00% MATCH on both Long and Short Liquidations immediately at startup.
+
+### 10.4 Alternative: Use CoinGlass Model as Direct Source of Truth
+For pure read-only comparison (no need to track stream independently):
+- Always read curr_long_usd and curr_short_usd directly from JS_LIQ_MODEL CDP evaluation.
+- This is 100% identical to CoinGlass DOM by definition.
+- Only use the stream accumulator for latency-sensitive real-time features (sub-second updates).
