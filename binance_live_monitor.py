@@ -81,6 +81,8 @@ class AggTradeSnapshot:
     cvd_24h: float
     candle_buy_btc: float
     candle_sell_btc: float
+    candle_buy_cnt: int
+    candle_sell_cnt: int
     fp_delta: float
     fp_poc: Optional[float]
 
@@ -99,6 +101,7 @@ class KlineSnapshot:
     close: float
     volume: float
     quote_volume: float
+    trade_count: float
     volume_sma9: Optional[float]
     taker_buy: float
     taker_sell: float
@@ -340,6 +343,8 @@ class AggTradeState:
         self.current_candle_ts = 0
         self.candle_buy_btc = 0.0
         self.candle_sell_btc = 0.0
+        self.candle_buy_cnt = 0
+        self.candle_sell_cnt = 0
         self.session_cvd = 0.0       # BTC, running since service start (legacy)
         self.cvd_24h = 0.0           # BTC, 24h rolling window
         self._trade_history = deque(maxlen=100000)  # (ts_ms, signed_qty_btc)
@@ -360,12 +365,17 @@ class AggTradeState:
             elif cts != self.current_candle_ts:
                 self.current_candle_ts = cts
                 self.candle_buy_btc = self.candle_sell_btc = 0.0
+                self.candle_buy_cnt = self.candle_sell_cnt = 0
             
             self.quality = DataQuality.CANONICAL
             self.profile.add(cts, price, qty)
             signed_qty = qty if not is_buyer_maker else -qty
-            self.candle_buy_btc += qty if not is_buyer_maker else 0.0
-            self.candle_sell_btc += qty if is_buyer_maker else 0.0
+            if not is_buyer_maker:
+                self.candle_buy_btc += qty
+                self.candle_buy_cnt += 1
+            else:
+                self.candle_sell_btc += qty
+                self.candle_sell_cnt += 1
             self.session_cvd += signed_qty
             self.cvd_24h += signed_qty
             self._trade_history.append((ts_ms, signed_qty))
@@ -391,12 +401,16 @@ class AggTradeState:
         now_cts = (int(time.time() * 1000) // 900000) * 900000
         buy = self.candle_buy_btc if now_cts == self.current_candle_ts else 0.0
         sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
+        buy_cnt = self.candle_buy_cnt if now_cts == self.current_candle_ts else 0
+        sell_cnt = self.candle_sell_cnt if now_cts == self.current_candle_ts else 0
         return AggTradeSnapshot(
             quality=self.quality,
             session_cvd=self.session_cvd,
             cvd_24h=self.cvd_24h,
             candle_buy_btc=buy,
             candle_sell_btc=sell,
+            candle_buy_cnt=buy_cnt,
+            candle_sell_cnt=sell_cnt,
             fp_delta=self.fp_delta,
             fp_poc=self.profile.poc
         )
@@ -497,6 +511,7 @@ class KlineState:
             self.close  = float(lf[4])
             self.volume = float(lf[5])
             self.quote_volume = float(lf[7])
+            self.trade_count = float(lf[8])
             self.volume_sma9 = sum(q_vols[-9:]) / 9.0 if len(q_vols) >= 9 else self.quote_volume
             self.taker_buy  = float(lf[9])
             self.taker_sell = float(lf[5]) - float(lf[9])
@@ -513,6 +528,7 @@ class KlineState:
             self.close  = float(k["c"])
             self.volume = float(k["v"])
             self.quote_volume = float(k.get("q", self.volume * self.close))
+            self.trade_count = float(k.get("n", self.trade_count))
             self.taker_buy  = float(k.get("V", 0))
             self.taker_sell = self.volume - self.taker_buy
 
@@ -555,6 +571,7 @@ class KlineState:
             if self.low == 0.0 or price < self.low: self.low = price
             self.volume += qty
             self.quote_volume += price * qty
+            self.trade_count += 1
             if len(self._past_q_vols) >= 8:
                 self.volume_sma9 = (sum(self._past_q_vols[-8:]) + self.quote_volume) / 9.0
 
@@ -591,6 +608,7 @@ class KlineState:
             close=self.close,
             volume=self.volume,
             quote_volume=self.quote_volume,
+            trade_count=self.trade_count,
             volume_sma9=self.volume_sma9,
             taker_buy=self.taker_buy,
             taker_sell=self.taker_sell,
@@ -987,12 +1005,13 @@ async def poll_ratios_loop():
             ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if ls_d: REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
             
-            # CoinGlass Whale Index is topLongShortPositionRatio * 100
+            # CoinGlass Whale Index is (topLongShortPositionRatio - 1.0) * 100
             tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if tp:
-                whale_val = float(tp[0]['longShortRatio']) * 100.0
+                raw_ratio = float(tp[0]['longShortRatio'])
+                whale_val = (raw_ratio - 1.0) * 100.0
                 REST_CACHE.whale = f"{whale_val:.4f}"
-                REST_CACHE.ls_ratio = float(tp[0]['longShortRatio'])
+                REST_CACHE.ls_ratio = raw_ratio
         except Exception:
             pass
         await asyncio.sleep(10)
@@ -1061,6 +1080,14 @@ async def compute_snapshot(seq_id):
         def fv(val, q=DataQuality.CANONICAL):
             return FeatureValue(value=val, quality=q, timestamp_ms=now_ms)
 
+        tot_cnt = kl_snap.trade_count
+        if tot_cnt > 0 and kl_snap.volume > 0:
+            tb_cnt = tot_cnt * (kl_snap.taker_buy / kl_snap.volume)
+            ts_cnt = tot_cnt - tb_cnt
+        else:
+            tb_cnt = float(agg_snap.candle_buy_cnt)
+            ts_cnt = float(agg_snap.candle_sell_cnt)
+
         return FeatureSnapshot(
             sequence_id=seq_id,
             receive_timestamp_ms=now_ms,
@@ -1073,10 +1100,10 @@ async def compute_snapshot(seq_id):
                 "future_cvd": fv(fcv_24h, fcvd_q),
                 "future_cvd_session": fv(agg_snap.session_cvd, fcvd_q),
                 "fut_buy_15m": fv(agg_snap.candle_buy_btc, agg_snap.quality),
-                "fut_sell_15m":fv(agg_snap.candle_sell_btc, agg_snap.quality),
+                "fut_sell_15m":fv(-agg_snap.candle_sell_btc, agg_snap.quality),
                 "spot_cvd":   fv(scvd, scvd_q),
                 "spot_buy_15m":fv(spot_agg_snap.candle_buy_btc, spot_agg_snap.quality),
-                "spot_sell_15m":fv(spot_agg_snap.candle_sell_btc, spot_agg_snap.quality),
+                "spot_sell_15m":fv(-spot_agg_snap.candle_sell_btc, spot_agg_snap.quality),
                 "funding_pct":fv(funding, mp_q),
                 "basis":      fv(basis, mp_q),
                 "oi_k":       fv(oi_k),
@@ -1085,11 +1112,12 @@ async def compute_snapshot(seq_id):
                 "fp_delta":   fv(agg_snap.fp_delta, agg_snap.quality),
                 "fp_poc":     fv(agg_snap.fp_poc, agg_snap.quality),
                 "long_liq":   fv(liq_snap.long_usd, liq_snap.quality),
-                "short_liq":  fv(liq_snap.short_usd, liq_snap.quality),
-                "bid_dollar": fv(bd_t, ob_q), "ask_dollar": fv(ad_t, ob_q),
-                "bid_coin":   fv(bc_t, ob_q), "ask_coin":   fv(ac_t, ob_q),
+                "short_liq":  fv(-liq_snap.short_usd, liq_snap.quality),
+                "bid_dollar": fv(bd_t, ob_q), "ask_dollar": fv(-ad_t, ob_q),
+                "bid_coin":   fv(bc_t, ob_q), "ask_coin":   fv(-ac_t, ob_q),
                 "whale_idx":  fv(whale),
-                "taker_buy":  fv(tb), "taker_sell": fv(ts),
+                "taker_buy":  fv(tb_cnt),
+                "taker_sell": fv(-ts_cnt),
                 "ema8":  fv(kl_snap.ema8,   kq),
                 "ema21": fv(kl_snap.ema21,  kq),
                 "ema50": fv(kl_snap.ema50,  kq),

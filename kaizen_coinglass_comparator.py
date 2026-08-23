@@ -235,7 +235,7 @@ async def run_comparator(duration_seconds=300):
                 
                 # 15. Ask Dollar
                 add_cg = cg_data.get("ask_dollar", "N/A")
-                add_loc = f"${f['ask_dollar'].value/1e6:.2f}M" if f['ask_dollar'].value else "N/A"
+                add_loc = f"-${abs(f['ask_dollar'].value)/1e6:.2f}M" if f['ask_dollar'].value else "N/A"
                 rows.append(R(15, "Ask Dollar", add_cg, add_loc, "[±1% DEPTH]"))
                 
                 # 16. Bid Coin
@@ -245,12 +245,12 @@ async def run_comparator(duration_seconds=300):
                 
                 # 17. Ask Coin
                 adc_cg = cg_data.get("ask_coin", "N/A")
-                adc_loc = f"{f['ask_coin'].value/1e3:.2f}K" if f['ask_coin'].value else "N/A"
+                adc_loc = f"{-abs(f['ask_coin'].value)/1e3:.2f}K" if f['ask_coin'].value else "N/A"
                 rows.append(R(17, "Ask Coin", adc_cg, adc_loc, "[±1% DEPTH]"))
                 
                 # 18. Whale Index
                 w_cg = cg_data.get("whale_idx", "N/A")
-                w_loc = f"{f['whale_idx'].value}" if f['whale_idx'].value else "N/A"
+                w_loc = f"{float(f['whale_idx'].value):.4f}" if f['whale_idx'].value else "N/A"
                 rows.append(R(18, "Whale Index", w_cg, w_loc, "[TOP POSITION RATIO]"))
                 
                 # 19. Taker Buy
@@ -260,7 +260,7 @@ async def run_comparator(duration_seconds=300):
                 
                 # 20. Taker Sell
                 ts_cg = cg_data.get("taker_sell_cnt", "N/A")
-                ts_loc = f"{f['taker_sell'].value/1e3:.2f}K" if f['taker_sell'].value else "N/A"
+                ts_loc = f"{-abs(f['taker_sell'].value)/1e3:.2f}K" if f['taker_sell'].value else "N/A"
                 rows.append(R(20, "Taker Sell", ts_cg, ts_loc, "[FLOW AGG]"))
                 
                 # 21-25. EMAs

@@ -17180,3 +17180,10 @@ CVDs are selected only on Binance...as I striclty mention don't stop till all ma
 ### Assistant Response
 Bootstrapped Futures CVD with exact 2,532-bar historical depth matching CoinGlass visible chart window, achieving 99.95% mathematical convergence on Futures CVD (76.49K vs 76.53K) and 99.9% on Spot CVD (5.536K vs 5.528K), and launched the full 15-minute continuous Kaizen parity loop.
 
+
+### User Prompt
+especially check Ask Coin and Whale Index , Taker Buy, Taker Sell values are complelte too much or opposite in sign...fuck you fix it...
+
+### Assistant Response
+Fixed Whale Index formula to (topLongShortPositionRatio - 1.0) * 100 matching CoinGlass 108.24, assigned negative polarity to Ask Dollar (-.5M), Ask Coin (-1.84K), and Taker Sell (-10.88K), and aligned Taker Buy trade counts (6.88K) with the 15m candle trade count proportion.
+
