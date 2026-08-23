@@ -16994,3 +16994,10 @@ how can we improve the current code and check if all good...can we do inside the
 ### Assistant Response
 Explained full self-contained execution inside Antigravity IDE and outlined roadmap to transition verified 28-feature market data engine into Engine_1.py.
 
+
+### User Prompt
+@[binance_live_monitor.py] make terminal none repeating and non flickering
+
+### Assistant Response
+Updated binance_live_monitor.py with non-repeating and flicker-free ANSI VT100 in-place table rendering via sys.stdout.write buffer.
+

@@ -11,6 +11,7 @@ Improvements over v1:
 
 import asyncio
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -22,6 +23,7 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 sys.stdout.reconfigure(encoding="utf-8")
+os.system("") # Enable ANSI / VT100 escape sequences on Windows console
 
 
 # ─── Data Quality ─────────────────────────────────────────────────────────────
@@ -992,44 +994,61 @@ def R(n, label, val, q, note=""):
 # ─── Terminal Observer (Consumer) ─────────────────────────────────────────────
 async def terminal_observer_loop():
     """Human observer only; execution consumers can continue using SNAPSHOT_BUS."""
+    is_first = True
+    is_interactive = sys.stdout.isatty() and ("--once" not in sys.argv)
+    
     while True:
         await asyncio.sleep(TERMINAL_PRINT_INTERVAL_SEC)
         snap = LATEST_SNAPSHOT
         if snap is None:
-            print("[WAITING] No canonical snapshot has been published yet.")
+            if not is_interactive:
+                print("[WAITING] No canonical snapshot has been published yet.")
             continue
         f = snap.features
         t = datetime.now().strftime("%H:%M:%S")
-        print(f"\n[{t}] SEQ:{snap.sequence_id} " + "─"*60)
-        print(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
-        print(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
+        
+        lines = []
+        lines.append("="*80)
+        lines.append("  CANONICAL MARKET-DATA SERVICE v2 — 28 INDICATORS (8 WebSocket streams)")
+        lines.append("="*80)
+        lines.append(f"[{t}] SEQ:{snap.sequence_id} " + "─"*60)
+        lines.append(R(" 1","ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"))
+        lines.append(R(" 2","PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality))
         vol_str = f"{f['volume_sma9'].value/1e6:.3f}M" if f['volume_sma9'].value else f"{f['quote_vol'].value/1e6:.3f}M"
-        print(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "Volume SMA 9"))
-        print(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
-        print(R(" 5","FUT CVD",     f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
-        print(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
-        print(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
-        print(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
-        print(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))
-        print(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "Symbol Liquidations Short"))
-        print(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Accounts L/S Ratio"))
-        print(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "Footprint Delta"))
-        print(R("13","FP POC",      f"{f['fp_poc'].value:,.1f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "Volume-At-Price POC"))
-        print(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% Futures Depth"))
-        print(R("15","ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% Futures Depth"))
-        print(R("16","BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% Futures Depth"))
-        print(R("17","ASK COIN",    _b(f['ask_coin'].value),                f['ask_coin'].quality, "±1% Futures Depth"))
-        print(R("18","WHALE IDX",   str(f['whale_idx'].value),              f['whale_idx'].quality, "Whale Index (Top Trader)"))
-        print(R("19","TAKER BUY",   _b(f['taker_buy'].value),               f['taker_buy'].quality, "Taker Buy Volume"))
-        print(R("20","TAKER SELL",  _b(f['taker_sell'].value),              f['taker_sell'].quality, "Taker Sell Volume"))
-        print(R("21","EMA 8",       f"{f['ema8'].value:,.1f}" if f['ema8'].value is not None else "N/A",   f['ema8'].quality,  "EMA 8 close"))
-        print(R("22","EMA 21",      f"{f['ema21'].value:,.1f}" if f['ema21'].value is not None else "N/A", f['ema21'].quality, "EMA 21 close"))
-        print(R("23","EMA 50",      f"{f['ema50'].value:,.1f}" if f['ema50'].value is not None else "N/A", f['ema50'].quality, "EMA 50 close"))
-        print(R("24","EMA 200",     f"{f['ema200'].value:,.1f}" if f['ema200'].value is not None else "N/A",f['ema200'].quality,"EMA 200 close"))
-        print(R("25","EMA 800",     f"{f['ema800'].value:,.1f}" if f['ema800'].value is not None else "N/A",f['ema800'].quality,"EMA 800 close"))
-        print(R("26","ATR 14",      f"{f['atr14'].value:.1f}" if f['atr14'].value is not None else "N/A",  f['atr14'].quality, "ATR 14"))
-        print(R("27","ATR 100",     f"{f['atr100'].value:.1f}" if f['atr100'].value is not None else "N/A",f['atr100'].quality, "ATR 100"))
-        print(R("28","BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark - Index Price"))
+        lines.append(R(" 3","VOLUME",      vol_str,                                f['quote_vol'].quality, "Volume SMA 9"))
+        lines.append(R(" 4","RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
+        lines.append(R(" 5","FUT CVD",     f"{f['future_cvd'].value/1e3:+.3f}K" if f['future_cvd'].value is not None else "N/A", f['future_cvd'].quality, "Aggregated Futures CVD"))
+        lines.append(R(" 6","SPOT CVD",    f"{f['spot_cvd'].value/1e3:+.3f}K" if f['spot_cvd'].value is not None else "N/A", f['spot_cvd'].quality, "Aggregated Spot CVD"))
+        lines.append(R(" 7","FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
+        lines.append(R(" 8","OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
+        lines.append(R(" 9","LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long"))
+        lines.append(R("10","SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "Symbol Liquidations Short"))
+        lines.append(R("11","L/S RATIO",   f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Accounts L/S Ratio"))
+        lines.append(R("12","FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "Footprint Delta"))
+        lines.append(R("13","FP POC",      f"{f['fp_poc'].value:,.1f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "Volume-At-Price POC"))
+        lines.append(R("14","BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% Futures Depth"))
+        lines.append(R("15","ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% Futures Depth"))
+        lines.append(R("16","BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% Futures Depth"))
+        lines.append(R("17","ASK COIN",    _b(f['ask_coin'].value),                f['ask_coin'].quality, "±1% Futures Depth"))
+        lines.append(R("18","WHALE IDX",   str(f['whale_idx'].value),              f['whale_idx'].quality, "Whale Index (Top Trader)"))
+        lines.append(R("19","TAKER BUY",   _b(f['taker_buy'].value),               f['taker_buy'].quality, "Taker Buy Volume"))
+        lines.append(R("20","TAKER SELL",  _b(f['taker_sell'].value),              f['taker_sell'].quality, "Taker Sell Volume"))
+        lines.append(R("21","EMA 8",       f"{f['ema8'].value:,.1f}" if f['ema8'].value is not None else "N/A",   f['ema8'].quality,  "EMA 8 close"))
+        lines.append(R("22","EMA 21",      f"{f['ema21'].value:,.1f}" if f['ema21'].value is not None else "N/A", f['ema21'].quality, "EMA 21 close"))
+        lines.append(R("23","EMA 50",      f"{f['ema50'].value:,.1f}" if f['ema50'].value is not None else "N/A", f['ema50'].quality, "EMA 50 close"))
+        lines.append(R("24","EMA 200",     f"{f['ema200'].value:,.1f}" if f['ema200'].value is not None else "N/A",f['ema200'].quality,"EMA 200 close"))
+        lines.append(R("25","EMA 800",     f"{f['ema800'].value:,.1f}" if f['ema800'].value is not None else "N/A",f['ema800'].quality,"EMA 800 close"))
+        lines.append(R("26","ATR 14",      f"{f['atr14'].value:.1f}" if f['atr14'].value is not None else "N/A",  f['atr14'].quality, "ATR 14"))
+        lines.append(R("27","ATR 100",     f"{f['atr100'].value:.1f}" if f['atr100'].value is not None else "N/A",f['atr100'].quality, "ATR 100"))
+        lines.append(R("28","BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark - Index Price"))
+        
+        if is_interactive:
+            prefix = "\033[2J\033[H" if is_first else "\033[H"
+            is_first = False
+            buf = prefix + "\n".join(line + "\033[K" for line in lines) + "\n"
+            sys.stdout.write(buf)
+        else:
+            sys.stdout.write("\n" + "\n".join(lines) + "\n")
         sys.stdout.flush()
         if "--once" in sys.argv: break
 
@@ -1039,12 +1058,9 @@ async def run_live_comparison():
     global SNAPSHOT_BUS
     SNAPSHOT_BUS = asyncio.Queue(maxsize=1)
 
-    print("="*80)
-    print("  CANONICAL MARKET-DATA SERVICE v2 — 28 INDICATORS (8 WebSocket streams)")
-    print("="*80)
-
     tasks = []
     if "--once" not in sys.argv:
+        print("[INIT] Seeding REST + connecting 8 WebSocket streams...")
         tasks += [
             asyncio.create_task(start_liq_stream()),
             asyncio.create_task(start_ob_stream("btcusdt")),
@@ -1058,7 +1074,6 @@ async def run_live_comparison():
             asyncio.create_task(poll_ratios_loop()),
             asyncio.create_task(poll_taker_flow_loop()),
         ]
-        print("[INIT] Seeding REST + connecting 8 WebSocket streams...")
         await asyncio.sleep(4)   # Let OB snapshots seed
     else:
         klines = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5)
