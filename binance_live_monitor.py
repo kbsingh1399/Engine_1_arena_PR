@@ -58,7 +58,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import websockets
 
@@ -592,7 +592,8 @@ class AggTradeState:
         self.candle_sell_btc = 0.0
         self.candle_buy_cnt = 0
         self.candle_sell_cnt = 0
-        self.session_cvd = 0.0       # BTC net running sum since service start
+        self.session_cvd = 0.0       # BTC net, reset at 00:00 UTC
+        self.session_day = None      # UTC day integer for deterministic parity
         self.cvd_24h = 0.0           # BTC 24-hour rolling window CVD
         self._trade_history = deque(maxlen=100000)
         self.quality = DataQuality.PARTIAL
@@ -687,6 +688,10 @@ class AggTradeState:
             await KL_STATE.apply_trade_tick(price, qty)
 
         async with self._lock:
+            event_day = ts_ms // 86_400_000
+            if self.session_day != event_day:
+                self.session_day = event_day
+                self.session_cvd = 0.0
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
             elif cts != self.current_candle_ts:
@@ -758,7 +763,8 @@ class SpotAggTradeState:
         self.current_candle_ts = 0
         self.candle_buy_btc = 0.0
         self.candle_sell_btc = 0.0
-        self.session_cvd = 0.0
+        self.session_cvd = 0.0       # BTC net, reset at 00:00 UTC
+        self.session_day = None
         self.quality = DataQuality.PARTIAL
         self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
@@ -771,14 +777,14 @@ class SpotAggTradeState:
         qty = float(qty_str)
         price = float(price_str)
 
-        if price > 0 and KL_STATE.ready:
-            await KL_STATE.apply_trade_tick(price, qty)
-            AGG_STATE.profile.add(cts, price, qty, is_buyer_maker)
-
         async with self._lock:
             if not self._first_trade_seen:
                 self._first_trade_seen = True
                 self.quality = DataQuality.CANONICAL
+            event_day = ts_ms // 86_400_000
+            if self.session_day != event_day:
+                self.session_day = event_day
+                self.session_cvd = 0.0
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
             elif cts != self.current_candle_ts:
@@ -1305,7 +1311,12 @@ async def _recover_fut_agg() -> None:
         if AGG_STATE.session_cvd == 0.0:
             fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5)
             if isinstance(fk_data, list):
-                AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in fk_data)
+                day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
+                AGG_STATE.session_day = day_start // 86_400_000
+                AGG_STATE.session_cvd = sum(
+                    2.0 * float(k[9]) - float(k[5])
+                    for k in fk_data if int(k[0]) >= day_start
+                )
         
         if last_id:
             url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
@@ -1346,7 +1357,12 @@ async def _recover_spot_agg() -> None:
         if SPOT_AGG.session_cvd == 0.0:
             sk_data = await async_fetch("https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=1)
             if isinstance(sk_data, list):
-                SPOT_AGG.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in sk_data)
+                day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
+                SPOT_AGG.session_day = day_start // 86_400_000
+                SPOT_AGG.session_cvd = sum(
+                    2.0 * float(k[9]) - float(k[5])
+                    for k in sk_data if int(k[0]) >= day_start
+                )
         if last_id:
             url = f"https://data-api.binance.vision/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
             trades = await async_fetch(url, weight=1)
