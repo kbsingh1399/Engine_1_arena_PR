@@ -18174,3 +18174,16 @@ Total of 10 files for BTCUSDT:
 - 1 Master Consolidated Parquet: BTCUSDT_15m_master_2020_2026.parquet (~233,000 rows, ~80 MB)
 - 1 Supplemental Footprint Parquet: Master_BTCUSDT_15m_Final_Footprint.parquet
 - 1 Dataset Metadata Manifest: dataset_manifest.json
+
+
+---
+## 2026-08-25 01:32 IST
+
+**USER:** we don't need yearly breakdown. BTCUSDT_15m_master_2020_2026.parquet have all date wise timestamped data..so ml can fetch from there
+
+**AGENT (Omni):**
+Refactored parquet_exporter.py to eliminate yearly partitioned file generation. The pipeline now outputs strictly:
+1. BTCUSDT_15m_master_2020_2026.parquet: Unified, contiguous master dataset with all timestamped rows (48 columns).
+2. Master_BTCUSDT_15m_Final_Footprint.parquet: Supplemental tick footprint file.
+3. dataset_manifest.json: Metadata data contract manifest.
+Cleaned up Google Drive destination directory and verified 100% integrity pass.
