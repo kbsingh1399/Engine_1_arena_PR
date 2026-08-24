@@ -76,6 +76,11 @@ CANONICAL_COLUMNS: List[str] = [
     "ask_depth_usd",          # float64: Resting Ask liquidity in USD within -1% (Negative, Indicator 15. ASK DOLLAR DEPTH)
     "bid_depth_coin",         # float64: Resting Bid liquidity in BTC within +1% (Indicator 16. BID COIN DEPTH)
     "ask_depth_coin",         # float64: Resting Ask liquidity in BTC within -1% (Negative, Indicator 17. ASK COIN DEPTH)
+    
+    # 11. Feature Provenance Metadata
+    "future_flow_source",     # string: TICK_EXACT or KLINE_APPROX
+    "spot_flow_source",       # string: SPOT_EXACT or UNAVAILABLE
+    "poc_source",             # string: TICK_EXACT or OHLC_APPROX
 ]
 
 COLUMN_DTYPES: Dict[str, str] = {
@@ -83,6 +88,9 @@ COLUMN_DTYPES: Dict[str, str] = {
     "close_time_ms": "int64",
     "datetime_utc": "string",
     "symbol": "string",
+    "future_flow_source": "string",
+    "spot_flow_source": "string",
+    "poc_source": "string",
     "open": "float64",
     "high": "float64",
     "low": "float64",
