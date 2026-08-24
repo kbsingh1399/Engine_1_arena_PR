@@ -19,6 +19,7 @@ from ..core.canonical_indicators import (
     compute_volume_sma9_series,
     compute_session_cvd,
     estimate_depth_from_volatility,
+    compute_session_value_area,
 )
 from ..core.mathematical_liquidation_engine import MathematicalLiquidationModel
 from ..core.schema import CANONICAL_COLUMNS
@@ -36,7 +37,7 @@ class HistoricalMetricsProcessor:
         spot_df: pd.DataFrame = None
     ) -> pd.DataFrame:
         """
-        Executes end-to-end indicator calculation and produces a canonical 28-indicator DataFrame.
+        Executes end-to-end indicator calculation and produces a canonical multi-indicator DataFrame.
         """
         print("[PROCESSOR] Processing Master Historical Dataset...")
         df = klines_df.copy()
@@ -63,16 +64,17 @@ class HistoricalMetricsProcessor:
         vols_quote = df["volume_quote"].values
         open_times = df["open_time_ms"].values
 
-        # 3. Volume SMA 9
+        # 3. Volume SMA 9 & Average Trade Size
         print("[PROCESSOR] Computing Volume SMA 9 & Technical Indicators...")
         df["volume_sma9"] = compute_volume_sma9_series(vols_quote)
+        df["avg_trade_size_usd"] = np.round(vols_quote / np.maximum(df["trade_count"].values, 1), 2)
 
         # 4. Technical Indicators (Wilder RSI 14, Wilder ATR 14 & 100)
-        df["rsi_14"] = compute_wilder_rsi_series(closes, period=14)
-        df["atr_14"] = compute_wilder_atr_series(highs, lows, closes, period=14)
-        df["atr_100"] = compute_wilder_atr_series(highs, lows, closes, period=100)
+        df["rsi_14"] = compute_wilder_rsi_series(closes, 14)
+        df["atr_14"] = compute_wilder_atr_series(highs, lows, closes, 14)
+        df["atr_100"] = compute_wilder_atr_series(highs, lows, closes, 100)
 
-        # 5. Exponential Moving Averages (EMA 8, 21, 50, 200, 800)
+        # 5. Continuous Seeded EMAs
         print("[PROCESSOR] Computing Seeded Continuous EMAs (8, 21, 50, 200, 800)...")
         df["ema_8"] = np.round(compute_ema_series(closes, 8), 2)
         df["ema_21"] = np.round(compute_ema_series(closes, 21), 2)
@@ -80,47 +82,51 @@ class HistoricalMetricsProcessor:
         df["ema_200"] = np.round(compute_ema_series(closes, 200), 2)
         df["ema_800"] = np.round(compute_ema_series(closes, 800), 2)
 
-        # 6. Cumulative Volume Delta (CVD) & Footprint Integration
+        # 6. Developing Daily Session Value Area High (VAH) & Low (VAL) ($25.0 bucket)
+        print("[PROCESSOR] Computing Developing Daily Session Value Area (VAH / VAL)...")
+        svah, sval, pvah, pval = compute_session_value_area(open_times, highs, lows, closes, vols_base, bucket_size=25.0)
+        df["session_vah"] = svah
+        df["session_val"] = sval
+        df["prev_day_vah"] = pvah
+        df["prev_day_val"] = pval
+
+        # 7. Order Flow & Cumulative Volume Deltas
         print("[PROCESSOR] Computing Order Flow & Cumulative Volume Deltas...")
-        
-        # Default approximate calculations
         approx_buy_btc = df["taker_buy_volume"].astype(np.float64).values
         approx_sell_btc = vols_base - approx_buy_btc
-        buy_ratio = np.clip(approx_buy_btc / np.maximum(vols_base, 1e-6), 0.05, 0.95)
-        total_counts = df["trade_count"].values
-        approx_buy_count = np.round(total_counts * buy_ratio).astype(np.int64)
-        approx_sell_count = -np.round(total_counts * (1.0 - buy_ratio)).astype(np.int64)
-        
+        approx_buy_count = np.round(df["trade_count"].values * (approx_buy_btc / np.maximum(vols_base, 1e-6))).astype(np.int64)
+        approx_sell_count = df["trade_count"].values - approx_buy_count
+
         if footprint_df is not None and not footprint_df.empty:
             print("[PROCESSOR] Merging exact high-fidelity tick footprint data where available...")
-            fp_df = footprint_df.sort_values(by="open_time_ms").copy()
-            # Left join to find exact matching 15m footprint blocks
-            df = pd.merge(
+            fp_clean = footprint_df.sort_values(by="open_time_ms").copy()
+            merged_fp = pd.merge_asof(
                 df.sort_values("open_time_ms"),
-                fp_df[["open_time_ms", "taker_buy_vol_coin", "taker_sell_vol_coin", "taker_buy_count", "taker_sell_count"]],
+                fp_clean,
                 on="open_time_ms",
-                how="left"
+                direction="nearest",
+                tolerance=60000
             )
-            # Where footprint is NaN (e.g. today's live candles), fallback to approx
-            taker_buy_btc = df["taker_buy_vol_coin"].fillna(pd.Series(approx_buy_btc)).values
-            taker_sell_btc = df["taker_sell_vol_coin"].fillna(pd.Series(approx_sell_btc)).values
             
-            taker_buy_count = df["taker_buy_count"].fillna(pd.Series(approx_buy_count)).values.astype(np.int64)
-            # Notice we negate the footprint sell count to match the parity convention (-ve)
-            taker_sell_count_fp = -df["taker_sell_count"]
-            taker_sell_count = taker_sell_count_fp.fillna(pd.Series(approx_sell_count)).values.astype(np.int64)
+            exact_mask = merged_fp["taker_buy_vol_coin"].notna()
+            taker_buy_btc = np.where(exact_mask, merged_fp["taker_buy_vol_coin"].values, approx_buy_btc)
+            taker_sell_btc = np.where(exact_mask, merged_fp["taker_sell_vol_coin"].values, approx_sell_btc)
+            df["taker_buy_count"] = np.where(exact_mask, merged_fp["taker_buy_count"].values, approx_buy_count).astype(np.int64)
+            df["taker_sell_count"] = np.where(exact_mask, merged_fp["taker_sell_count"].values, approx_sell_count).astype(np.int64)
+            df["future_flow_source"] = np.where(exact_mask, "TICK_EXACT", "KLINE_APPROX")
             
-            df.drop(columns=["taker_buy_vol_coin", "taker_sell_vol_coin", "taker_buy_count", "taker_sell_count"], inplace=True)
-            df["taker_buy_count"] = taker_buy_count
-            df["taker_sell_count"] = taker_sell_count
-            df["future_flow_source"] = np.where(df["open_time_ms"].isin(fp_df["open_time_ms"]), "TICK_EXACT", "KLINE_APPROX")
+            if "max_single_trade_vol" in merged_fp.columns:
+                real_max_trade = merged_fp["max_single_trade_vol"].values
+                df["max_trade_vol_btc"] = np.round(np.where(np.isnan(real_max_trade), vols_base * 0.05, real_max_trade), 4)
+            else:
+                df["max_trade_vol_btc"] = np.round(vols_base * 0.05, 4)
         else:
-            print("[PROCESSOR] Using approximate kline footprint data everywhere...")
             taker_buy_btc = approx_buy_btc
             taker_sell_btc = approx_sell_btc
             df["taker_buy_count"] = approx_buy_count
             df["taker_sell_count"] = approx_sell_count
             df["future_flow_source"] = "KLINE_APPROX"
+            df["max_trade_vol_btc"] = np.round(vols_base * 0.05, 4)
 
         fut_delta_15m = np.round(taker_buy_btc - taker_sell_btc, 2)
         
@@ -157,11 +163,9 @@ class HistoricalMetricsProcessor:
         df["spot_cvd_session"] = compute_session_cvd(open_times, spot_delta_15m)
         df["spot_cvd_lifetime"] = np.round(np.cumsum(spot_delta_15m), 2)
 
-        # 7. Footprint & POC
+        # 8. Footprint POC
         df["fp_delta"] = fut_delta_15m
-        # Use real POC from footprint if available, else approximate
         if footprint_df is not None and "real_poc" in footprint_df.columns:
-            # real_poc was already merged via the footprint merge above; use it
             poc_merged = pd.merge(
                 df[["open_time_ms"]],
                 footprint_df[["open_time_ms", "real_poc"]].drop_duplicates("open_time_ms"),
@@ -175,7 +179,7 @@ class HistoricalMetricsProcessor:
             df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 1)
             df["poc_source"] = "OHLC_APPROX"
         
-        # 8. Order Book Depth (+-1% span normalized)
+        # 9. Order Book Depth (+-1% span normalized)
         print("[PROCESSOR] Estimating Order Book Depth Liquidity...")
         b_usd, a_usd, b_coin, a_coin = estimate_depth_from_volatility(closes, df["atr_14"].values, vols_base)
         df["bid_depth_usd"] = b_usd
@@ -183,11 +187,10 @@ class HistoricalMetricsProcessor:
         df["bid_depth_coin"] = b_coin
         df["ask_depth_coin"] = a_coin
 
-        # 9. Merge Historical Funding Rates
+        # 10. Merge Historical Funding Rates
         print("[PROCESSOR] Merging Continuous Funding Rates...")
         if not funding_df.empty:
             f_df = funding_df.sort_values(by="fundingTime").copy()
-            # Forward fill funding rate to each 15m bar
             df = pd.merge_asof(
                 df,
                 f_df[["fundingTime", "fundingRate"]],
@@ -195,29 +198,33 @@ class HistoricalMetricsProcessor:
                 right_on="fundingTime",
                 direction="backward"
             )
-            # Causal alignment: never backfill a future funding observation into older bars.
             raw_fr = df["fundingRate"].ffill().values
             df["funding_rate_pct"] = np.round(np.nan_to_num(raw_fr, nan=0.0001) * 100.0, 6)
-            df.drop(columns=["fundingTime", "fundingRate"], inplace=True)
+            df.drop(columns=["fundingTime", "fundingRate"], inplace=True, errors="ignore")
         else:
             df["funding_rate_pct"] = 0.010000
 
-        # Basis USD: real futures-spot spread if spot data available
+        # Basis USD
         if "spot_close" in df.columns and df["spot_close"].notna().any():
             df["basis_usd"] = np.round(df["close"].values - df["spot_close"].values, 2)
             df["basis_usd"] = df["basis_usd"].ffill().fillna(0.0)
             df.drop(columns=["spot_close"], inplace=True, errors="ignore")
         else:
-            # Fallback: estimate from premium index if no spot data
             df["basis_usd"] = 0.0
 
-        # 10. Merge Historical Metrics (Open Interest, L/S Ratios, Whale Index)
-        print("[PROCESSOR] Merging Daily Metrics (Open Interest, L/S, Whale Index)...")
+        # 11. Merge Historical Metrics (Open Interest, L/S Ratios, Whale Index, Taker Ratio)
+        print("[PROCESSOR] Merging Daily Metrics (Open Interest, L/S, Whale Index, Taker Ratio)...")
         if not metrics_df.empty:
             m_df = metrics_df.sort_values(by="timestamp_ms").copy()
+            cols_to_merge = ["timestamp_ms", "sum_open_interest", "sum_open_interest_value", "count_long_short_ratio", "sum_toptrader_long_short_ratio"]
+            if "count_toptrader_long_short_ratio" in m_df.columns:
+                cols_to_merge.append("count_toptrader_long_short_ratio")
+            if "sum_taker_long_short_vol_ratio" in m_df.columns:
+                cols_to_merge.append("sum_taker_long_short_vol_ratio")
+
             merged = pd.merge_asof(
                 df,
-                m_df[["timestamp_ms", "sum_open_interest", "sum_open_interest_value", "count_long_short_ratio", "sum_toptrader_long_short_ratio"]],
+                m_df[cols_to_merge],
                 left_on="open_time_ms",
                 right_on="timestamp_ms",
                 direction="backward"
@@ -238,24 +245,39 @@ class HistoricalMetricsProcessor:
             df["open_interest_usd"] = np.round(oi_usd, 2)
             df["ls_ratio_global"] = np.round(ls_glob, 4)
             df["ls_ratio_top"] = np.round(ls_top, 4)
-            # Whale Index: Coinglass uses Top Trader L/S Ratio (Positions) multiplied by 100.
-            # Our dataset has Top Trader L/S Ratio (Accounts), which tracks closely but isn't exact.
-            # But the nearest approximation matching the screenshots exactly is ls_top * 100.
             df["whale_index"] = np.round(ls_top * 100.0, 4)
+
+            if "count_toptrader_long_short_ratio" in merged.columns:
+                raw_top_acc = merged["count_toptrader_long_short_ratio"].ffill().values
+                df["top_account_ratio"] = np.round(np.nan_to_num(raw_top_acc, nan=1.050), 4)
+            else:
+                df["top_account_ratio"] = np.round(ls_glob * 1.02, 4)
+
+            if "sum_taker_long_short_vol_ratio" in merged.columns:
+                raw_taker_ratio = merged["sum_taker_long_short_vol_ratio"].ffill().values
+                fallback_taker = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
+                df["taker_volume_ratio"] = np.round(np.where(np.isnan(raw_taker_ratio), fallback_taker, raw_taker_ratio), 4)
+            else:
+                df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
         else:
             df["open_interest_k"] = 127.500
             df["open_interest_usd"] = df["open_interest_k"] * 1000.0 * closes
             df["ls_ratio_global"] = 1.0350
             df["ls_ratio_top"] = 1.0769
+            df["top_account_ratio"] = 1.0500
             df["whale_index"] = 107.6900
+            df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
 
-        # 11. Compute Mathematical Liquidations using Upgraded Model
+        # OI rate of change (% per 15m bar)
+        df["oi_change_pct"] = np.round(df["open_interest_k"].pct_change().fillna(0.0).values * 100.0, 4)
+
+        # 12. Compute Mathematical Liquidations using Upgraded Model
         print("[PROCESSOR] Computing Mathematical Liquidations (Non-Linear Cascade + Funding Asymmetry)...")
         long_liqs, short_liqs = self.liq_model.compute_vectorized(df)
         df["long_liq_usd"] = long_liqs
         df["short_liq_usd"] = short_liqs
 
-        # 12. Final Schema Selection and Ordering
+        # 13. Final Schema Selection and Ordering
         final_df = df[CANONICAL_COLUMNS].copy()
         
         # Verify no NaN values

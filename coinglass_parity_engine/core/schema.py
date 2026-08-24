@@ -53,6 +53,7 @@ CANONICAL_COLUMNS: List[str] = [
     "basis_usd",              # float64: Futures Mark Price - Spot Index Price Spread in USD (Indicator 28. BASIS)
     "open_interest_k",        # float64: Open Interest in thousands of BTC contracts (Indicator 8. OPEN INT K)
     "open_interest_usd",      # float64: Open Interest value in USD
+    "oi_change_pct",          # float64: 15m period Open Interest percentage rate of change
     
     # 7. Liquidations (Mathematical LMC Engine)
     "long_liq_usd",           # float64: Long liquidation dollar volume in USD (Negative polarity, Indicator 9. LONG LIQ)
@@ -61,15 +62,23 @@ CANONICAL_COLUMNS: List[str] = [
     # 8. Crowd Positioning & Whale Metrics
     "ls_ratio_global",        # float64: Global Accounts Long/Short Ratio (Indicator 11. L/S GLOBAL)
     "ls_ratio_top",           # float64: Top Trader Long/Short Position Ratio (Indicator 11b. L/S TOP)
+    "top_account_ratio",      # float64: Top Trader Long/Short Account Ratio
     "whale_index",            # float64: CoinGlass Whale Index = Top Trader Ratio * 100 (Indicator 18. WHALE IDX)
+    "taker_volume_ratio",     # float64: Official Taker Long/Short Volume Ratio (Taker Buy Vol / Taker Sell Vol)
     
     # 9. Order Flow Footprint & Microstructure
     "fp_delta",               # float64: Footprint Net Delta in BTC (Indicator 12. FOOTPRINT DELTA)
     "fp_poc",                 # float64: Footprint Point of Control Price in USD (Indicator 13. FOOTPRINT POC)
+    "session_vah",            # float64: Developing Session 70% Value Area High in USD
+    "session_val",            # float64: Developing Session 70% Value Area Low in USD
+    "prev_day_vah",           # float64: Prior Day Finalized Value Area High in USD
+    "prev_day_val",           # float64: Prior Day Finalized Value Area Low in USD
     "taker_buy_count",        # int64: Taker aggressive buy trade count (Indicator 19. TAKER BUY COUNT)
     "taker_sell_count",       # int64: Taker aggressive sell trade count (Negative polarity, Indicator 20. TAKER SELL)
     "taker_buy_vol_btc",      # float64: Taker aggressive buy volume in BTC
     "taker_sell_vol_btc",     # float64: Taker aggressive sell volume in BTC
+    "max_trade_vol_btc",      # float64: Maximum single trade execution size in BTC
+    "avg_trade_size_usd",     # float64: Average trade execution size in USD
     
     # 10. Order Book Resting Depth (+-1% around Mid Price)
     "bid_depth_usd",          # float64: Resting Bid liquidity in USD within +1% (Indicator 14. BID DOLLAR DEPTH)
@@ -117,17 +126,26 @@ COLUMN_DTYPES: Dict[str, str] = {
     "basis_usd": "float64",
     "open_interest_k": "float64",
     "open_interest_usd": "float64",
+    "oi_change_pct": "float64",
     "long_liq_usd": "float64",
     "short_liq_usd": "float64",
     "ls_ratio_global": "float64",
     "ls_ratio_top": "float64",
+    "top_account_ratio": "float64",
     "whale_index": "float64",
+    "taker_volume_ratio": "float64",
     "fp_delta": "float64",
     "fp_poc": "float64",
+    "session_vah": "float64",
+    "session_val": "float64",
+    "prev_day_vah": "float64",
+    "prev_day_val": "float64",
     "taker_buy_count": "int64",
     "taker_sell_count": "int64",
     "taker_buy_vol_btc": "float64",
     "taker_sell_vol_btc": "float64",
+    "max_trade_vol_btc": "float64",
+    "avg_trade_size_usd": "float64",
     "bid_depth_usd": "float64",
     "ask_depth_usd": "float64",
     "bid_depth_coin": "float64",

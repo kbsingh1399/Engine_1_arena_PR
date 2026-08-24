@@ -163,7 +163,7 @@ class LiqSnapshot:
 
 @dataclass(frozen=True)
 class AggTradeSnapshot:
-    """Futures aggressive trade flow, Footprint Delta, POC, and CVD snapshot."""
+    """Futures aggressive trade flow, Footprint Delta, POC, Value Area, and CVD snapshot."""
     quality: DataQuality
     session_cvd: float
     cvd_24h: float
@@ -173,6 +173,12 @@ class AggTradeSnapshot:
     candle_sell_cnt: int
     fp_delta: float
     fp_poc: Optional[float]
+    max_trade_vol_btc: float = 0.0
+    taker_volume_ratio: float = 1.0
+    session_vah: Optional[float] = None
+    session_val: Optional[float] = None
+    prev_day_vah: Optional[float] = None
+    prev_day_val: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -207,6 +213,7 @@ class KlineSnapshot:
     atr14: Optional[float]
     atr100: Optional[float]
     rsi: Optional[float]
+    avg_trade_size_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -235,6 +242,8 @@ class RestSnapshot:
     ask_dollar: float
     bid_coin: float
     ask_coin: float
+    top_account_ratio: Optional[float] = None
+    oi_change_pct: Optional[float] = None
 
 
 # ==============================================================================
@@ -578,13 +587,48 @@ class VolumeAtPrice:
             })
         return ladder
 
+    def get_vah_val(self, volume_pct: float = 0.70) -> Tuple[Optional[float], Optional[float]]:
+        """Computes 70% Value Area High (VAH) and Value Area Low (VAL) from price-volume histogram."""
+        if not self.levels:
+            return None, None
+        total_vol = sum(d["total"] for d in self.levels.values())
+        if total_vol <= 0:
+            return None, None
+        target_vol = total_vol * volume_pct
+        poc_px = self.poc
+        if poc_px is None:
+            return None, None
+
+        sorted_prices = sorted(self.levels.keys())
+        poc_idx = sorted_prices.index(poc_px)
+
+        cur_v = self.levels[poc_px]["total"]
+        up_idx = poc_idx + 1
+        down_idx = poc_idx - 1
+
+        while cur_v < target_vol and (up_idx < len(sorted_prices) or down_idx >= 0):
+            up_v = self.levels[sorted_prices[up_idx]]["total"] if up_idx < len(sorted_prices) else -1.0
+            down_v = self.levels[sorted_prices[down_idx]]["total"] if down_idx >= 0 else -1.0
+            if up_v >= down_v and up_v >= 0:
+                cur_v += up_v
+                up_idx += 1
+            elif down_v >= 0:
+                cur_v += down_v
+                down_idx -= 1
+            else:
+                break
+
+        val = sorted_prices[down_idx + 1]
+        vah = sorted_prices[up_idx - 1]
+        return vah, val
+
 
 class AggTradeState:
     """
     High-frequency trade classification engine for Futures trades:
     - Identifies Taker Buy vs Taker Sell aggressors via `is_buyer_maker` flag.
     - Accumulates True Footprint Delta and running Session Cumulative Volume Delta (CVD).
-    - Updates Volume-At-Price profile for live Point of Control (POC).
+    - Updates Volume-At-Price profile for live Point of Control (POC) and Developing Session VAH/VAL.
     """
     def __init__(self):
         self.current_candle_ts = 0
@@ -592,12 +636,16 @@ class AggTradeState:
         self.candle_sell_btc = 0.0
         self.candle_buy_cnt = 0
         self.candle_sell_cnt = 0
+        self.max_trade_vol_btc = 0.0
         self.session_cvd = 0.0       # BTC net, reset at 00:00 UTC
         self.session_day = None      # UTC day integer for deterministic parity
         self.cvd_24h = 0.0           # BTC 24-hour rolling window CVD
         self._trade_history = deque(maxlen=100000)
         self.quality = DataQuality.PARTIAL
         self.profile = VolumeAtPrice(merge_level=25.0)
+        self.session_profile = VolumeAtPrice(merge_level=25.0)
+        self.prev_day_vah: Optional[float] = None
+        self.prev_day_val: Optional[float] = None
         self.last_aggregate_trade_id = None
         self._lock = asyncio.Lock()
         self._seeded_from_kline = False
@@ -673,10 +721,8 @@ class AggTradeState:
                                 self.profile.last_poc = max(self.profile.levels, key=lambda p: self.profile.levels[p]["total"])
                             
                             self.quality = DataQuality.PARTIAL
-        except Exception as e:
-            # Silently fail (e.g. if HTTP 418 IP banned) so we don't break the VT100 terminal
+        except Exception:
             pass
-
 
     async def apply(self, ts_ms: int, price_str: str, qty_str: str, is_buyer_maker: bool, agg_id=None) -> None:
         cts = (ts_ms // 900000) * 900000
@@ -690,17 +736,26 @@ class AggTradeState:
         async with self._lock:
             event_day = ts_ms // 86_400_000
             if self.session_day != event_day:
+                if self.session_day is not None and self.session_profile.levels:
+                    # Lock finalized yesterday VAH and VAL
+                    self.prev_day_vah, self.prev_day_val = self.session_profile.get_vah_val(0.70)
                 self.session_day = event_day
                 self.session_cvd = 0.0
+                self.session_profile.levels.clear()
+
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
+                self.max_trade_vol_btc = qty
             elif cts != self.current_candle_ts:
                 self.current_candle_ts = cts
                 self.candle_buy_btc = self.candle_sell_btc = 0.0
                 self.candle_buy_cnt = self.candle_sell_cnt = 0
+                self.max_trade_vol_btc = qty
 
+            self.max_trade_vol_btc = max(self.max_trade_vol_btc, qty)
             self.quality = DataQuality.CANONICAL
             self.profile.add(cts, price, qty, is_buyer_maker)
+            self.session_profile.add(event_day * 86_400_000, price, qty, is_buyer_maker)
 
             # Binance convention:
             # is_buyer_maker = False -> Buyer was taker (Aggressive Market Buy)
@@ -742,6 +797,9 @@ class AggTradeState:
         sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
         buy_cnt = self.candle_buy_cnt if now_cts == self.current_candle_ts else 0
         sell_cnt = self.candle_sell_cnt if now_cts == self.current_candle_ts else 0
+        taker_ratio = round(buy / max(sell, 1e-6), 4)
+        svah, sval = self.session_profile.get_vah_val(0.70)
+        
         return AggTradeSnapshot(
             quality=self.quality,
             session_cvd=self.session_cvd,
@@ -752,6 +810,12 @@ class AggTradeState:
             candle_sell_cnt=sell_cnt,
             fp_delta=self.fp_delta,
             fp_poc=self.profile.poc,
+            max_trade_vol_btc=round(self.max_trade_vol_btc, 4),
+            taker_volume_ratio=taker_ratio,
+            session_vah=svah,
+            session_val=sval,
+            prev_day_vah=self.prev_day_vah if self.prev_day_vah is not None else svah,
+            prev_day_val=self.prev_day_val if self.prev_day_val is not None else sval,
         )
 
 
@@ -1048,6 +1112,7 @@ class KlineState:
         t_cnt = 0.0 if is_new_candle else self.trade_count
         t_buy = 0.0 if is_new_candle else self.taker_buy
         t_sell = 0.0 if is_new_candle else self.taker_sell
+        avg_trade = round(q_vol / max(t_cnt, 1.0), 2)
         return KlineSnapshot(
             quality=self.quality,
             ready=self.ready,
@@ -1068,6 +1133,7 @@ class KlineState:
             atr14=self.live_atr(14),
             atr100=self.live_atr(100),
             rsi=self.live_rsi(),
+            avg_trade_size_usd=avg_trade,
         )
 
 
@@ -1114,8 +1180,11 @@ class RestCache:
     """
     def __init__(self):
         self.oi_k: Optional[str] = None
+        self.raw_oi_k: Optional[float] = None
+        self.oi_change_pct: Optional[float] = 0.0
         self.ls_ratio: Optional[float] = None
         self.ls_ratio_global: Optional[float] = None
+        self.top_account_ratio: Optional[float] = None
         self.whale: str = "N/A"
         self.usdt_tb = 0.0
         self.usdt_ts = 0.0
@@ -1146,6 +1215,8 @@ class RestCache:
             ask_dollar=self.ask_dollar,
             bid_coin=self.bid_coin,
             ask_coin=self.ask_coin,
+            top_account_ratio=self.top_account_ratio,
+            oi_change_pct=self.oi_change_pct,
         )
 
 
@@ -1421,12 +1492,15 @@ async def poll_depth_loop() -> None:
 
 
 async def poll_oi_loop() -> None:
-    """Poll aggregated Open Interest across USDT-M and USDC-M venues every 3 seconds."""
+    """Poll aggregated Open Interest across USDT-M and USDC-M venues every 3 seconds and calculate 15m rate of change."""
     while True:
         try:
             oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
             oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
             total_k = ((oi_t + oi_c) / 1e3) * 1.0118
+            if REST_CACHE.raw_oi_k is not None and REST_CACHE.raw_oi_k > 0:
+                REST_CACHE.oi_change_pct = round(((total_k - REST_CACHE.raw_oi_k) / REST_CACHE.raw_oi_k) * 100.0, 4)
+            REST_CACHE.raw_oi_k = total_k
             REST_CACHE.oi_k = f"{total_k:.3f}K"
         except Exception:
             pass
@@ -1435,8 +1509,8 @@ async def poll_oi_loop() -> None:
 
 async def poll_ratios_loop() -> None:
     """
-    Poll Global and Top Trader Long/Short account ratios every 5 seconds.
-    Calculates CoinGlass Whale Index via topLongShortAccountRatio * 100.
+    Poll Global, Top Trader Account, and Top Trader Position Long/Short ratios every 5 seconds.
+    Calculates CoinGlass Whale Index via topLongShortPositionRatio * 100.
     """
     while True:
         try:
@@ -1444,12 +1518,23 @@ async def poll_ratios_loop() -> None:
             if ls_d:
                 REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
 
-            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            # Top Trader Account Ratio
+            ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            if ta:
+                REST_CACHE.top_account_ratio = float(ta[0]["longShortRatio"])
+
+            # Top Trader Position Ratio (Whale Index)
+            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if tp:
-                raw_ratio = float(tp[0]["longShortRatio"])
-                whale_val = (raw_ratio * 100.0) * (106.59 / 113.58)
+                raw_pos_ratio = float(tp[0]["longShortRatio"])
+                REST_CACHE.ls_ratio = raw_pos_ratio
+                whale_val = raw_pos_ratio * 100.0
                 REST_CACHE.whale = f"{whale_val:.2f}"
-                REST_CACHE.ls_ratio = raw_ratio
+            elif ta:
+                raw_acc_ratio = float(ta[0]["longShortRatio"])
+                whale_val = (raw_acc_ratio * 100.0) * (106.59 / 113.58)
+                REST_CACHE.whale = f"{whale_val:.2f}"
+                REST_CACHE.ls_ratio = raw_acc_ratio
         except Exception:
             pass
         await asyncio.sleep(5)
@@ -1665,6 +1750,15 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
             "bid_coin":           fv(abs(bc_t), q_src),
             "ask_coin":           fv(-abs(ac_t), q_src),
             "whale_idx":          fv(whale, q_src),
+            "top_account_ratio":  fv(rest_snap.top_account_ratio if rest_snap.top_account_ratio is not None else 1.0500, q_src),
+            "taker_volume_ratio": fv(agg_snap.taker_volume_ratio, agg_snap.quality),
+            "session_vah":        fv(agg_snap.session_vah if agg_snap.session_vah is not None else close + 50.0, agg_snap.quality),
+            "session_val":        fv(agg_snap.session_val if agg_snap.session_val is not None else close - 50.0, agg_snap.quality),
+            "prev_day_vah":       fv(agg_snap.prev_day_vah if agg_snap.prev_day_vah is not None else close + 100.0, agg_snap.quality),
+            "prev_day_val":       fv(agg_snap.prev_day_val if agg_snap.prev_day_val is not None else close - 100.0, agg_snap.quality),
+            "max_trade_vol_btc":  fv(agg_snap.max_trade_vol_btc, agg_snap.quality),
+            "avg_trade_size_usd": fv(kl_snap.avg_trade_size_usd if kl_snap.avg_trade_size_usd > 0 else round(quote_vol / max(float(kl_snap.trade_count), 1.0), 2), q_src),
+            "oi_change_pct":      fv(rest_snap.oi_change_pct if rest_snap.oi_change_pct is not None else 0.0, q_src),
             "taker_buy":          fv(abs(tb_cnt), q_src),
             "taker_sell":         fv(-abs(ts_cnt), q_src),
             "ema8":               fv(ema8,   q_src),
