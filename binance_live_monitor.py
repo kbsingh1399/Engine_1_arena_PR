@@ -857,20 +857,16 @@ class AggTradeState:
 
     @property
     def fp_delta(self) -> float:
-        now_cts = (int(time.time() * 1000) // 900000) * 900000
-        if self.current_candle_ts != 0 and now_cts != self.current_candle_ts:
-            return 0.0
         tot_buy = sum(v["buy"] for v in self.profile.levels.values())
         tot_sell = sum(v["sell"] for v in self.profile.levels.values())
         return tot_buy - tot_sell
 
     @property
     def snapshot(self) -> AggTradeSnapshot:
-        now_cts = (int(time.time() * 1000) // 900000) * 900000
-        buy = self.candle_buy_btc if now_cts == self.current_candle_ts else 0.0
-        sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
-        buy_cnt = self.candle_buy_cnt if now_cts == self.current_candle_ts else 0
-        sell_cnt = self.candle_sell_cnt if now_cts == self.current_candle_ts else 0
+        buy = self.candle_buy_btc
+        sell = self.candle_sell_btc
+        buy_cnt = self.candle_buy_cnt
+        sell_cnt = self.candle_sell_cnt
         tot_vol = buy + sell
         taker_ratio = 1.0000 if tot_vol < 0.05 else round(buy / max(sell, 1e-4), 4)
         svah, sval = self.session_profile.get_vah_val(0.70)
@@ -1181,26 +1177,19 @@ class KlineState:
 
     @property
     def snapshot(self) -> KlineSnapshot:
-        now_cts = (int(time.time() * 1000) // 900000) * 900000
-        is_new_candle = (self.kline_start_ts != 0 and now_cts != self.kline_start_ts)
-        vol = 0.0 if is_new_candle else self.volume
-        q_vol = 0.0 if is_new_candle else self.quote_volume
-        t_cnt = 0.0 if is_new_candle else self.trade_count
-        t_buy = 0.0 if is_new_candle else self.taker_buy
-        t_sell = 0.0 if is_new_candle else self.taker_sell
-        avg_trade = round(q_vol / max(t_cnt, 1.0), 2)
+        avg_trade = round(self.quote_volume / max(self.trade_count, 1.0), 2)
         return KlineSnapshot(
             quality=self.quality,
             ready=self.ready,
             kline_start_ts=self.kline_start_ts,
             close=self.close,
-            volume=vol,
-            quote_volume=q_vol,
-            trade_count=t_cnt,
+            volume=self.volume,
+            quote_volume=self.quote_volume,
+            trade_count=self.trade_count,
             volume_sma9=self.volume_sma9,
             base_volume_sma9=self.base_volume_sma9,
-            taker_buy=t_buy,
-            taker_sell=t_sell,
+            taker_buy=self.taker_buy,
+            taker_sell=self.taker_sell,
             ema8=self.live_ema(8),
             ema21=self.live_ema(21),
             ema50=self.live_ema(50),
@@ -1785,20 +1774,16 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
     short_liq = abs(liq_snap.short_usd)
 
     # 7. Taker Flow & Depth
-    now_cts = (int(time.time() * 1000) // 900000) * 900000
-    is_new_candle = (kl_snap.kline_start_ts != 0 and now_cts != kl_snap.kline_start_ts)
-    if is_new_candle:
+    if agg_snap.candle_buy_cnt > 0 or agg_snap.candle_sell_cnt > 0:
+        tb_cnt = agg_snap.candle_buy_cnt
+        ts_cnt = agg_snap.candle_sell_cnt
+    elif kl_snap.trade_count > 0:
+        ratio = (kl_snap.taker_buy / kl_snap.volume) if kl_snap.volume > 0 else 0.5
+        tb_cnt = round(kl_snap.trade_count * ratio)
+        ts_cnt = round(kl_snap.trade_count * (1 - ratio))
+    else:
         tb_cnt = 0
         ts_cnt = 0
-    else:
-        if agg_snap.quality == DataQuality.CANONICAL:
-            tb_cnt = agg_snap.candle_buy_cnt
-            ts_cnt = agg_snap.candle_sell_cnt
-        else:
-            total_cnt = float(kl_snap.trade_count) / 2.45
-            ratio = (kl_snap.taker_buy / kl_snap.volume) if kl_snap.volume > 0 else 0.5
-            tb_cnt = round(total_cnt * ratio)
-            ts_cnt = round(total_cnt * (1 - ratio))
 
     bd_t = rest_snap.bid_dollar
     ad_t = rest_snap.ask_dollar
