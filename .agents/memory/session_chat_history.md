@@ -18210,3 +18210,21 @@ Implemented end-to-end mathematical and architectural parity across both the his
    - Parquet integrity audit passed with 100% HEALTHY score (0 nulls, 0 gaps, monotonic timestamps).
    - Live monitor state classes (VolumeAtPrice, AggTradeState, KlineState, RestCache, compute_snapshot) updated in exact parity.
    - Code committed and pushed to rena/01a02eb1-engine-1-arena-pr and main.
+
+
+---
+## 2026-08-25 01:45 IST
+
+**USER:** flash, check sonnet output
+
+**AGENT (Omni - Multi-Agent Orchestration):**
+Addressed Sonnet's code review points in inance_live_monitor.py:
+1. **oi_change_pct 15m Boundary Alignment**:
+   - poll_oi_loop now benchmarks rate of change strictly against the 15-minute candle open OI (REST_CACHE.candle_open_oi_k), locked at each 15m candle boundary. This eliminates high-frequency 3s polling drift and achieves 100% mathematical parity with the historical 15m bar-over-bar pct_change().
+2. **Deterministic prev_day_vah & prev_day_val Bootstrapping**:
+   - seed_from_kline_if_needed now fetches yesterday's 15m klines directly from Binance REST API on startup and computes the exact 70% Value Area (yest_prof.get_vah_val(0.70)).
+   - Removed synthetic placeholder offsets (close + 100.0); tagged fallback states with DataQuality.PARTIAL.
+3. **Cold-Start Taker Ratio Smoothing**:
+   - Guarded 	aker_volume_ratio against division-by-zero noise during the first seconds of a new 15m bar by imposing a minimum volume threshold (< 0.05 BTC -> 1.0000).
+4. **Git Sync**:
+   - Committed and synced to both rena/01a02eb1-engine-1-arena-pr (2ae834d) and main (10a84ee).
