@@ -1668,11 +1668,27 @@ async def poll_taker_flow_loop() -> None:
         await asyncio.sleep(3)
 
 
-async def poll_fut_trades_loop() -> None:
-    """High-frequency REST trade accumulator for Binance Futures."""
-    last_agg_id = None
+async def poll_mark_price_loop() -> None:
+    """High-frequency REST mark price & funding rate poller."""
     while True:
         try:
+            d = await async_fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", weight=1)
+            if isinstance(d, dict):
+                await MARK_PRICE.apply({
+                    "p": d.get("markPrice"),
+                    "i": d.get("indexPrice"),
+                    "r": d.get("lastFundingRate"),
+                })
+        except Exception:
+            pass
+        await asyncio.sleep(1.0)
+
+
+async def poll_fut_trades_loop() -> None:
+    """High-frequency REST trade accumulator for Binance Futures."""
+    while True:
+        try:
+            last_agg_id = AGG_STATE.last_aggregate_trade_id
             if last_agg_id:
                 url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_agg_id+1}&limit=100"
             else:
@@ -1680,17 +1696,16 @@ async def poll_fut_trades_loop() -> None:
             trades = await async_fetch(url, weight=1)
             if isinstance(trades, list):
                 for t in trades:
-                    last_agg_id = int(t["a"])
                     await AGG_STATE.apply(
                         ts_ms=int(t["T"]),
                         price_str=t["p"],
                         qty_str=t["q"],
                         is_buyer_maker=t["m"],
-                        agg_id=t["a"]
+                        agg_id=int(t["a"])
                     )
         except Exception:
             pass
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.3)
 
 
 async def poll_kline_loop() -> None:
@@ -2119,6 +2134,9 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
             asyncio.create_task(poll_oi_loop()),
             asyncio.create_task(poll_ratios_loop()),
             asyncio.create_task(poll_taker_flow_loop()),
+            asyncio.create_task(poll_fut_trades_loop()),
+            asyncio.create_task(poll_kline_loop()),
+            asyncio.create_task(poll_mark_price_loop()),
         ]
         await asyncio.sleep(2)  # Allow initial REST seeds and socket handshakes to settle
     else:
