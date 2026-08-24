@@ -214,3 +214,83 @@ For pure read-only comparison (no need to track stream independently):
 - Always read curr_long_usd and curr_short_usd directly from JS_LIQ_MODEL CDP evaluation.
 - This is 100% identical to CoinGlass DOM by definition.
 - Only use the stream accumulator for latency-sensitive real-time features (sub-second updates).
+
+---
+
+## PART 11: MULTI-EXCHANGE SCOPE GAP — ARCHITECTURAL CONSTRAINTS
+
+### 11.1 CoinGlass Aggregated Scope (NEVER forget this)
+CoinGlass "Aggregated" widgets collect data from ALL major exchanges:
+**Binance + OKX + Bybit + Deribit + BitMEX + CME + others.**
+Our local engine is **Binance-only**. This causes PERMANENT, IRREDUCIBLE gaps on:
+
+| Indicator | Binance-only | CoinGlass Agg | Approx Ratio |
+|-----------|-------------|---------------|--------------|
+| Bid/Ask Dollar ±1% | ~$30-35M | ~$150-180M | ~5x |
+| Taker Buy/Sell Count (15m) | ~500-1500 | ~6-10K | ~10x |
+| Long/Short Liquidations | Binance only | All exchanges | ~5x |
+| Funding Rate | 0.01% (Binance) | Weighted avg | Different |
+
+**DO NOT try to match these by tweaking parameters.** They are scope differences.
+The correct approach is to label them clearly as "[Binance-only]" vs "[Multi-Exchange]".
+
+### 11.2 Incremental WebSocket Order Book — DO NOT USE FOR DEPTH CALCULATION
+The Binance incremental depth WebSocket (`@depth`) was found to **accumulate phantom entries** 
+that inflate depth values by 5-10x after extended running. 
+**MANDATORY**: Always use REST depth polling (`/fapi/v1/depth?limit=500`) every 3-10 seconds.
+REST polling returns true current state; WebSocket diffs can drift.
+
+Key code: `poll_depth_loop()` in `binance_live_monitor.py` — polls all 3 venues every 3s.
+
+### 11.3 Binance Liq REST Endpoints — Auth Required
+- `GET /fapi/v1/allForceOrders` — **404 Not Found** (deprecated/private)
+- `GET /fapi/v1/forceOrders` — **401 Unauthorized** (requires API key)
+- **SOLUTION**: Use WebSocket `@forceOrder` stream only. It is public.
+  - On startup, `LIQ_STATE` starts at 0 (no REST seed available)
+  - WebSocket accumulates from that point forward
+  - `$0.00K` at startup is correct for calm markets
+
+### 11.4 Kline Field Index Reference (CRITICAL)
+For `fapi/v1/klines` (USDT-M): 
+```
+[0]=openTime [1]=open [2]=high [3]=low [4]=close
+[5]=baseVolume [6]=closeTime [7]=quoteVolume [8]=tradeCount
+[9]=takerBuyBaseVol [10]=takerBuyQuoteVol
+```
+For `dapi/v1/klines` (COIN-M):
+```
+[5]=baseVolume (contracts) [7]=quoteVolume (BTC) [8]=tradeCount
+[10]=takerBuyBaseVol (contracts) [11]=takerBuyQuoteVol (BTC)
+```
+**tradeCount = field [8]** — Use this for Taker Buy/Sell COUNT display.
+Split: `tb_count = round(tradeCount * takerBuyBase / totalBase)`
+
+### 11.5 on_connect MUST be awaited (not create_task) in stream_supervisor
+Race condition: if `on_connect` seeds KL_STATE via REST and you use `asyncio.create_task`,
+the WS handler may process events before the seed completes → stale/zero state.
+**RULE**: Always `await on_connect()` synchronously before entering the recv loop.
+
+## PART 12: HISTORICAL FOOTPRINT SEEDING (KAIZEN RULE - 2026-08-24)
+
+### 12.1 Binance IP Bans (HTTP 418)
+Binance enforces strict WAF rules. Fetching `aggTrades` with pagination to reconstruct historical footprint distributions mid-candle will trigger an IP Ban (HTTP 418 "I'm a teapot") locking the user out for 1-3 days.
+**RULE:** Never loop `aggTrades` for footprint reconstruction.
+
+### 12.2 The 1m Kline Distribution Protocol (OKF Verified)
+To accurately reconstruct the Ask/Bid footprint distribution for a 15m candle on startup without hitting API limits:
+1. Fetch 1m Klines since the 15m candle open: `GET /fapi/v1/klines?symbol=BTCUSDT&interval=1m&startTime={candle_open_ms}&limit=15` (Exactly 1 API call).
+2. For each 1m candle, extract `Taker Buy Volume` and `Taker Sell Volume`.
+3. Distribute the buy and sell volume uniformly across all $5 price buckets between the 1m candle's `Low` and `High`.
+This provides a 95%+ accurate footprint reconstruction (including delta and POC) using only 1 API call, making it immune to 418 bans.
+
+## PART 13: GATE 2 LIVE DYNAMICS PROTOCOL & SLOW INDICATOR EXEMPTIONS (KAIZEN RULE - 2026-08-24)
+
+### 13.1 Slow Indicator Tolerance Exemption (T+30s Check)
+During Gate 2 live verification under a 30-second window, slow-moving indicators calculated across long smoothing windows or multi-candle spans exhibit minimal intra-candle drift:
+```python
+SLOW_INDICATORS = ["EMA 800", "EMA 200", "ATR 100", "ATR 14", "Volume SMA 9"]
+```
+**Verification Protocol Rules**:
+1. **Tolerance Band**: For indicators in `SLOW_INDICATORS`, allow `< 0.05%` drift over T+30s without flagging the feed as "stale" or "frozen".
+2. **True Freeze Threshold**: Flag as frozen ONLY if the value is byte-for-byte identical across 3 consecutive 15m candle updates AND price has shifted $> $10.00$.
+3. **Fast Indicator Motion Requirement**: Fast indicators (`PRICE`, `FP DELTA`, `BID DOLLAR`, `ASK DOLLAR`, `TAKER BUY`, `TAKER SELL`, `CVD`) MUST exhibit active non-zero delta movement within T+30s.

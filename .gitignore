@@ -60,3 +60,7 @@ chrome_profile*
 six_strategy_models/
 venv/
 live_engine_output.txt
+data_cache/
+coinglass_parity_engine/data_cache/
+temp_metrics.csv
+frame_*.txt
