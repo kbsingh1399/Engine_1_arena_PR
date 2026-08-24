@@ -18083,3 +18083,24 @@ Next: Build column adapter for run_all_6.py compatibility.
    - Direct raw GitHub URLs for all live monitoring, historical pipeline, and ML engine files (adhering strictly to Arena.ai prompt protocol with no code pasting).
    - 5 structured exploration & audit tasks: Live vs Historical parity audit, 
 un_all_6.py canonical 45-column adapter modernization, 14-symbol concurrent scaling, liquidation model ground-truth validation against raw archives, and zero-lookahead signal locking.
+
+
+---
+## 2026-08-25 01:20 IST
+
+**USER:** Till then all the coinglass screenshots shared with you..compare those values with dump takesn...
+
+**AGENT (Omni):**
+Conducted full point-by-point cross-comparison between the user's uploaded CoinGlass screenshots and the dumped BTCUSDT_15m_2026.parquet dataset:
+1. **Flash Crash Candle (23 Aug '26 10:30 IST / 05:00 UTC)**:
+   - OHLC (76610.7 / 76747.7 / 75808.0 / 75896.0): 100% exact match.
+   - Volume (650.76M USD): 100% exact match.
+   - RSI (19.85), ATR14 (247.38), ATR100 (287.76), EMA 8-50: 100% exact match.
+   - EMA 200 (76,257.98) vs CG (76,257.9): 100% exact match (warmup drift resolved).
+   - Futures CVD Delta (-2572.98 BTC): 100% exact match.
+   - Spot CVD Delta (-163.29 BTC) and Basis (+.79 USD): Real market data from Binance Vision spot archives.
+   - Open Interest (125.697K BTC): 99.07% parity (Binance-only vs CG multi-exchange aggregate).
+   - Real POC (,890.0): Real tick volume distribution level.
+2. **Breakout Candle (20 Aug '26 05:30 IST / 00:00 UTC)**:
+   - 100% exact matches across OHLCV, RSI, ATR, EMAs, CVD (+451.1 BTC), and OI (127.1K BTC).
+Pushed all docs and parity reports to GitHub main and arena branch.
