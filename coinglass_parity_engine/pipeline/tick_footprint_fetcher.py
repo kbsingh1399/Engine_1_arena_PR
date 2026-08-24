@@ -85,9 +85,9 @@ class TickFootprintFetcher:
                 # Align timestamps to 15m boundary
                 df["open_time_ms"] = (df["transact_time"] // 900000) * 900000
                 
-                # Compute real POC: bin prices to nearest $10, find highest-volume level
+                # Compute real POC: bin prices to canonical $25.0 increments matching CoinGlass ladder
                 df["price"] = df["price"].astype(np.float64)
-                df["price_bin"] = (df["price"] / 10.0).round() * 10.0
+                df["price_bin"] = (df["price"] / 25.0).round() * 25.0
                 
                 grouped = df.groupby("open_time_ms").agg(
                     total_vol_coin=pd.NamedAgg(column="quantity", aggfunc="sum"),

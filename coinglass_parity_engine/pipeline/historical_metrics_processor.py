@@ -113,12 +113,14 @@ class HistoricalMetricsProcessor:
             df.drop(columns=["taker_buy_vol_coin", "taker_sell_vol_coin", "taker_buy_count", "taker_sell_count"], inplace=True)
             df["taker_buy_count"] = taker_buy_count
             df["taker_sell_count"] = taker_sell_count
+            df["future_flow_source"] = np.where(df["open_time_ms"].isin(fp_df["open_time_ms"]), "TICK_EXACT", "KLINE_APPROX")
         else:
             print("[PROCESSOR] Using approximate kline footprint data everywhere...")
             taker_buy_btc = approx_buy_btc
             taker_sell_btc = approx_sell_btc
             df["taker_buy_count"] = approx_buy_count
             df["taker_sell_count"] = approx_sell_count
+            df["future_flow_source"] = "KLINE_APPROX"
 
         fut_delta_15m = np.round(taker_buy_btc - taker_sell_btc, 2)
         
@@ -143,11 +145,13 @@ class HistoricalMetricsProcessor:
             spot_vol = df["spot_volume"].fillna(1e-6).values
             spot_sell = spot_vol - spot_buy
             spot_delta_15m = np.round(spot_buy - spot_sell, 2)
+            df["spot_flow_source"] = np.where(df["open_time_ms"].isin(s_df["open_time"]), "SPOT_EXACT", "UNAVAILABLE")
             df.drop(columns=["open_time", "spot_volume", "spot_taker_buy_volume"], inplace=True, errors="ignore")
         else:
             print("[PROCESSOR] No spot klines available, approximating Spot CVD...")
             spot_delta_15m = np.round(fut_delta_15m / 5.02, 2)
             df["spot_close"] = np.nan
+            df["spot_flow_source"] = "UNAVAILABLE"
 
         df["spot_cvd_15m"] = spot_delta_15m
         df["spot_cvd_session"] = compute_session_cvd(open_times, spot_delta_15m)
@@ -166,8 +170,10 @@ class HistoricalMetricsProcessor:
             real_poc = poc_merged["real_poc"].values
             fallback_poc = np.round((df["high"].values + df["low"].values + 2.0 * df["close"].values) / 4.0, 1)
             df["fp_poc"] = np.where(np.isnan(real_poc), fallback_poc, np.round(real_poc, 1))
+            df["poc_source"] = np.where(np.isnan(real_poc), "OHLC_APPROX", "TICK_EXACT")
         else:
             df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 1)
+            df["poc_source"] = "OHLC_APPROX"
         
         # 8. Order Book Depth (+-1% span normalized)
         print("[PROCESSOR] Estimating Order Book Depth Liquidity...")

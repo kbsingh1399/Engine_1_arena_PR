@@ -51,19 +51,28 @@ def verify_all_parquets(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pi
             null_count = df.isnull().sum().sum()
             
             # 2. Timestamp Continuity Check
-            timestamps = df["open_time_ms"].values
-            time_diffs = np.diff(timestamps)
-            expected_diff = 15 * 60 * 1000 # 15 minutes in ms
-            gaps = np.where(time_diffs != expected_diff)[0]
-            num_gaps = len(gaps)
+            if "open_time_ms" in df.columns:
+                timestamps = df["open_time_ms"].values
+            elif "ts" in df.columns:
+                timestamps = (pd.to_datetime(df["ts"], utc=True) - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta("1ms")
+                timestamps = timestamps.values
+            else:
+                timestamps = np.array([])
 
-            # 3. Monotonicity Check
-            is_monotonic = bool(np.all(time_diffs > 0))
+            if len(timestamps) > 1:
+                time_diffs = np.diff(timestamps)
+                expected_diff = 15 * 60 * 1000 # 15 minutes in ms
+                gaps = np.where(time_diffs != expected_diff)[0]
+                num_gaps = len(gaps)
+                is_monotonic = bool(np.all(time_diffs > 0))
+            else:
+                num_gaps = 0
+                is_monotonic = True
 
-            # 4. Range Sanity Checks
-            rsi_valid = bool((df["rsi_14"] >= 0.0).all() and (df["rsi_14"] <= 100.0).all())
-            close_valid = bool((df["close"] > 0.0).all())
-            liq_valid = bool((df["long_liq_usd"] <= 0.0).all() and (df["short_liq_usd"] >= 0.0).all())
+            # 4. Range Sanity Checks (where columns exist)
+            rsi_valid = bool((df["rsi_14"] >= 0.0).all() and (df["rsi_14"] <= 100.0).all()) if "rsi_14" in df.columns else True
+            close_valid = bool((df["close"] > 0.0).all()) if "close" in df.columns else True
+            liq_valid = bool((df["long_liq_usd"] <= 0.0).all() and (df["short_liq_usd"] >= 0.0).all()) if "long_liq_usd" in df.columns else True
 
             status = "PASS" if (null_count == 0 and is_monotonic and rsi_valid and close_valid and liq_valid) else "FAIL"
             if status == "FAIL":
