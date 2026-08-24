@@ -39,7 +39,7 @@ INDICATOR SPECIFICATIONS:
 15. ASK DOLLAR      : Total resting Ask depth within -1% of mid-price in USD ($) [Negative polarity]
 16. BID COIN        : Total resting Bid depth within +1% of mid-price in BTC coins
 17. ASK COIN        : Total resting Ask depth within -1% of mid-price in BTC coins [Negative polarity]
-18. WHALE IDX       : CoinGlass Whale Index = (Top Trader L/S Ratio - 1.0) * 100
+18. WHALE IDX       : CoinGlass Whale Index = Top Trader L/S Position Ratio * 100
 19. TAKER BUY       : Taker aggressive buy volume / trade count in active 15m candle
 20. TAKER SELL      : Taker aggressive sell volume / trade count in active 15m candle [Negative polarity]
 21-25. EMAs (8/21/50/200/800) : Exponential Moving Averages seeded from 3500 bars for exact convergence
@@ -695,37 +695,38 @@ class AggTradeState:
                             yest_prof.levels[b]["delta"] += (b_p - s_p)
                     self.prev_day_vah, self.prev_day_val = yest_prof.get_vah_val(0.70)
 
-            # 2. Fetch today's 15m klines to populate developing session profile
-            url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={today_start_ms}&limit=96"
-            req_today = urllib.request.Request(url_today, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_today, timeout=5) as resp:
-                today_data = json.loads(resp.read().decode())
-                if today_data:
-                    async with self._lock:
-                        for item in today_data:
-                            h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
-                            buy_v = float(item[9])
-                            b_min = round(l_px / 25.0) * 25.0
-                            b_max = round(h_px / 25.0) * 25.0
-                            buckets = []
-                            curr = b_min
-                            while curr <= b_max:
-                                buckets.append(curr)
-                                curr += 25.0
-                            if not buckets:
-                                buckets = [b_min]
-                            b_p = buy_v / len(buckets)
-                            s_p = (tot_v - buy_v) / len(buckets)
-                            t_p = tot_v / len(buckets)
-                            for b in buckets:
-                                if b not in self.session_profile.levels:
-                                    self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
-                                self.session_profile.levels[b]["buy"] += b_p
-                                self.session_profile.levels[b]["sell"] += s_p
-                                self.session_profile.levels[b]["total"] += t_p
-                                self.session_profile.levels[b]["delta"] += (b_p - s_p)
+            # 2. Fetch today's completed 15m klines to populate developing session profile
+            if candle_open_ms > today_start_ms:
+                url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={today_start_ms}&endTime={candle_open_ms-1}&limit=96"
+                req_today = urllib.request.Request(url_today, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req_today, timeout=5) as resp:
+                    today_data = json.loads(resp.read().decode())
+                    if today_data:
+                        async with self._lock:
+                            for item in today_data:
+                                h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
+                                buy_v = float(item[9])
+                                b_min = round(l_px / 25.0) * 25.0
+                                b_max = round(h_px / 25.0) * 25.0
+                                buckets = []
+                                curr = b_min
+                                while curr <= b_max:
+                                    buckets.append(curr)
+                                    curr += 25.0
+                                if not buckets:
+                                    buckets = [b_min]
+                                b_p = buy_v / len(buckets)
+                                s_p = (tot_v - buy_v) / len(buckets)
+                                t_p = tot_v / len(buckets)
+                                for b in buckets:
+                                    if b not in self.session_profile.levels:
+                                        self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                                    self.session_profile.levels[b]["buy"] += b_p
+                                    self.session_profile.levels[b]["sell"] += s_p
+                                    self.session_profile.levels[b]["total"] += t_p
+                                    self.session_profile.levels[b]["delta"] += (b_p - s_p)
 
-            # 3. Fetch 1m klines since candle open to approximate current bar footprint
+            # 3. Fetch 1m klines since candle open to approximate current forming bar footprint & session profile
             url = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m&startTime={candle_open_ms}&limit=15"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as resp:
@@ -772,6 +773,14 @@ class AggTradeState:
                                     self.profile.levels[b]["sell"] += sell_per
                                     self.profile.levels[b]["total"] += tot_per
                                     self.profile.levels[b]["delta"] += (buy_per - sell_per)
+                                    
+                                    # Also seed into session_profile for the forming bar minutes exactly once
+                                    if b not in self.session_profile.levels:
+                                        self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                                    self.session_profile.levels[b]["buy"] += buy_per
+                                    self.session_profile.levels[b]["sell"] += sell_per
+                                    self.session_profile.levels[b]["total"] += tot_per
+                                    self.session_profile.levels[b]["delta"] += (buy_per - sell_per)
 
                             self.candle_buy_btc = total_buy
                             self.candle_sell_btc = total_sell
@@ -786,6 +795,12 @@ class AggTradeState:
             pass
 
     async def apply(self, ts_ms: int, price_str: str, qty_str: str, is_buyer_maker: bool, agg_id=None) -> None:
+        # Idempotency guard: discard already processed trades
+        if agg_id is not None:
+            if self.last_aggregate_trade_id is not None and int(agg_id) <= int(self.last_aggregate_trade_id):
+                return
+            self.last_aggregate_trade_id = int(agg_id)
+
         cts = (ts_ms // 900000) * 900000
         qty = float(qty_str)
         price = float(price_str)
@@ -833,8 +848,6 @@ class AggTradeState:
             self.cvd_24h += signed_qty
             self._trade_history.append((ts_ms, signed_qty))
             self._prune_old_trades(ts_ms)
-            if agg_id:
-                self.last_aggregate_trade_id = agg_id
 
     def _prune_old_trades(self, current_ts_ms: int) -> None:
         cutoff = current_ts_ms - 24 * 3600 * 1000
@@ -897,6 +910,11 @@ class SpotAggTradeState:
         self._first_trade_seen = False
 
     async def apply(self, qty_str: str, is_buyer_maker: bool, agg_id=None, ts_ms=None, price_str: str = "0") -> None:
+        if agg_id is not None:
+            if self.last_aggregate_trade_id is not None and int(agg_id) <= int(self.last_aggregate_trade_id):
+                return
+            self.last_aggregate_trade_id = int(agg_id)
+
         if ts_ms is None:
             ts_ms = int(time.time() * 1000)
         cts = (ts_ms // 900000) * 900000
@@ -923,9 +941,6 @@ class SpotAggTradeState:
             else:
                 self.candle_buy_btc += qty
                 self.session_cvd += qty
-
-            if agg_id:
-                self.last_aggregate_trade_id = agg_id
 
     @property
     def snapshot(self) -> SpotAggTradeSnapshot:
@@ -1056,13 +1071,12 @@ class KlineState:
             self.ready = True
             self.quality = DataQuality.CANONICAL
 
-        # Initialize Futures CVD directly from Binance historical REST bars (last 1000 candles ~ 10 days)
-        if len(klines) >= 100:
-            sub = klines[-1000:] if len(klines) >= 1000 else klines
-            raw_c = sum((2.0 * float(k[9]) - float(k[5])) for k in sub)
-            AGG_STATE.session_cvd = raw_c + CVD_OFFSET
-            AGG_STATE.candle_buy_btc = float(klines[-1][9])
-            AGG_STATE.candle_sell_btc = float(klines[-1][5]) - float(klines[-1][9])
+        # Initialize Futures CVD strictly starting from UTC 00:00:00 today
+        day_start_ms = (int(time.time() * 1000) // 86_400_000) * 86_400_000
+        AGG_STATE.session_day = day_start_ms // 86_400_000
+        AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in klines if int(k[0]) >= day_start_ms)
+        AGG_STATE.candle_buy_btc = float(klines[-1][9])
+        AGG_STATE.candle_sell_btc = float(klines[-1][5]) - float(klines[-1][9])
 
     async def apply_kline_event(self, k: dict) -> None:
         """Process real-time 15m kline event from Binance WebSocket."""
@@ -1443,11 +1457,12 @@ async def _agg_handler(data: dict) -> None:
 async def _recover_fut_agg() -> None:
     last_id = AGG_STATE.last_aggregate_trade_id
     try:
-        if AGG_STATE.session_cvd == 0.0:
-            fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=5)
+        day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
+        cur_day = day_start // 86_400_000
+        if AGG_STATE.session_day != cur_day or AGG_STATE.session_cvd == 0.0:
+            fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=100", weight=5)
             if isinstance(fk_data, list):
-                day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
-                AGG_STATE.session_day = day_start // 86_400_000
+                AGG_STATE.session_day = cur_day
                 AGG_STATE.session_cvd = sum(
                     2.0 * float(k[9]) - float(k[5])
                     for k in fk_data if int(k[0]) >= day_start
@@ -1460,7 +1475,7 @@ async def _recover_fut_agg() -> None:
                 for t in trades:
                     await AGG_STATE.apply(
                         ts_ms=int(t["T"]), price_str=t["p"], qty_str=t["q"],
-                        is_buyer_maker=t["m"], agg_id=t["a"]
+                        is_buyer_maker=t["m"], agg_id=int(t["a"])
                     )
     except Exception:
         pass
@@ -1489,11 +1504,12 @@ async def _spot_agg_handler(data: dict) -> None:
 async def _recover_spot_agg() -> None:
     last_id = SPOT_AGG.last_aggregate_trade_id
     try:
-        if SPOT_AGG.session_cvd == 0.0:
-            sk_data = await async_fetch("https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000", weight=1)
+        day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
+        cur_day = day_start // 86_400_000
+        if SPOT_AGG.session_day != cur_day or SPOT_AGG.session_cvd == 0.0:
+            sk_data = await async_fetch("https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100", weight=1)
             if isinstance(sk_data, list):
-                day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
-                SPOT_AGG.session_day = day_start // 86_400_000
+                SPOT_AGG.session_day = cur_day
                 SPOT_AGG.session_cvd = sum(
                     2.0 * float(k[9]) - float(k[5])
                     for k in sk_data if int(k[0]) >= day_start
@@ -1503,7 +1519,10 @@ async def _recover_spot_agg() -> None:
             trades = await async_fetch(url, weight=1)
             if isinstance(trades, list):
                 for t in trades:
-                    await SPOT_AGG.apply(qty_str=t["q"], is_buyer_maker=t["m"], agg_id=t["a"], price_str=t.get("p", "0"))
+                    await SPOT_AGG.apply(
+                        qty_str=t["q"], is_buyer_maker=t["m"], agg_id=int(t["a"]),
+                        ts_ms=int(t["T"]), price_str=t.get("p", "0")
+                    )
     except Exception:
         pass
 
@@ -1613,7 +1632,7 @@ async def poll_ratios_loop() -> None:
                 REST_CACHE.whale = f"{whale_val:.2f}"
             elif ta:
                 raw_acc_ratio = float(ta[0]["longShortRatio"])
-                whale_val = (raw_acc_ratio * 100.0) * (106.59 / 113.58)
+                whale_val = raw_acc_ratio * 100.0
                 REST_CACHE.whale = f"{whale_val:.2f}"
                 REST_CACHE.ls_ratio = raw_acc_ratio
         except Exception:
@@ -2115,8 +2134,6 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
             asyncio.create_task(poll_oi_loop()),
             asyncio.create_task(poll_ratios_loop()),
             asyncio.create_task(poll_taker_flow_loop()),
-            asyncio.create_task(poll_fut_trades_loop()),
-            asyncio.create_task(poll_kline_loop()),
         ]
         await asyncio.sleep(2)  # Allow initial REST seeds and socket handshakes to settle
     else:
@@ -2185,7 +2202,7 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
             tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
             if tp:
                 raw_ratio = float(tp[0]["longShortRatio"])
-                REST_CACHE.whale = f"{(raw_ratio - 1.0) * 100.0:.4f}"
+                REST_CACHE.whale = f"{raw_ratio * 100.0:.2f}"
                 REST_CACHE.ls_ratio = raw_ratio
         except Exception:
             pass
