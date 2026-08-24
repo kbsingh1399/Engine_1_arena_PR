@@ -189,7 +189,8 @@ class HistoricalMetricsProcessor:
                 right_on="fundingTime",
                 direction="backward"
             )
-            raw_fr = df["fundingRate"].bfill().ffill().values
+            # Causal alignment: never backfill a future funding observation into older bars.
+            raw_fr = df["fundingRate"].ffill().values
             df["funding_rate_pct"] = np.round(np.nan_to_num(raw_fr, nan=0.0001) * 100.0, 6)
             df.drop(columns=["fundingTime", "fundingRate"], inplace=True)
         else:
@@ -215,16 +216,16 @@ class HistoricalMetricsProcessor:
                 right_on="timestamp_ms",
                 direction="backward"
             )
-            raw_oi_btc = merged["sum_open_interest"].bfill().ffill().values
+            raw_oi_btc = merged["sum_open_interest"].ffill().values
             oi_btc = np.nan_to_num(raw_oi_btc, nan=125000.0)
 
-            raw_oi_usd = merged["sum_open_interest_value"].bfill().ffill().values
+            raw_oi_usd = merged["sum_open_interest_value"].ffill().values
             oi_usd = np.where(np.isnan(raw_oi_usd), oi_btc * closes, raw_oi_usd)
 
-            raw_ls_glob = merged["count_long_short_ratio"].bfill().ffill().values
+            raw_ls_glob = merged["count_long_short_ratio"].ffill().values
             ls_glob = np.nan_to_num(raw_ls_glob, nan=1.035)
 
-            raw_ls_top = merged["sum_toptrader_long_short_ratio"].bfill().ffill().values
+            raw_ls_top = merged["sum_toptrader_long_short_ratio"].ffill().values
             ls_top = np.nan_to_num(raw_ls_top, nan=1.076)
 
             df["open_interest_k"] = np.round(oi_btc / 1000.0, 3)
@@ -255,7 +256,12 @@ class HistoricalMetricsProcessor:
         null_counts = final_df.isnull().sum()
         if null_counts.any():
             print(f"[PROCESSOR] Imputing isolated null values...")
-            final_df = final_df.ffill().bfill()
+            # Backfill would inject a future observation into earlier training rows.
+            # Keep only causal forward-fill; pre-source rows retain the documented
+            # neutral/sentinel value after numeric filling below.
+            final_df = final_df.ffill()
+            numeric = final_df.select_dtypes(include=[np.number]).columns
+            final_df[numeric] = final_df[numeric].fillna(0.0)
 
         print(f"[PROCESSOR] Successfully synthesized canonical dataset: {len(final_df):,} rows x {len(final_df.columns)} columns.")
         return final_df
