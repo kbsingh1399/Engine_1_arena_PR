@@ -659,11 +659,73 @@ class AggTradeState:
             import json
             import time
             
-            # Determine current 15m candle open
             now_ms = int(time.time() * 1000)
             candle_open_ms = (now_ms // 900000) * 900000
+            today_start_ms = (now_ms // 86400000) * 86400000
+            yesterday_start_ms = today_start_ms - 86400000
             
-            # Fetch 1m klines since the candle opened to approximate footprint distribution
+            # 1. Fetch yesterday's 15m klines to compute canonical prev_day_vah / prev_day_val
+            url_yest = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={yesterday_start_ms}&endTime={today_start_ms-1}&limit=96"
+            req_yest = urllib.request.Request(url_yest, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_yest, timeout=5) as resp:
+                yest_data = json.loads(resp.read().decode())
+                if yest_data:
+                    yest_prof = VolumeAtPrice(merge_level=25.0)
+                    for item in yest_data:
+                        h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
+                        buy_v = float(item[9])
+                        b_min = round(l_px / 25.0) * 25.0
+                        b_max = round(h_px / 25.0) * 25.0
+                        buckets = []
+                        curr = b_min
+                        while curr <= b_max:
+                            buckets.append(curr)
+                            curr += 25.0
+                        if not buckets:
+                            buckets = [b_min]
+                        b_p = buy_v / len(buckets)
+                        s_p = (tot_v - buy_v) / len(buckets)
+                        t_p = tot_v / len(buckets)
+                        for b in buckets:
+                            if b not in yest_prof.levels:
+                                yest_prof.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                            yest_prof.levels[b]["buy"] += b_p
+                            yest_prof.levels[b]["sell"] += s_p
+                            yest_prof.levels[b]["total"] += t_p
+                            yest_prof.levels[b]["delta"] += (b_p - s_p)
+                    self.prev_day_vah, self.prev_day_val = yest_prof.get_vah_val(0.70)
+
+            # 2. Fetch today's 15m klines to populate developing session profile
+            url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={today_start_ms}&limit=96"
+            req_today = urllib.request.Request(url_today, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_today, timeout=5) as resp:
+                today_data = json.loads(resp.read().decode())
+                if today_data:
+                    async with self._lock:
+                        for item in today_data:
+                            h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
+                            buy_v = float(item[9])
+                            b_min = round(l_px / 25.0) * 25.0
+                            b_max = round(h_px / 25.0) * 25.0
+                            buckets = []
+                            curr = b_min
+                            while curr <= b_max:
+                                buckets.append(curr)
+                                curr += 25.0
+                            if not buckets:
+                                buckets = [b_min]
+                            b_p = buy_v / len(buckets)
+                            s_p = (tot_v - buy_v) / len(buckets)
+                            t_p = tot_v / len(buckets)
+                            for b in buckets:
+                                if b not in self.session_profile.levels:
+                                    self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                                self.session_profile.levels[b]["buy"] += b_p
+                                self.session_profile.levels[b]["sell"] += s_p
+                                self.session_profile.levels[b]["total"] += t_p
+                                self.session_profile.levels[b]["delta"] += (b_p - s_p)
+
+            # 3. Fetch 1m klines since candle open to approximate current bar footprint
             url = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m&startTime={candle_open_ms}&limit=15"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as resp:
@@ -687,7 +749,6 @@ class AggTradeState:
                                 total_buy += buy_vol
                                 total_sell += sell_vol
                                 
-                                # Distribute volume across price buckets between low and high
                                 b_min = round(low_price / self.profile.merge_level) * self.profile.merge_level
                                 b_max = round(high_price / self.profile.merge_level) * self.profile.merge_level
                                 
@@ -797,7 +858,8 @@ class AggTradeState:
         sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
         buy_cnt = self.candle_buy_cnt if now_cts == self.current_candle_ts else 0
         sell_cnt = self.candle_sell_cnt if now_cts == self.current_candle_ts else 0
-        taker_ratio = round(buy / max(sell, 1e-6), 4)
+        tot_vol = buy + sell
+        taker_ratio = 1.0000 if tot_vol < 0.05 else round(buy / max(sell, 1e-4), 4)
         svah, sval = self.session_profile.get_vah_val(0.70)
         
         return AggTradeSnapshot(
@@ -1181,6 +1243,8 @@ class RestCache:
     def __init__(self):
         self.oi_k: Optional[str] = None
         self.raw_oi_k: Optional[float] = None
+        self.candle_start_ts: int = 0
+        self.candle_open_oi_k: Optional[float] = None
         self.oi_change_pct: Optional[float] = 0.0
         self.ls_ratio: Optional[float] = None
         self.ls_ratio_global: Optional[float] = None
@@ -1492,14 +1556,31 @@ async def poll_depth_loop() -> None:
 
 
 async def poll_oi_loop() -> None:
-    """Poll aggregated Open Interest across USDT-M and USDC-M venues every 3 seconds and calculate 15m rate of change."""
+    """
+    Poll aggregated Open Interest across USDT-M and USDC-M venues every 3 seconds.
+    Calculates 15m bar-over-bar rate of change against the candle open OI benchmark.
+    """
     while True:
         try:
+            now_ms = int(time.time() * 1000)
+            candle_ts = (now_ms // 900000) * 900000
+
             oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
             oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
             total_k = ((oi_t + oi_c) / 1e3) * 1.0118
-            if REST_CACHE.raw_oi_k is not None and REST_CACHE.raw_oi_k > 0:
-                REST_CACHE.oi_change_pct = round(((total_k - REST_CACHE.raw_oi_k) / REST_CACHE.raw_oi_k) * 100.0, 4)
+
+            if REST_CACHE.candle_start_ts != candle_ts:
+                # 15m Candle boundary: lock previous bar's closing OI as the new bar's open benchmark
+                if REST_CACHE.raw_oi_k is not None and REST_CACHE.raw_oi_k > 0:
+                    REST_CACHE.candle_open_oi_k = REST_CACHE.raw_oi_k
+                REST_CACHE.candle_start_ts = candle_ts
+
+            if REST_CACHE.candle_open_oi_k is None or REST_CACHE.candle_open_oi_k <= 0:
+                REST_CACHE.candle_open_oi_k = total_k
+
+            if REST_CACHE.candle_open_oi_k > 0:
+                REST_CACHE.oi_change_pct = round(((total_k - REST_CACHE.candle_open_oi_k) / REST_CACHE.candle_open_oi_k) * 100.0, 4)
+
             REST_CACHE.raw_oi_k = total_k
             REST_CACHE.oi_k = f"{total_k:.3f}K"
         except Exception:
@@ -1752,10 +1833,10 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
             "whale_idx":          fv(whale, q_src),
             "top_account_ratio":  fv(rest_snap.top_account_ratio if rest_snap.top_account_ratio is not None else 1.0500, q_src),
             "taker_volume_ratio": fv(agg_snap.taker_volume_ratio, agg_snap.quality),
-            "session_vah":        fv(agg_snap.session_vah if agg_snap.session_vah is not None else close + 50.0, agg_snap.quality),
-            "session_val":        fv(agg_snap.session_val if agg_snap.session_val is not None else close - 50.0, agg_snap.quality),
-            "prev_day_vah":       fv(agg_snap.prev_day_vah if agg_snap.prev_day_vah is not None else close + 100.0, agg_snap.quality),
-            "prev_day_val":       fv(agg_snap.prev_day_val if agg_snap.prev_day_val is not None else close - 100.0, agg_snap.quality),
+            "session_vah":        fv(agg_snap.session_vah if agg_snap.session_vah is not None else close, agg_snap.quality if agg_snap.session_vah is not None else DataQuality.PARTIAL),
+            "session_val":        fv(agg_snap.session_val if agg_snap.session_val is not None else close, agg_snap.quality if agg_snap.session_val is not None else DataQuality.PARTIAL),
+            "prev_day_vah":       fv(agg_snap.prev_day_vah if agg_snap.prev_day_vah is not None else (agg_snap.session_vah if agg_snap.session_vah is not None else close), agg_snap.quality if agg_snap.prev_day_vah is not None else DataQuality.PARTIAL),
+            "prev_day_val":       fv(agg_snap.prev_day_val if agg_snap.prev_day_val is not None else (agg_snap.session_val if agg_snap.session_val is not None else close), agg_snap.quality if agg_snap.prev_day_val is not None else DataQuality.PARTIAL),
             "max_trade_vol_btc":  fv(agg_snap.max_trade_vol_btc, agg_snap.quality),
             "avg_trade_size_usd": fv(kl_snap.avg_trade_size_usd if kl_snap.avg_trade_size_usd > 0 else round(quote_vol / max(float(kl_snap.trade_count), 1.0), 2), q_src),
             "oi_change_pct":      fv(rest_snap.oi_change_pct if rest_snap.oi_change_pct is not None else 0.0, q_src),
