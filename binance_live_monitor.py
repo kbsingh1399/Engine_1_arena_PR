@@ -2582,7 +2582,10 @@ class MatrixAssetState:
     depth_ratio: float = 1.0
     ema8: float = 0.0
     ema21: float = 0.0
+    ema50: float = 0.0
     ema200: float = 0.0
+    ema800: float = 0.0
+    max_trade_vol_btc: float = 0.0
     last_update_ts: float = 0.0
 
     def __post_init__(self):
@@ -2674,8 +2677,9 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
         ratio_g_url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=15m&limit=1"
         ratio_t_url = f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={sym}&period=15m&limit=1"
         depth_url = f"https://fapi.binance.com/fapi/v1/depth?symbol={sym}&limit=100"
+        oi_hist_url = f"https://fapi.binance.com/futures/data/openInterestHist?symbol={sym}&period=15m&limit=2"
 
-        k_data, spot_k_data, oi_data, prem_data, rg_data, rt_data, depth_data = await asyncio.gather(
+        k_data, spot_k_data, oi_data, prem_data, rg_data, rt_data, depth_data, oi_hist_data = await asyncio.gather(
             async_fetch(k_url, weight=1),
             async_fetch(spot_k_url, weight=1),
             async_fetch(oi_url, weight=1),
@@ -2683,6 +2687,7 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             async_fetch(ratio_g_url, weight=1),
             async_fetch(ratio_t_url, weight=1),
             async_fetch(depth_url, weight=1),
+            async_fetch(oi_hist_url, weight=1),
             return_exceptions=True
         )
 
@@ -2692,6 +2697,7 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             lows = [float(k[3]) for k in k_data]
             vols = [float(k[7]) for k in k_data]
             base_vols = [float(k[5]) for k in k_data]
+            trades_count = [float(k[8]) for k in k_data]
             taker_buys = [float(k[9]) for k in k_data]
             taker_sells = [base_vols[i] - taker_buys[i] for i in range(len(base_vols))]
 
@@ -2707,7 +2713,11 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             st.vol_sma9 = sum(vols[-9:]) / min(len(vols), 9) if vols else 0.0
             st.ema8 = calc_ema(closes, 8)
             st.ema21 = calc_ema(closes, 21)
+            st.ema50 = calc_ema(closes, 50)
             st.ema200 = calc_ema(closes, 200)
+            st.ema800 = calc_ema(closes, 800)
+            st.max_trade_vol_btc = max(base_vols[-10:]) if len(base_vols) > 0 else 0.0
+            st.avg_trade_usd = (st.quote_vol_15m / trades_count[-1]) if trades_count[-1] > 0 else 0.0
 
             m_lvl = get_merge_level(sym)
             st.fp_poc = round(st.price / m_lvl) * m_lvl
@@ -2733,6 +2743,11 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             oi_coin = float(oi_data.get("openInterest", 0.0))
             st.oi_usd = oi_coin * st.price
             st.oi_k = f"${st.oi_usd/1e6:.0f}M" if st.oi_usd >= 1e6 else f"${st.oi_usd/1e3:.0f}K"
+
+        if isinstance(oi_hist_data, list) and len(oi_hist_data) >= 2:
+            prev_oi = float(oi_hist_data[-2].get("sumOpenInterest", 1.0))
+            curr_oi = float(oi_hist_data[-1].get("sumOpenInterest", prev_oi))
+            st.oi_chg_pct = ((curr_oi - prev_oi) / prev_oi * 100.0) if prev_oi > 0 else 0.0
 
         if isinstance(rg_data, list) and len(rg_data) > 0:
             st.ls_ratio_global = float(rg_data[0].get("longShortRatio", 1.0))
@@ -2778,7 +2793,7 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
 
     table = Table(
         box=box.SIMPLE_HEAVY,
-        expand=True,
+        expand=False,
         show_header=True,
         header_style="bold bright_white on blue",
         pad_edge=False,
@@ -2801,54 +2816,50 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
                 row_vals.append("[dim]...[/dim]")
         table.add_row(*row_vals)
 
-    # 1. Price & Basis
-    add_row("Price ($)", lambda s: f"[bold green]{fmt_p(s.price)}[/bold green]")
-    add_row("Basis ($)", lambda s: f"[green]{s.basis:+.2f}[/green]" if s.basis >= 0 else f"[red]{s.basis:+.2f}[/red]")
-    
-    table.add_section()
-    # 2. 15m Microstructure
-    add_row("15m Vol ($M)", lambda s: fmt_v(s.quote_vol_15m))
-    add_row("Vol SMA9 ($)", lambda s: fmt_v(s.vol_sma9))
-    add_row("Wilder RSI", lambda s: (
+    # 1. ASSET is handled in the headers above
+    add_row("2. PRICE", lambda s: f"[bold green]{fmt_p(s.price)}[/bold green]")
+    add_row("3. VOLUME", lambda s: f"[bold white]{fmt_v(s.quote_vol_15m)}[/bold white]")
+    add_row("4. RSI (14)", lambda s: (
         f"[bold red]{s.rsi:.1f}[/bold red]" if s.rsi >= 70 else (
         f"[bold green]{s.rsi:.1f}[/bold green]" if s.rsi <= 30 else f"[yellow]{s.rsi:.1f}[/yellow]"
     )))
-    add_row("ATR (14)", lambda s: f"{s.atr14:.2f}" if s.atr14 >= 1 else f"{s.atr14:.4f}")
-
-    table.add_section()
-    # 3. Orderflow & CVD
-    add_row("Fut CVD", lambda s: f"[green]{fmt_c(s.fut_cvd)}[/green]" if s.fut_cvd >= 0 else f"[red]{fmt_c(s.fut_cvd)}[/red]")
-    add_row("15m Delta", lambda s: f"[green]{fmt_c(s.fp_delta)}[/green]" if s.fp_delta >= 0 else f"[red]{fmt_c(s.fp_delta)}[/red]")
-    add_row("Spot CVD", lambda s: f"[green]{fmt_c(s.spot_cvd)}[/green]" if s.spot_cvd >= 0 else f"[red]{fmt_c(s.spot_cvd)}[/red]")
-
-    table.add_section()
-    # 4. Derivatives Positioning & Whale Index
-    add_row("Funding (%)", lambda s: f"[green]{s.funding_rate:+.3f}%[/green]" if s.funding_rate >= 0 else f"[red]{s.funding_rate:+.3f}%[/red]")
-    add_row("Open Int ($)", lambda s: f"{s.oi_k}")
-    add_row("Global L/S", lambda s: f"{s.ls_ratio_global:.2f}")
-    add_row("Top L/S", lambda s: f"{s.ls_ratio_top:.2f}")
-    add_row("Whale Idx", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
-
-    table.add_section()
-    # 5. Liquidations & Cascades
-    add_row("Liqs (L/S)", lambda s: f"{fmt_v(s.long_liq_15m)}/{fmt_v(s.short_liq_15m)}")
-    add_row("Cascade Bias", lambda s: s.cascade_bias)
-
-    table.add_section()
-    # 6. Footprint & Value Area
-    add_row("POC ($)", lambda s: fmt_p(s.fp_poc))
-    add_row("VAH (70%)", lambda s: fmt_p(s.session_vah))
-    add_row("VAL (70%)", lambda s: fmt_p(s.session_val))
-    add_row("Prev VAH/VAL", lambda s: f"{fmt_pc(s.prev_day_vah)}/{fmt_pc(s.prev_day_val)}")
-
-    table.add_section()
-    # 7. Order Book Depth & EMAs
-    add_row("Bid Depth", lambda s: fmt_v(s.bid_depth_1pct))
-    add_row("Ask Depth", lambda s: fmt_v(s.ask_depth_1pct))
-    add_row("Depth Imbal", lambda s: f"[green]{s.depth_ratio:.1f}x[/green]" if s.depth_ratio >= 1.0 else f"[red]{s.depth_ratio:.1f}x[/red]")
-    add_row("EMA 8 / 21", lambda s: fmt_ema_p(s.ema8, s.ema21))
-
-    dyn_console.print(table)
+    add_row("5. FUT CVD", lambda s: f"[green]{fmt_c(s.fut_cvd)}[/green]" if s.fut_cvd >= 0 else f"[red]{fmt_c(s.fut_cvd)}[/red]")
+    add_row("6. SPOT CVD", lambda s: f"[green]{fmt_c(s.spot_cvd)}[/green]" if s.spot_cvd >= 0 else f"[red]{fmt_c(s.spot_cvd)}[/red]")
+    add_row("7. FUNDING %", lambda s: f"[green]{s.funding_rate:+.3f}%[/green]" if s.funding_rate >= 0 else f"[red]{s.funding_rate:+.3f}%[/red]")
+    add_row("8. OPEN INT", lambda s: f"[bright_yellow]{s.oi_k}[/bright_yellow]")
+    add_row("9. LONG LIQ", lambda s: f"[green]{fmt_v(s.long_liq_15m)}[/green]")
+    add_row("10. SHORT LIQ", lambda s: f"[red]{fmt_v(s.short_liq_15m)}[/red]")
+    add_row("10b. CASCADE", lambda s: s.cascade_bias)
+    add_row("11. L/S GLOBAL", lambda s: f"[green]{s.ls_ratio_global:.2f}[/green]" if s.ls_ratio_global >= 1.0 else f"[red]{s.ls_ratio_global:.2f}[/red]")
+    add_row("11b. L/S TOP", lambda s: f"[green]{s.ls_ratio_top:.2f}[/green]" if s.ls_ratio_top >= 1.0 else f"[red]{s.ls_ratio_top:.2f}[/red]")
+    add_row("12. FP DELTA", lambda s: f"[green]{fmt_c(s.fp_delta)}[/green]" if s.fp_delta >= 0 else f"[red]{fmt_c(s.fp_delta)}[/red]")
+    add_row("13. FP POC", lambda s: f"[bold magenta]{fmt_p(s.fp_poc)}[/bold magenta]")
+    add_row("14. BID DOLLAR", lambda s: f"[bold green]{fmt_v(s.bid_depth_1pct)}[/bold green]")
+    add_row("15. ASK DOLLAR", lambda s: f"[bold red]{fmt_v(s.ask_depth_1pct)}[/bold red]")
+    add_row("16. BID COIN", lambda s: f"[green]{fmt_pc(s.bid_depth_1pct / s.price)}[/green]" if s.price > 0 else "0")
+    add_row("17. ASK COIN", lambda s: f"[red]{fmt_pc(s.ask_depth_1pct / s.price)}[/red]" if s.price > 0 else "0")
+    add_row("18. WHALE IDX", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
+    add_row("19. TAKER BUY", lambda s: f"[bold green]{fmt_pc(s.fut_buy_15m)}[/bold green]")
+    add_row("20. TAKER SELL", lambda s: f"[bold red]{fmt_pc(s.fut_sell_15m)}[/bold red]")
+    add_row("21. EMA 8", lambda s: f"[cyan]{fmt_pc(s.ema8)}[/cyan]")
+    add_row("22. EMA 21", lambda s: f"[cyan]{fmt_pc(s.ema21)}[/cyan]")
+    add_row("23. EMA 50", lambda s: f"[blue]{fmt_pc(s.ema50)}[/blue]")
+    add_row("24. EMA 200", lambda s: f"[blue]{fmt_pc(s.ema200)}[/blue]")
+    add_row("25. EMA 800", lambda s: f"[magenta]{fmt_pc(s.ema800)}[/magenta]")
+    add_row("26. ATR 14", lambda s: f"[cyan]{s.atr14:.2f}[/cyan]" if s.atr14 >= 1 else f"[cyan]{s.atr14:.4f}[/cyan]")
+    add_row("27. ATR 100", lambda s: f"[cyan]{s.atr100:.2f}[/cyan]" if s.atr100 >= 1 else f"[cyan]{s.atr100:.4f}[/cyan]")
+    add_row("28. BASIS", lambda s: f"[green]{s.basis:+.2f}[/green]" if s.basis >= 0 else f"[red]{s.basis:+.2f}[/red]")
+    add_row("29. SESSION VAH", lambda s: fmt_p(s.session_vah))
+    add_row("30. SESSION VAL", lambda s: fmt_p(s.session_val))
+    add_row("31. PREV DAY VAH", lambda s: fmt_pc(s.prev_day_vah))
+    add_row("32. PREV DAY VAL", lambda s: fmt_pc(s.prev_day_val))
+    add_row("33. MAX TRADE", lambda s: fmt_pc(s.max_trade_vol_btc))
+    add_row("34. AVG TRADE $", lambda s: fmt_p(s.avg_trade_usd))
+    add_row("35. VOL SMA 9", lambda s: fmt_v(s.vol_sma9))
+    add_row("36. OI CHANGE %", lambda s: f"[green]{s.oi_chg_pct:+.2f}%[/green]" if s.oi_chg_pct >= 0 else f"[red]{s.oi_chg_pct:+.2f}%[/red]")
+    add_row("37. ALT TAKER FLO", lambda s: "[dim]N/A[/dim]")
+    
+    dyn_console.print(Align.center(table))
 
 
 async def run_multi_asset_matrix() -> None:
@@ -2873,11 +2884,16 @@ async def run_multi_asset_matrix() -> None:
 
     # 1. Combined Futures WebSocket: aggTrades + ForceOrders + MarkPrice + Tickers + BookTicker
     async def matrix_futures_ws_loop():
-        streams = [f"{sym.lower()}@aggTrade" for sym in symbols]
+        streams = []
+        for sym in symbols:
+            lsym = sym.lower()
+            streams.extend([
+                f"{lsym}@aggTrade",
+                f"{lsym}@bookTicker",
+                f"{lsym}@kline_15m",
+                f"{lsym}@markPrice@1s"
+            ])
         streams.append("!forceOrder@arr")
-        streams.append("!markPrice@arr@1s")
-        streams.append("!ticker@arr")
-        streams.append("!bookTicker")
         stream_url = f"wss://fstream.binance.com/stream?streams={'/'.join(streams)}"
 
         while True:
@@ -2903,6 +2919,17 @@ async def run_multi_asset_matrix() -> None:
                                     st.fut_sell_15m += qty
                                     st.fut_cvd -= qty
                                 st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+                        elif "@kline_15m" in stream:
+                            sym = data.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                k = data.get("k", {})
+                                if k:
+                                    st.quote_vol_15m = float(k.get("q", 0.0))
+                                    st.base_vol_15m = float(k.get("v", 0.0))
+                                    trades = float(k.get("n", 1))
+                                    if trades > 0:
+                                        st.avg_trade_usd = st.quote_vol_15m / trades
                         elif stream == "!forceOrder@arr":
                             o = data.get("o", {})
                             sym = o.get("s", "").upper()
@@ -2922,14 +2949,12 @@ async def run_multi_asset_matrix() -> None:
                                     st.cascade_bias = "[bold green]🟢 Bull Flush[/bold green]"
                                 else:
                                     st.cascade_bias = "⚪ Neutral"
-                        elif stream == "!markPrice@arr@1s":
-                            if isinstance(data, list):
-                                for item in data:
-                                    sym = item.get("s", "").upper()
-                                    st = MATRIX_STATES.get(sym)
-                                    if st:
-                                        st.funding_rate = float(item.get("r", 0.0)) * 100.0
-                        elif stream == "!bookTicker":
+                        elif "@markPrice" in stream:
+                            sym = data.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                st.funding_rate = float(data.get("r", 0.0)) * 100.0
+                        elif "@bookTicker" in stream:
                             sym = data.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
                             if st:
@@ -2975,14 +3000,39 @@ async def run_multi_asset_matrix() -> None:
             except Exception:
                 await asyncio.sleep(2)
 
+    async def poll_slow_metrics(sym: str):
+        try:
+            st = MATRIX_STATES.get(sym)
+            if not st: return
+            oi_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
+            ratio_g_url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=15m&limit=1"
+            ratio_t_url = f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={sym}&period=15m&limit=1"
+            
+            oi_data, rg_data, rt_data = await asyncio.gather(
+                async_fetch(oi_url, weight=1),
+                async_fetch(ratio_g_url, weight=1),
+                async_fetch(ratio_t_url, weight=1),
+                return_exceptions=True
+            )
+            if isinstance(oi_data, dict) and st.price > 0:
+                oi_coin = float(oi_data.get("openInterest", 0.0))
+                st.oi_usd = oi_coin * st.price
+                st.oi_k = f"${st.oi_usd/1e6:.0f}M" if st.oi_usd >= 1e6 else f"${st.oi_usd/1e3:.0f}K"
+            if isinstance(rg_data, list) and len(rg_data) > 0:
+                st.ls_ratio_global = float(rg_data[0].get("longShortRatio", 1.0))
+            if isinstance(rt_data, list) and len(rt_data) > 0:
+                st.ls_ratio_top = float(rt_data[0].get("longShortRatio", 1.0))
+                st.whale_index = st.ls_ratio_top * 100.0
+        except Exception:
+            pass
+
     # 3. Background REST poller for slow-moving metrics (OI & Long/Short ratios)
     async def matrix_rest_poller():
         while True:
             try:
-                # Poll slow ratios every 30 seconds
-                tasks = [bootstrap_matrix_symbol(sym) for sym in symbols]
-                await asyncio.gather(*tasks, return_exceptions=True)
                 await asyncio.sleep(30.0)
+                tasks = [poll_slow_metrics(sym) for sym in symbols]
+                await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -3021,8 +3071,8 @@ async def run_multi_asset_matrix() -> None:
 
 if __name__ == "__main__":
     try:
-        # If user explicitly specifies a single symbol via --symbol or -s, run focused single-symbol mode
-        has_single_symbol = any(arg in ("--symbol", "-s") for arg in sys.argv)
+        # If user explicitly specifies a single symbol via --single, run focused single-symbol mode
+        has_single_symbol = any(arg == "--single" for arg in sys.argv)
         if has_single_symbol:
             asyncio.run(run_live_comparison())
         else:

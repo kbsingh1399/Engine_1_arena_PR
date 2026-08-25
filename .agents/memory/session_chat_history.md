@@ -35165,3 +35165,11 @@ Consolidated all 18-asset matrix monitor capabilities directly into binance_live
 
 [🔓OMNI-Ω]
 Fixed: 1. Terminal cursor artifact (hidden during rendering). 2. Dynamic auto-fitting on zoom/resize. 3. Centered column alignment.
+
+
+**User:** what is the refresh rate...Values are loading slow now...does it contain all those 37 parameters?
+
+**OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
+
+[🔓OMNI-Ω]
+Explained 500ms (2 Hz) refresh rate, dual Spot+Futures WebSocket streaming, and verified all 37 Engine parameters.
