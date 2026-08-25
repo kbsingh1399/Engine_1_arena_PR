@@ -33,28 +33,33 @@ from rich import box
 sys.stdout.reconfigure(encoding="utf-8")
 os.system("")  # Initialize Windows ANSI VT processing
 
-RICH_CONSOLE = Console(highlight=False)
+try:
+    _term_w = os.get_terminal_size().columns
+except Exception:
+    _term_w = 200
+
+RICH_CONSOLE = Console(highlight=False, width=max(_term_w, 180))
 
 TAB1_SYMBOLS = ["BTCUSDT", "ETHUSDT", "XRPUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT", "ADAUSDT", "TRXUSDT", "LINKUSDT"]
 TAB2_SYMBOLS = ["AVAXUSDT", "SUIUSDT", "NEARUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "APTUSDT", "OPUSDT", "ARBUSDT"]
 ALL_SYMBOLS  = TAB1_SYMBOLS + TAB2_SYMBOLS
 
 # CLI Argument parsing
-TARGET_TAB = 1
-SELECTED_SYMBOLS = TAB1_SYMBOLS
+TARGET_TAB = "ALL"
+SELECTED_SYMBOLS = ALL_SYMBOLS
 
 for i, arg in enumerate(sys.argv):
     if arg in ("--tab", "-t") and i + 1 < len(sys.argv):
         t_val = sys.argv[i+1]
-        if t_val == "2":
-            TARGET_TAB = 2
-            SELECTED_SYMBOLS = TAB2_SYMBOLS
-        elif t_val.lower() in ("all", "both"):
-            TARGET_TAB = "ALL"
-            SELECTED_SYMBOLS = ALL_SYMBOLS
-        else:
+        if t_val == "1":
             TARGET_TAB = 1
             SELECTED_SYMBOLS = TAB1_SYMBOLS
+        elif t_val == "2":
+            TARGET_TAB = 2
+            SELECTED_SYMBOLS = TAB2_SYMBOLS
+        else:
+            TARGET_TAB = "ALL"
+            SELECTED_SYMBOLS = ALL_SYMBOLS
     elif arg in ("--symbols", "-s") and i + 1 < len(sys.argv):
         raw_syms = sys.argv[i+1].split(",")
         SELECTED_SYMBOLS = [s.strip().upper() if s.strip().upper().endswith("USDT") else f"{s.strip().upper()}USDT" for s in raw_syms if s.strip()]
@@ -69,6 +74,54 @@ def get_merge_level(symbol: str) -> float:
     elif any(s.startswith(x) for x in ["SOL", "BNB", "BCH", "AVAX", "LTC", "APT", "LINK"]): return 0.1
     elif any(s.startswith(x) for x in ["DOT", "NEAR", "SUI", "OP", "ARB"]): return 0.01
     else: return 0.0001
+
+
+def fmt_price(p: float) -> str:
+    if p >= 1000:
+        return f"${p:,.0f}"
+    elif p >= 10:
+        return f"${p:.1f}"
+    elif p >= 1:
+        return f"${p:.2f}"
+    elif p >= 0.01:
+        return f"${p:.3f}"
+    else:
+        return f"${p:.4f}"
+
+
+def fmt_ema_pair(e8: float, e21: float) -> str:
+    if e8 >= 1000:
+        return f"{e8/1e3:.1f}k/{e21/1e3:.1f}k"
+    elif e8 >= 10:
+        return f"{e8:.0f}/{e21:.0f}"
+    elif e8 >= 1:
+        return f"{e8:.2f}/{e21:.2f}"
+    else:
+        return f"{e8:.3f}/{e21:.3f}"
+
+
+def fmt_compact(v: float) -> str:
+    if abs(v) >= 1e9:
+        return f"{v/1e9:+.1f}B"
+    elif abs(v) >= 1e6:
+        return f"{v/1e6:+.1f}M"
+    elif abs(v) >= 1e3:
+        return f"{v/1e3:+.1f}K"
+    elif abs(v) >= 10:
+        return f"{v:+.1f}"
+    elif abs(v) >= 1:
+        return f"{v:+.2f}"
+    elif abs(v) > 0:
+        return f"{v:+.4f}"
+    else:
+        return "0.0"
+
+
+def fmt_vol(v: float) -> str:
+    if v >= 1e9: return f"${v/1e9:.1f}B"
+    elif v >= 1e6: return f"${v/1e6:.1f}M"
+    elif v >= 1e3: return f"${v/1e3:.0f}K"
+    else: return f"${v:.0f}"
 
 
 # ==============================================================================
@@ -269,7 +322,7 @@ async def bootstrap_single_asset(sym: str) -> None:
     if isinstance(oi_data, dict):
         oi_coin = float(oi_data.get("openInterest", 0.0))
         state.oi_usd = oi_coin * state.price
-        state.oi_k = f"${state.oi_usd/1e6:.1f}M" if state.oi_usd >= 1e6 else f"${state.oi_usd/1e3:.0f}K"
+        state.oi_k = f"${state.oi_usd/1e6:.0f}M" if state.oi_usd >= 1e6 else f"${state.oi_usd/1e3:.0f}K"
 
     if isinstance(rg_data, list) and len(rg_data) > 0:
         state.ls_ratio_global = float(rg_data[0].get("longShortRatio", 1.0))
@@ -277,7 +330,7 @@ async def bootstrap_single_asset(sym: str) -> None:
     if isinstance(rt_data, list) and len(rt_data) > 0:
         raw_r = float(rt_data[0].get("longShortRatio", 1.0))
         state.ls_ratio_top = raw_r
-        state.whale_index = f"{raw_r * 100.0:.2f}"
+        state.whale_index = f"{raw_r * 100.0:.1f}"
 
     if isinstance(depth_data, dict):
         bids = depth_data.get("bids", [])
@@ -300,31 +353,31 @@ def render_matrix_table() -> None:
     """
     Renders the exact Excel matrix grid requested by the user:
     - Column 1: Parameter Name
-    - Column 2..N: Asset Symbols (e.g. BTC | ETH | XRP | SOL | BNB | DOGE | ADA | TRX | LINK)
+    - Column 2..N: Asset Symbols (all 18 assets side-by-side)
     """
     curr_time = datetime.now().strftime("%H:%M:%S")
-    tab_name = f"Tab {TARGET_TAB} Assets" if isinstance(TARGET_TAB, int) else "All Monitored Assets"
+    tab_name = f"All {len(SELECTED_SYMBOLS)} Assets"
     
     # Header Banner
     banner = Table.grid(expand=True)
     banner.add_column(justify="left", ratio=1)
     banner.add_column(justify="right", ratio=1)
     banner.add_row(
-        f"[bold yellow]⚡ BINANCE MULTI-ASSET MATRIX TERMINAL[/bold yellow] | [bold cyan]{tab_name}[/bold cyan] | [white]{len(SELECTED_SYMBOLS)} Assets[/white]",
+        f"[bold yellow]⚡ BINANCE ALL-18 ASSET MATRIX TERMINAL[/bold yellow] | [bold cyan]{tab_name}[/bold cyan]",
         f"[cyan]Clock: {curr_time}[/cyan] | Stream: [bold green]CANONICAL LIVE ●[/bold green]"
     )
     RICH_CONSOLE.print(Panel(banner, box=box.ROUNDED, style="bright_blue"))
 
     # Construct the Master Comparative Matrix Table
-    table = Table(box=box.HEAVY_EDGE, expand=True, show_header=True, header_style="bold bright_white on blue")
+    table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold bright_white on blue")
     
     # First Column: Parameter Name
-    table.add_column("Parameter", style="bold cyan", width=22, no_wrap=True)
+    table.add_column("Parameter", style="bold cyan", min_width=16, no_wrap=True)
 
     # Columns 2..N: One column per asset symbol
     for sym in SELECTED_SYMBOLS:
         base = get_base_asset(sym)
-        table.add_column(f"{base}", justify="right", style="bold white", min_width=11)
+        table.add_column(f"{base}", justify="right", style="bold white", min_width=6, no_wrap=True)
 
     # Helper row adder
     def add_metric_row(label: str, getter_func):
@@ -338,14 +391,14 @@ def render_matrix_table() -> None:
         table.add_row(*row_vals)
 
     # 1. Price & Basis Section
-    add_metric_row("Price ($)", lambda s: f"[bold green]${s.price:,.2f}[/bold green]" if s.price >= 10 else f"[bold green]${s.price:,.4f}[/bold green]")
-    add_metric_row("Basis (Fut-Spot)", lambda s: f"[green]{s.basis:+.2f}[/green]" if s.basis >= 0 else f"[red]{s.basis:+.2f}[/red]")
+    add_metric_row("Price ($)", lambda s: f"[bold green]{fmt_price(s.price)}[/bold green]")
+    add_metric_row("Basis ($)", lambda s: f"[green]{s.basis:+.2f}[/green]" if s.basis >= 0 else f"[red]{s.basis:+.2f}[/red]")
     
     table.add_section()
     # 2. 15m Microstructure
-    add_metric_row("15m Volume ($M)", lambda s: f"${s.quote_vol_15m/1e6:.2f}M")
-    add_metric_row("Volume SMA 9 ($M)", lambda s: f"${s.vol_sma9/1e6:.2f}M")
-    add_metric_row("Wilder RSI (14)", lambda s: (
+    add_metric_row("15m Vol ($M)", lambda s: fmt_vol(s.quote_vol_15m))
+    add_metric_row("Vol SMA9 ($)", lambda s: fmt_vol(s.vol_sma9))
+    add_metric_row("Wilder RSI", lambda s: (
         f"[bold red]{s.rsi:.1f}[/bold red]" if s.rsi >= 70 else (
         f"[bold green]{s.rsi:.1f}[/bold green]" if s.rsi <= 30 else f"[yellow]{s.rsi:.1f}[/yellow]"
     )))
@@ -353,36 +406,30 @@ def render_matrix_table() -> None:
 
     table.add_section()
     # 3. Orderflow & CVD
-    add_metric_row("Fut Session CVD", lambda s: f"[green]+{s.fut_cvd:,.0f}[/green]" if s.fut_cvd >= 0 else f"[red]{s.fut_cvd:,.0f}[/red]")
-    add_metric_row("Fut 15m Delta", lambda s: f"[green]+{s.fp_delta:,.1f}[/green]" if s.fp_delta >= 0 else f"[red]{s.fp_delta:,.1f}[/red]")
-    add_metric_row("Spot Session CVD", lambda s: f"[green]+{s.spot_cvd:,.0f}[/green]" if s.spot_cvd >= 0 else f"[red]{s.spot_cvd:,.0f}[/red]")
+    add_metric_row("Fut CVD", lambda s: f"[green]{fmt_compact(s.fut_cvd)}[/green]" if s.fut_cvd >= 0 else f"[red]{fmt_compact(s.fut_cvd)}[/red]")
+    add_metric_row("15m Delta", lambda s: f"[green]{fmt_compact(s.fp_delta)}[/green]" if s.fp_delta >= 0 else f"[red]{fmt_compact(s.fp_delta)}[/red]")
+    add_metric_row("Spot CVD", lambda s: f"[green]{fmt_compact(s.spot_cvd)}[/green]" if s.spot_cvd >= 0 else f"[red]{fmt_compact(s.spot_cvd)}[/red]")
 
     table.add_section()
     # 4. Derivatives Positioning & Whale Index
-    add_metric_row("Funding Rate (%)", lambda s: f"[green]{s.funding_rate:+.4f}%[/green]" if s.funding_rate >= 0 else f"[red]{s.funding_rate:+.4f}%[/red]")
-    add_metric_row("Open Interest", lambda s: f"{s.oi_k}")
-    add_metric_row("Global L/S Ratio", lambda s: f"{s.ls_ratio_global:.2f}")
-    add_metric_row("Top Trader L/S", lambda s: f"{s.ls_ratio_top:.2f}")
-    add_metric_row("CoinGlass Whale", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
+    add_metric_row("Funding (%)", lambda s: f"[green]{s.funding_rate:+.3f}%[/green]" if s.funding_rate >= 0 else f"[red]{s.funding_rate:+.3f}%[/red]")
+    add_metric_row("Open Int ($)", lambda s: f"{s.oi_k}")
+    add_metric_row("Global L/S", lambda s: f"{s.ls_ratio_global:.2f}")
+    add_metric_row("Top L/S", lambda s: f"{s.ls_ratio_top:.2f}")
+    add_metric_row("Whale Idx", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
 
     table.add_section()
-    # 5. Liquidations & Risk Bias
-    add_metric_row("15m Long Liqs ($)", lambda s: f"[bold red]${s.long_liq_15m:,.0f}[/bold red]")
-    add_metric_row("15m Short Liqs ($)", lambda s: f"[bold green]${s.short_liq_15m:,.0f}[/bold green]")
-    add_metric_row("Cascade Bias", lambda s: s.cascade_bias)
+    # 5. Footprint & Value Area
+    add_metric_row("POC ($)", lambda s: fmt_price(s.fp_poc))
+    add_metric_row("VAH (70%)", lambda s: fmt_price(s.session_vah))
+    add_metric_row("VAL (70%)", lambda s: fmt_price(s.session_val))
 
     table.add_section()
-    # 6. Footprint & Value Area
-    add_metric_row("Footprint POC ($)", lambda s: f"${s.fp_poc:,.2f}" if s.fp_poc >= 10 else f"${s.fp_poc:,.4f}")
-    add_metric_row("Session VAH (70%)", lambda s: f"${s.session_vah:,.2f}" if s.session_vah >= 10 else f"${s.session_vah:,.4f}")
-    add_metric_row("Session VAL (70%)", lambda s: f"${s.session_val:,.2f}" if s.session_val >= 10 else f"${s.session_val:,.4f}")
-
-    table.add_section()
-    # 7. Order Book Depth & EMAs
-    add_metric_row("±1% Bid Depth", lambda s: f"${s.bid_depth_1pct/1e6:.1f}M")
-    add_metric_row("±1% Ask Depth", lambda s: f"${s.ask_depth_1pct/1e6:.1f}M")
-    add_metric_row("Depth Imbalance", lambda s: f"[green]{s.depth_ratio:.2f}x[/green]" if s.depth_ratio >= 1.0 else f"[red]{s.depth_ratio:.2f}x[/red]")
-    add_metric_row("EMA 8 / 21 / 200", lambda s: f"${s.ema8:,.0f}/${s.ema21:,.0f}/${s.ema200:,.0f}" if s.ema8 >= 100 else f"${s.ema8:.2f}/${s.ema21:.2f}")
+    # 6. Order Book Depth & EMAs
+    add_metric_row("Bid Depth", lambda s: fmt_vol(s.bid_depth_1pct))
+    add_metric_row("Ask Depth", lambda s: fmt_vol(s.ask_depth_1pct))
+    add_metric_row("Depth Imbal", lambda s: f"[green]{s.depth_ratio:.1f}x[/green]" if s.depth_ratio >= 1.0 else f"[red]{s.depth_ratio:.1f}x[/red]")
+    add_metric_row("EMA 8 / 21", lambda s: fmt_ema_pair(s.ema8, s.ema21))
 
     RICH_CONSOLE.print(table)
 

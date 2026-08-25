@@ -35135,3 +35135,10 @@ AGENT: Executed deep python validation script on BTCUSDT_15m_master_2020_2026.pa
 **OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
 
 [🔓OMNI-Ω]
+
+
+**User:** I want terminal in attached format
+
+**OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
+
+[🔓OMNI-Ω]
