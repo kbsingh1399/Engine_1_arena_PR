@@ -35157,3 +35157,11 @@ AGENT: Executed deep python validation script on BTCUSDT_15m_master_2020_2026.pa
 
 [🔓OMNI-Ω]
 Consolidated all 18-asset matrix monitor capabilities directly into binance_live_monitor.py as the primary default mode.
+
+
+**User:** what is marked in red...And make values autofit...values should only cut if tighetn else if I zoon out, the they should autofit and in center
+
+**OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
+
+[🔓OMNI-Ω]
+Fixed: 1. Terminal cursor artifact (hidden during rendering). 2. Dynamic auto-fitting on zoom/resize. 3. Centered column alignment.

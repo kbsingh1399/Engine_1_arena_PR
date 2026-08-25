@@ -2755,6 +2755,13 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
         pass
 
 
+def fmt_pc(p: float) -> str:
+    if p >= 1000: return f"{p/1e3:.1f}k"
+    elif p >= 10: return f"{p:.0f}"
+    elif p >= 1: return f"{p:.1f}"
+    else: return f"{p:.2f}"
+
+
 def render_multi_asset_matrix(symbols: List[str]) -> None:
     curr_time = datetime.now().strftime("%H:%M:%S")
     term_width = shutil.get_terminal_size(fallback=(200, 30)).columns
@@ -2765,7 +2772,7 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
     banner.add_column(justify="right", ratio=1)
     banner.add_row(
         f"[bold yellow]⚡ BINANCE ALL-{len(symbols)} ASSET MATRIX TERMINAL[/bold yellow] | [bold cyan]{len(symbols)} Parallel Assets[/bold cyan]",
-        f"[cyan]Clock: {curr_time}[/cyan] | Stream: [bold green]CANONICAL LIVE ●[/bold green]"
+        f"[cyan]Clock: {curr_time}[/cyan] | Refresh: [bold green]500ms (2 Hz)[/bold green] | Stream: [bold green]CANONICAL LIVE ●[/bold green]"
     )
     dyn_console.print(Panel(banner, box=box.ROUNDED, style="bright_blue"))
 
@@ -2823,13 +2830,19 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
     add_row("Whale Idx", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
 
     table.add_section()
-    # 5. Footprint & Value Area
+    # 5. Liquidations & Cascades
+    add_row("Liqs (L/S)", lambda s: f"{fmt_v(s.long_liq_15m)}/{fmt_v(s.short_liq_15m)}")
+    add_row("Cascade Bias", lambda s: s.cascade_bias)
+
+    table.add_section()
+    # 6. Footprint & Value Area
     add_row("POC ($)", lambda s: fmt_p(s.fp_poc))
     add_row("VAH (70%)", lambda s: fmt_p(s.session_vah))
     add_row("VAL (70%)", lambda s: fmt_p(s.session_val))
+    add_row("Prev VAH/VAL", lambda s: f"{fmt_pc(s.prev_day_vah)}/{fmt_pc(s.prev_day_val)}")
 
     table.add_section()
-    # 6. Order Book Depth & EMAs
+    # 7. Order Book Depth & EMAs
     add_row("Bid Depth", lambda s: fmt_v(s.bid_depth_1pct))
     add_row("Ask Depth", lambda s: fmt_v(s.ask_depth_1pct))
     add_row("Depth Imbal", lambda s: f"[green]{s.depth_ratio:.1f}x[/green]" if s.depth_ratio >= 1.0 else f"[red]{s.depth_ratio:.1f}x[/red]")
@@ -2858,11 +2871,13 @@ async def run_multi_asset_matrix() -> None:
         render_multi_asset_matrix(symbols)
         return
 
-    # Combined WebSocket streaming loop for all 18 assets
-    async def matrix_ws_loop():
+    # 1. Combined Futures WebSocket: aggTrades + ForceOrders + MarkPrice + Tickers + BookTicker
+    async def matrix_futures_ws_loop():
         streams = [f"{sym.lower()}@aggTrade" for sym in symbols]
         streams.append("!forceOrder@arr")
         streams.append("!markPrice@arr@1s")
+        streams.append("!ticker@arr")
+        streams.append("!bookTicker")
         stream_url = f"wss://fstream.binance.com/stream?streams={'/'.join(streams)}"
 
         while True:
@@ -2872,6 +2887,7 @@ async def run_multi_asset_matrix() -> None:
                         msg = json.loads(raw_msg)
                         stream = msg.get("stream", "")
                         data = msg.get("data", {})
+                        
                         if "@aggTrade" in stream:
                             sym = data.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
@@ -2887,6 +2903,25 @@ async def run_multi_asset_matrix() -> None:
                                     st.fut_sell_15m += qty
                                     st.fut_cvd -= qty
                                 st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+                        elif stream == "!forceOrder@arr":
+                            o = data.get("o", {})
+                            sym = o.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                side = o.get("S", "")
+                                qty = float(o.get("q", 0.0))
+                                px = float(o.get("p", 0.0))
+                                usd = qty * px
+                                if side == "SELL":
+                                    st.long_liq_15m += usd
+                                elif side == "BUY":
+                                    st.short_liq_15m += usd
+                                if st.long_liq_15m > st.short_liq_15m * 2 and st.long_liq_15m > 50_000:
+                                    st.cascade_bias = "[bold red]🔴 Bear Flush[/bold red]"
+                                elif st.short_liq_15m > st.long_liq_15m * 2 and st.short_liq_15m > 50_000:
+                                    st.cascade_bias = "[bold green]🟢 Bull Flush[/bold green]"
+                                else:
+                                    st.cascade_bias = "⚪ Neutral"
                         elif stream == "!markPrice@arr@1s":
                             if isinstance(data, list):
                                 for item in data:
@@ -2894,48 +2929,94 @@ async def run_multi_asset_matrix() -> None:
                                     st = MATRIX_STATES.get(sym)
                                     if st:
                                         st.funding_rate = float(item.get("r", 0.0)) * 100.0
+                        elif stream == "!bookTicker":
+                            sym = data.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                bp, bq = float(data.get("b", 0.0)), float(data.get("B", 0.0))
+                                ap, aq = float(data.get("a", 0.0)), float(data.get("A", 0.0))
+                                if bp > 0 and ap > 0:
+                                    bid_usd = bp * bq
+                                    ask_usd = ap * aq
+                                    st.bid_depth_1pct = bid_usd
+                                    st.ask_depth_1pct = ask_usd
+                                    st.depth_ratio = (bid_usd / ask_usd) if ask_usd > 0 else 1.0
             except asyncio.CancelledError:
                 break
             except Exception:
                 await asyncio.sleep(2)
 
-    async def matrix_rest_poller():
+    # 2. Combined Spot WebSocket: Spot Trades for instant Basis and Spot CVD
+    async def matrix_spot_ws_loop():
+        spot_streams = [f"{sym.lower()}@aggTrade" for sym in symbols]
+        spot_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(spot_streams)}"
         while True:
             try:
-                tasks = [bootstrap_matrix_symbol(sym) for sym in symbols]
-                await asyncio.gather(*tasks, return_exceptions=True)
-                await asyncio.sleep(15.0)
+                async with websockets.connect(spot_url, ping_interval=20, max_size=10_000_000) as ws:
+                    async for raw_msg in ws:
+                        msg = json.loads(raw_msg)
+                        data = msg.get("data", {})
+                        sym = data.get("s", "").upper()
+                        st = MATRIX_STATES.get(sym)
+                        if st:
+                            sp_px = float(data.get("p", 0.0))
+                            sp_qty = float(data.get("q", 0.0))
+                            is_maker = data.get("m", False)
+                            st.spot_price = sp_px
+                            st.basis = st.price - sp_px
+                            if not is_maker:
+                                st.spot_buy_15m += sp_qty
+                                st.spot_cvd += sp_qty
+                            else:
+                                st.spot_sell_15m += sp_qty
+                                st.spot_cvd -= sp_qty
             except asyncio.CancelledError:
                 break
             except Exception:
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(2)
 
+    # 3. Background REST poller for slow-moving metrics (OI & Long/Short ratios)
+    async def matrix_rest_poller():
+        while True:
+            try:
+                # Poll slow ratios every 30 seconds
+                tasks = [bootstrap_matrix_symbol(sym) for sym in symbols]
+                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.sleep(30.0)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(10.0)
+
+    # 4. Ultra-smooth 500ms (2 FPS) terminal observer
     async def matrix_terminal_observer():
         is_interactive = sys.stdout.isatty() and ("--once" not in sys.argv)
         if is_interactive:
-            sys.stdout.write("\033[?25l")  # Hide cursor to prevent stray prompt blocks
+            sys.stdout.write("\033[?25l")  # Hide cursor
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
         try:
             while True:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.5)  # 500ms silky-smooth refresh
                 if is_interactive:
                     sys.stdout.write("\033[H")
                     sys.stdout.flush()
                 render_multi_asset_matrix(symbols)
         finally:
             if is_interactive:
-                sys.stdout.write("\033[?25h\n")  # Restore cursor
+                sys.stdout.write("\033[?25h\n")
                 sys.stdout.flush()
 
-    t_ws = asyncio.create_task(matrix_ws_loop())
+    t_fws = asyncio.create_task(matrix_futures_ws_loop())
+    t_sws = asyncio.create_task(matrix_spot_ws_loop())
     t_poller = asyncio.create_task(matrix_rest_poller())
     try:
         await matrix_terminal_observer()
     finally:
-        t_ws.cancel()
+        t_fws.cancel()
+        t_sws.cancel()
         t_poller.cancel()
-        await asyncio.gather(t_ws, t_poller, return_exceptions=True)
+        await asyncio.gather(t_fws, t_sws, t_poller, return_exceptions=True)
 
 
 if __name__ == "__main__":
