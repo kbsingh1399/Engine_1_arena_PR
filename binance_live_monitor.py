@@ -2592,19 +2592,22 @@ class MatrixAssetState:
 MATRIX_STATES: Dict[str, MatrixAssetState] = {}
 
 
+import shutil
+
+
 def fmt_p(p: float) -> str:
     if p >= 1000: return f"${p:,.0f}"
-    elif p >= 10: return f"${p:.1f}"
+    elif p >= 10: return f"${p:.2f}"
     elif p >= 1: return f"${p:.2f}"
-    elif p >= 0.01: return f"${p:.3f}"
+    elif p >= 0.01: return f"${p:.4f}"
     else: return f"${p:.4f}"
 
 
 def fmt_ema_p(e8: float, e21: float) -> str:
     if e8 >= 1000: return f"{e8/1e3:.1f}k/{e21/1e3:.1f}k"
-    elif e8 >= 10: return f"{e8:.0f}/{e21:.0f}"
+    elif e8 >= 10: return f"{e8:.1f}/{e21:.1f}"
     elif e8 >= 1: return f"{e8:.2f}/{e21:.2f}"
-    else: return f"{e8:.3f}/{e21:.3f}"
+    else: return f"{e8:.2f}/{e21:.2f}"
 
 
 def fmt_c(v: float) -> str:
@@ -2754,6 +2757,9 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
 
 def render_multi_asset_matrix(symbols: List[str]) -> None:
     curr_time = datetime.now().strftime("%H:%M:%S")
+    term_width = shutil.get_terminal_size(fallback=(200, 30)).columns
+    dyn_console = Console(width=max(term_width, 180), highlight=False)
+
     banner = Table.grid(expand=True)
     banner.add_column(justify="left", ratio=1)
     banner.add_column(justify="right", ratio=1)
@@ -2761,14 +2767,22 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
         f"[bold yellow]⚡ BINANCE ALL-{len(symbols)} ASSET MATRIX TERMINAL[/bold yellow] | [bold cyan]{len(symbols)} Parallel Assets[/bold cyan]",
         f"[cyan]Clock: {curr_time}[/cyan] | Stream: [bold green]CANONICAL LIVE ●[/bold green]"
     )
-    RICH_CONSOLE.print(Panel(banner, box=box.ROUNDED, style="bright_blue"))
+    dyn_console.print(Panel(banner, box=box.ROUNDED, style="bright_blue"))
 
-    table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold bright_white on blue")
-    table.add_column("Parameter", style="bold cyan", min_width=16, no_wrap=True)
+    table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        show_header=True,
+        header_style="bold bright_white on blue",
+        pad_edge=False,
+        collapse_padding=True,
+        padding=(0, 1)
+    )
+    table.add_column("Parameter", style="bold cyan", min_width=14, no_wrap=True)
 
     for sym in symbols:
         base = sym[:-4] if sym.endswith("USDT") else sym
-        table.add_column(f"{base}", justify="right", style="bold white", min_width=6, no_wrap=True)
+        table.add_column(f"{base}", justify="center", style="bold white", no_wrap=True)
 
     def add_row(label: str, getter_func):
         row_vals = [label]
@@ -2821,7 +2835,7 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
     add_row("Depth Imbal", lambda s: f"[green]{s.depth_ratio:.1f}x[/green]" if s.depth_ratio >= 1.0 else f"[red]{s.depth_ratio:.1f}x[/red]")
     add_row("EMA 8 / 21", lambda s: fmt_ema_p(s.ema8, s.ema21))
 
-    RICH_CONSOLE.print(table)
+    dyn_console.print(table)
 
 
 async def run_multi_asset_matrix() -> None:
@@ -2880,32 +2894,48 @@ async def run_multi_asset_matrix() -> None:
                                     st = MATRIX_STATES.get(sym)
                                     if st:
                                         st.funding_rate = float(item.get("r", 0.0)) * 100.0
+            except asyncio.CancelledError:
+                break
             except Exception:
                 await asyncio.sleep(2)
 
     async def matrix_rest_poller():
         while True:
-            tasks = [bootstrap_matrix_symbol(sym) for sym in symbols]
-            await asyncio.gather(*tasks, return_exceptions=True)
-            await asyncio.sleep(15.0)
+            try:
+                tasks = [bootstrap_matrix_symbol(sym) for sym in symbols]
+                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.sleep(15.0)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(5.0)
 
     async def matrix_terminal_observer():
         is_interactive = sys.stdout.isatty() and ("--once" not in sys.argv)
-        first_frame = True
-        while True:
-            await asyncio.sleep(1.0)
-            if is_interactive:
-                if first_frame:
-                    sys.stdout.write("\033[2J\033[H")
-                    first_frame = False
-                else:
+        if is_interactive:
+            sys.stdout.write("\033[?25l")  # Hide cursor to prevent stray prompt blocks
+            sys.stdout.write("\033[2J\033[H")
+            sys.stdout.flush()
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+                if is_interactive:
                     sys.stdout.write("\033[H")
+                    sys.stdout.flush()
+                render_multi_asset_matrix(symbols)
+        finally:
+            if is_interactive:
+                sys.stdout.write("\033[?25h\n")  # Restore cursor
                 sys.stdout.flush()
-            render_multi_asset_matrix(symbols)
 
-    asyncio.create_task(matrix_ws_loop())
-    asyncio.create_task(matrix_rest_poller())
-    await matrix_terminal_observer()
+    t_ws = asyncio.create_task(matrix_ws_loop())
+    t_poller = asyncio.create_task(matrix_rest_poller())
+    try:
+        await matrix_terminal_observer()
+    finally:
+        t_ws.cancel()
+        t_poller.cancel()
+        await asyncio.gather(t_ws, t_poller, return_exceptions=True)
 
 
 if __name__ == "__main__":
@@ -2917,4 +2947,8 @@ if __name__ == "__main__":
         else:
             asyncio.run(run_multi_asset_matrix())
     except (KeyboardInterrupt, asyncio.CancelledError):
+        # Ensure cursor is visible on clean exit
+        if sys.stdout.isatty():
+            sys.stdout.write("\033[?25h\n")
+            sys.stdout.flush()
         print("\n[STOPPED] Service exited cleanly.")
