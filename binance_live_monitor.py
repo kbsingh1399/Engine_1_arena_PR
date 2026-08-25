@@ -64,7 +64,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -2587,6 +2587,11 @@ class MatrixAssetState:
     ema800: float = 0.0
     max_trade_vol_btc: float = 0.0
     last_update_ts: float = 0.0
+    active_bar_open_ms: int = 0
+    volume_at_price: dict[int, float] = field(default_factory=dict)
+    profile_tick_size: float = 1.0
+    bootstrap_ok: bool = True
+    bootstrap_error: str = ""
 
     def __post_init__(self):
         self.base_asset = self.symbol[:-4] if self.symbol.endswith("USDT") else self.symbol
@@ -2720,7 +2725,8 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             st.avg_trade_usd = (st.quote_vol_15m / trades_count[-1]) if trades_count[-1] > 0 else 0.0
 
             m_lvl = get_merge_level(sym)
-            st.fp_poc = round(st.price / m_lvl) * m_lvl
+            st.profile_tick_size = m_lvl
+            st.fp_poc = round(st.price / m_lvl) * m_lvl if m_lvl else st.price
             st.session_vah = max(highs[-32:]) if len(highs) >= 32 else max(highs)
             st.session_val = min(lows[-32:]) if len(lows) >= 32 else min(lows)
             st.prev_day_vah = max(highs[-96:-32]) if len(highs) >= 96 else st.session_vah
@@ -2766,8 +2772,10 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             st.bid_depth_1pct = bid_usd
             st.ask_depth_1pct = ask_usd
             st.depth_ratio = (bid_usd / ask_usd) if ask_usd > 0 else 1.0
-    except Exception:
-        pass
+    except Exception as exc:
+        st.bootstrap_error = f"{type(exc).__name__}: {exc}"
+        st.bootstrap_ok = False
+        print(f"[MATRIX BOOTSTRAP] {sym}: {st.bootstrap_error}")
 
 
 def fmt_pc(p: float) -> str:
@@ -2777,10 +2785,11 @@ def fmt_pc(p: float) -> str:
     else: return f"{p:.2f}"
 
 
-def render_multi_asset_matrix(symbols: List[str]) -> None:
+def render_multi_asset_matrix(symbols: List[str], dyn_console: Console = None) -> None:
     curr_time = datetime.now().strftime("%H:%M:%S")
-    term_width = shutil.get_terminal_size(fallback=(200, 30)).columns
-    dyn_console = Console(width=max(term_width, 180), highlight=False)
+    if dyn_console is None:
+        term_width = shutil.get_terminal_size(fallback=(200, 30)).columns
+        dyn_console = Console(width=max(term_width, 180), highlight=False)
 
     banner = Table.grid(expand=True)
     banner.add_column(justify="left", ratio=1)
@@ -2834,10 +2843,10 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
     add_row("11b. L/S TOP", lambda s: f"[green]{s.ls_ratio_top:.2f}[/green]" if s.ls_ratio_top >= 1.0 else f"[red]{s.ls_ratio_top:.2f}[/red]")
     add_row("12. FP DELTA", lambda s: f"[green]{fmt_c(s.fp_delta)}[/green]" if s.fp_delta >= 0 else f"[red]{fmt_c(s.fp_delta)}[/red]")
     add_row("13. FP POC", lambda s: f"[bold magenta]{fmt_p(s.fp_poc)}[/bold magenta]")
-    add_row("14. BID DOLLAR", lambda s: f"[bold green]{fmt_v(s.bid_depth_1pct)}[/bold green]")
-    add_row("15. ASK DOLLAR", lambda s: f"[bold red]{fmt_v(s.ask_depth_1pct)}[/bold red]")
-    add_row("16. BID COIN", lambda s: f"[green]{fmt_pc(s.bid_depth_1pct / s.price)}[/green]" if s.price > 0 else "0")
-    add_row("17. ASK COIN", lambda s: f"[red]{fmt_pc(s.ask_depth_1pct / s.price)}[/red]" if s.price > 0 else "0")
+    add_row("14. BEST BID NOTIONAL", lambda s: f"[bold green]{fmt_v(s.bid_depth_1pct)}[/bold green]")
+    add_row("15. BEST ASK NOTIONAL", lambda s: f"[bold red]{fmt_v(s.ask_depth_1pct)}[/bold red]")
+    add_row("16. BEST BID QTY", lambda s: f"[green]{fmt_pc(s.bid_depth_1pct / s.price)}[/green]" if s.price > 0 else "0")
+    add_row("17. BEST ASK QTY", lambda s: f"[red]{fmt_pc(s.ask_depth_1pct / s.price)}[/red]" if s.price > 0 else "0")
     add_row("18. WHALE IDX", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
     add_row("19. TAKER BUY", lambda s: f"[bold green]{fmt_pc(s.fut_buy_15m)}[/bold green]")
     add_row("20. TAKER SELL", lambda s: f"[bold red]{fmt_pc(s.fut_sell_15m)}[/bold red]")
@@ -2860,6 +2869,32 @@ def render_multi_asset_matrix(symbols: List[str]) -> None:
     add_row("37. ALT TAKER FLO", lambda s: "[dim]N/A[/dim]")
     
     dyn_console.print(Align.center(table))
+
+
+def reset_matrix_bar_if_needed(st: MatrixAssetState, bar_open_ms: int) -> None:
+    if st.active_bar_open_ms == bar_open_ms:
+        return
+    st.active_bar_open_ms = bar_open_ms
+    st.fut_buy_15m = 0.0
+    st.fut_sell_15m = 0.0
+    st.spot_buy_15m = 0.0
+    st.spot_sell_15m = 0.0
+    st.fp_delta = 0.0
+    st.fp_poc = 0.0
+    st.long_liq_15m = 0.0
+    st.short_liq_15m = 0.0
+    st.max_trade_vol_btc = 0.0
+    st.avg_trade_usd = 0.0
+    st.cascade_bias = "⚪ Neutral"
+    st.volume_at_price.clear()
+
+
+def add_profile_trade(st: MatrixAssetState, price: float, qty: float) -> None:
+    tick_size = st.profile_tick_size if st.profile_tick_size > 0 else 1.0
+    bucket = round(price / tick_size)
+    st.volume_at_price[bucket] = st.volume_at_price.get(bucket, 0.0) + qty
+    poc_bucket = max(st.volume_at_price, key=st.volume_at_price.get)
+    st.fp_poc = poc_bucket * tick_size
 
 
 async def run_multi_asset_matrix() -> None:
@@ -2891,9 +2926,9 @@ async def run_multi_asset_matrix() -> None:
                 f"{lsym}@aggTrade",
                 f"{lsym}@bookTicker",
                 f"{lsym}@kline_15m",
-                f"{lsym}@markPrice@1s"
+                f"{lsym}@markPrice@1s",
+                f"{lsym}@forceOrder"
             ])
-        streams.append("!forceOrder@arr")
         stream_url = f"wss://fstream.binance.com/stream?streams={'/'.join(streams)}"
 
         while True:
@@ -2919,18 +2954,21 @@ async def run_multi_asset_matrix() -> None:
                                     st.fut_sell_15m += qty
                                     st.fut_cvd -= qty
                                 st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+                                add_profile_trade(st, px, qty)
                         elif "@kline_15m" in stream:
                             sym = data.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
                             if st:
                                 k = data.get("k", {})
                                 if k:
+                                    bar_open_ms = int(k.get("t", 0))
+                                    reset_matrix_bar_if_needed(st, bar_open_ms)
                                     st.quote_vol_15m = float(k.get("q", 0.0))
                                     st.base_vol_15m = float(k.get("v", 0.0))
                                     trades = float(k.get("n", 1))
                                     if trades > 0:
                                         st.avg_trade_usd = st.quote_vol_15m / trades
-                        elif stream == "!forceOrder@arr":
+                        elif "@forceOrder" in stream:
                             o = data.get("o", {})
                             sym = o.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
@@ -3040,18 +3078,26 @@ async def run_multi_asset_matrix() -> None:
 
     # 4. Ultra-smooth 500ms (2 FPS) terminal observer
     async def matrix_terminal_observer():
+        import time
         is_interactive = sys.stdout.isatty() and ("--once" not in sys.argv)
         if is_interactive:
             sys.stdout.write("\033[?25l")  # Hide cursor
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
+        
+        term_width = shutil.get_terminal_size(fallback=(200, 30)).columns
+        dyn_console = Console(width=max(term_width, 180), highlight=False)
+        
         try:
             while True:
-                await asyncio.sleep(0.5)  # 500ms silky-smooth refresh
+                start_t = time.monotonic()
                 if is_interactive:
                     sys.stdout.write("\033[H")
                     sys.stdout.flush()
-                render_multi_asset_matrix(symbols)
+                render_multi_asset_matrix(symbols, dyn_console=dyn_console)
+                elapsed = time.monotonic() - start_t
+                sleep_t = max(0.01, 0.5 - elapsed)
+                await asyncio.sleep(sleep_t)
         finally:
             if is_interactive:
                 sys.stdout.write("\033[?25h\n")
