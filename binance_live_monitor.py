@@ -2929,7 +2929,6 @@ async def run_multi_asset_matrix() -> None:
         for sym in symbols:
             lsym = sym.lower()
             streams.extend([
-                f"{lsym}@aggTrade",
                 f"{lsym}@bookTicker",
                 f"{lsym}@kline_15m",
                 f"{lsym}@markPrice@1s",
@@ -2945,23 +2944,7 @@ async def run_multi_asset_matrix() -> None:
                         stream = msg.get("stream", "")
                         data = msg.get("data", {})
                         
-                        if "@aggTrade" in stream:
-                            sym = data.get("s", "").upper()
-                            st = MATRIX_STATES.get(sym)
-                            if st:
-                                px = float(data.get("p", 0.0))
-                                qty = float(data.get("q", 0.0))
-                                is_maker = data.get("m", False)
-                                st.price = px
-                                if not is_maker:
-                                    st.fut_buy_15m += qty
-                                    st.fut_cvd += qty
-                                else:
-                                    st.fut_sell_15m += qty
-                                    st.fut_cvd -= qty
-                                st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
-                                add_profile_trade(st, px, qty)
-                        elif "@kline_15m" in stream:
+                        if "@kline_15m" in stream:
                             sym = data.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
                             if st:
@@ -2969,11 +2952,38 @@ async def run_multi_asset_matrix() -> None:
                                 if k:
                                     bar_open_ms = int(k.get("t", 0))
                                     reset_matrix_bar_if_needed(st, bar_open_ms)
+                                    
+                                    px = float(k.get("c", 0.0))
+                                    if px > 0:
+                                        st.price = px
+                                        
                                     st.quote_vol_15m = float(k.get("q", 0.0))
                                     st.base_vol_15m = float(k.get("v", 0.0))
+                                    
+                                    taker_buy_base = float(k.get("V", 0.0))
+                                    taker_sell_base = max(0.0, st.base_vol_15m - taker_buy_base)
+                                    
+                                    if px > 0 and (taker_buy_base > 0 or taker_sell_base > 0):
+                                        diff = st.base_vol_15m - (st.fut_buy_15m + st.fut_sell_15m)
+                                        if diff > 0:
+                                            add_profile_trade(st, px, diff)
+                                            
+                                    st.fut_buy_15m = taker_buy_base
+                                    st.fut_sell_15m = taker_sell_base
+                                    st.fut_cvd = st.fut_buy_15m - st.fut_sell_15m
+                                    st.fp_delta = st.fut_cvd
+                                    
                                     trades = float(k.get("n", 1))
                                     if trades > 0:
                                         st.avg_trade_usd = st.quote_vol_15m / trades
+                        elif "@bookTicker" in stream:
+                            sym = data.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                b_px = float(data.get("b", 0.0))
+                                a_px = float(data.get("a", 0.0))
+                                if b_px > 0 and a_px > 0:
+                                    st.price = (b_px + a_px) / 2.0
                         elif "@forceOrder" in stream:
                             o = data.get("o", {})
                             sym = o.get("s", "").upper()
@@ -3051,11 +3061,13 @@ async def run_multi_asset_matrix() -> None:
             oi_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
             ratio_g_url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=15m&limit=1"
             ratio_t_url = f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={sym}&period=15m&limit=1"
+            kline_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit=1"
             
-            oi_data, rg_data, rt_data = await asyncio.gather(
+            oi_data, rg_data, rt_data, kline_data = await asyncio.gather(
                 async_fetch(oi_url, weight=1),
                 async_fetch(ratio_g_url, weight=1),
                 async_fetch(ratio_t_url, weight=1),
+                async_fetch(kline_url, weight=1),
                 return_exceptions=True
             )
             if isinstance(oi_data, dict) and st.price > 0:
@@ -3067,6 +3079,16 @@ async def run_multi_asset_matrix() -> None:
             if isinstance(rt_data, list) and len(rt_data) > 0:
                 st.ls_ratio_top = float(rt_data[0].get("longShortRatio", 1.0))
                 st.whale_index = st.ls_ratio_top * 100.0
+            if isinstance(kline_data, list) and len(kline_data) > 0:
+                k = kline_data[-1]
+                bar_open_ms = int(k[0])
+                reset_matrix_bar_if_needed(st, bar_open_ms)
+                st.base_vol_15m = float(k[5])
+                st.quote_vol_15m = float(k[7])
+                st.fut_buy_15m = float(k[9])
+                st.fut_sell_15m = max(0.0, st.base_vol_15m - st.fut_buy_15m)
+                st.fut_cvd = st.fut_buy_15m - st.fut_sell_15m
+                st.fp_delta = st.fut_cvd
         except Exception:
             pass
 
@@ -3074,13 +3096,13 @@ async def run_multi_asset_matrix() -> None:
     async def matrix_rest_poller():
         while True:
             try:
-                await asyncio.sleep(30.0)
+                await asyncio.sleep(5.0)
                 tasks = [poll_slow_metrics(sym) for sym in symbols]
                 await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.CancelledError:
                 break
             except Exception:
-                await asyncio.sleep(10.0)
+                await asyncio.sleep(5.0)
 
     # 4. Ultra-smooth 500ms (2 FPS) terminal observer
     async def matrix_terminal_observer():
