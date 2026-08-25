@@ -18,14 +18,14 @@ class ParquetExporter:
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def export_dataset(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def export_dataset(self, df: pd.DataFrame, symbol: str = "BTCUSDT") -> Dict[str, Any]:
         """
-        Exports the consolidated unified master Parquet file and metadata manifest.
+        Exports the consolidated unified master Parquet file and metadata manifest for the specified symbol.
         """
-        print(f"[EXPORTER] Exporting {len(df):,} records to {self.output_dir}...")
+        print(f"[EXPORTER] Exporting {len(df):,} records for {symbol} to {self.output_dir}...")
         
         master_clean = df.drop(columns=["_year"], errors="ignore").copy()
-        master_filename = "BTCUSDT_15m_master_2020_2026.parquet"
+        master_filename = f"{symbol}_15m_master_2020_2026.parquet"
         master_path = os.path.join(self.output_dir, master_filename)
         
         # Write high-performance snappy compressed Parquet
@@ -35,7 +35,7 @@ class ParquetExporter:
 
         # Export Manifest Metadata JSON
         manifest = {
-            "symbol": "BTCUSDT",
+            "symbol": symbol,
             "timeframe": "15m",
             "total_rows": len(master_clean),
             "columns": list(master_clean.columns),
@@ -47,9 +47,9 @@ class ParquetExporter:
             "master_size_mb": round(master_size_mb, 2)
         }
 
-        manifest_path = os.path.join(self.output_dir, "dataset_manifest.json")
+        manifest_path = os.path.join(self.output_dir, f"{symbol}_dataset_manifest.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
-        print(f"[EXPORTER] Master Export Complete. Manifest saved to {manifest_path}")
+        print(f"[EXPORTER] Master Export Complete for {symbol}. Manifest saved to {manifest_path}")
         return manifest

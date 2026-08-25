@@ -55,12 +55,12 @@ class BinanceHistoricalFetcher:
     # --------------------------------------------------------------------------
     # 1. Klines Ingestion (2020-01 -> Present)
     # --------------------------------------------------------------------------
-    def fetch_all_klines(self, start_year: int = 2019, end_year: int = 2026) -> pd.DataFrame:
+    def fetch_all_klines(self, symbol: str = "BTCUSDT", start_year: int = 2019, end_year: int = 2026) -> pd.DataFrame:
         """
-        Fetches all 15m Klines from Sept 2019 to present.
+        Fetches all 15m Klines from Sept 2019 to present for the specified symbol.
         Combines Binance Vision Monthly + Daily + Live REST.
         """
-        print(f"[FETCHER] Fetching Historical 15m Klines ({start_year} -> {end_year})...")
+        print(f"[FETCHER] Fetching Historical 15m Klines for {symbol} ({start_year} -> {end_year})...")
         now = datetime.now(timezone.utc)
         current_year = now.year
         current_month = now.month
@@ -75,14 +75,14 @@ class BinanceHistoricalFetcher:
         kline_dfs: List[pd.DataFrame] = []
         
         def _get_monthly_kline(ym: str) -> Optional[pd.DataFrame]:
-            cache_file = os.path.join(self.klines_dir, f"BTCUSDT-15m-{ym}.csv")
+            cache_file = os.path.join(self.klines_dir, f"{symbol}-15m-{ym}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
                     return pd.read_csv(cache_file)
                 except Exception:
                     pass
             
-            url = f"https://data.binance.vision/data/futures/um/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-{ym}.zip"
+            url = f"https://data.binance.vision/data/futures/um/monthly/klines/{symbol}/15m/{symbol}-15m-{ym}.zip"
             data = self._fetch_url(url)
             if data:
                 try:
@@ -107,7 +107,7 @@ class BinanceHistoricalFetcher:
                     df.to_csv(cache_file, index=False)
                     return df
                 except Exception as e:
-                    print(f"[WARN] Failed parsing klines for {ym}: {e}")
+                    print(f"[WARN] Failed parsing klines for {symbol} {ym}: {e}")
             return None
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -123,13 +123,13 @@ class BinanceHistoricalFetcher:
             current_daily_targets.append(f"{current_year}-{current_month:02d}-{d:02d}")
 
         def _get_daily_kline(ymd: str) -> Optional[pd.DataFrame]:
-            cache_file = os.path.join(self.klines_dir, f"BTCUSDT-15m-{ymd}.csv")
+            cache_file = os.path.join(self.klines_dir, f"{symbol}-15m-{ymd}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
                     return pd.read_csv(cache_file)
                 except Exception:
                     pass
-            url = f"https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/15m/BTCUSDT-15m-{ymd}.zip"
+            url = f"https://data.binance.vision/data/futures/um/daily/klines/{symbol}/15m/{symbol}-15m-{ymd}.zip"
             data = self._fetch_url(url)
             if data:
                 try:
@@ -166,7 +166,7 @@ class BinanceHistoricalFetcher:
 
         # Fetch recent bars from REST API to fill up to the latest closed candle
         try:
-            rest_url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1500"
+            rest_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit=1500"
             raw = self._fetch_url(rest_url)
             if raw:
                 rows = json.loads(raw.decode('utf-8'))
@@ -181,27 +181,27 @@ class BinanceHistoricalFetcher:
                     rest_df[c] = rest_df[c].astype(float)
                 kline_dfs.append(rest_df)
         except Exception as e:
-            print(f"[WARN] REST klines fetch failed: {e}")
+            print(f"[WARN] REST klines fetch failed for {symbol}: {e}")
 
         if not kline_dfs:
-            raise RuntimeError("No historical klines were fetched.")
+            raise RuntimeError(f"No historical klines were fetched for {symbol}.")
 
         master_df = pd.concat(kline_dfs, ignore_index=True)
         master_df.drop_duplicates(subset=["open_time"], inplace=True)
         master_df.sort_values(by="open_time", inplace=True)
         master_df.reset_index(drop=True, inplace=True)
-        print(f"[FETCHER] Total Historical Klines loaded: {len(master_df):,} bars (From {datetime.fromtimestamp(master_df['open_time'].iloc[0]/1000, tz=timezone.utc)} to {datetime.fromtimestamp(master_df['open_time'].iloc[-1]/1000, tz=timezone.utc)})")
+        print(f"[FETCHER] Total Historical Klines loaded for {symbol}: {len(master_df):,} bars (From {datetime.fromtimestamp(master_df['open_time'].iloc[0]/1000, tz=timezone.utc)} to {datetime.fromtimestamp(master_df['open_time'].iloc[-1]/1000, tz=timezone.utc)})")
         return master_df
 
     # --------------------------------------------------------------------------
     # 1b. Spot Klines (for real Basis USD and real Spot CVD)
     # --------------------------------------------------------------------------
-    def fetch_spot_klines(self, start_date: str = "2020-01-01") -> pd.DataFrame:
+    def fetch_spot_klines(self, symbol: str = "BTCUSDT", start_date: str = "2020-01-01") -> pd.DataFrame:
         """
         Fetches spot 15m klines from Binance Vision.
         Returns df with: open_time, spot_close, spot_taker_buy_volume, spot_volume
         """
-        print(f"[FETCHER] Fetching Spot 15m Klines from {start_date}...")
+        print(f"[FETCHER] Fetching Spot 15m Klines for {symbol} from {start_date}...")
         spot_dir = os.path.join(self.cache_dir, "spot_klines_15m")
         os.makedirs(spot_dir, exist_ok=True)
 
@@ -243,13 +243,13 @@ class BinanceHistoricalFetcher:
         spot_dfs: List[pd.DataFrame] = []
 
         def _get_monthly_spot(ym: str) -> Optional[pd.DataFrame]:
-            cache_file = os.path.join(spot_dir, f"BTCUSDT-spot-15m-{ym}.csv")
+            cache_file = os.path.join(spot_dir, f"{symbol}-spot-15m-{ym}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
                     return pd.read_csv(cache_file)
                 except Exception:
                     pass
-            url = f"https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/15m/BTCUSDT-15m-{ym}.zip"
+            url = f"https://data.binance.vision/data/spot/monthly/klines/{symbol}/15m/{symbol}-15m-{ym}.zip"
             data = self._fetch_url(url)
             if data:
                 df = _parse_spot_zip(data)
@@ -268,14 +268,14 @@ class BinanceHistoricalFetcher:
         # Daily archives for current month
         for d in range(1, now.day):
             ymd = f"{now.year}-{now.month:02d}-{d:02d}"
-            cache_file = os.path.join(spot_dir, f"BTCUSDT-spot-15m-{ymd}.csv")
+            cache_file = os.path.join(spot_dir, f"{symbol}-spot-15m-{ymd}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
                     spot_dfs.append(pd.read_csv(cache_file))
                     continue
                 except Exception:
                     pass
-            url = f"https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-{ymd}.zip"
+            url = f"https://data.binance.vision/data/spot/daily/klines/{symbol}/15m/{symbol}-15m-{ymd}.zip"
             data = self._fetch_url(url)
             if data:
                 df = _parse_spot_zip(data)
@@ -285,7 +285,7 @@ class BinanceHistoricalFetcher:
 
         # REST fallback for recent bars
         try:
-            rest_url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1500"
+            rest_url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=1500"
             raw = self._fetch_url(rest_url)
             if raw:
                 rows = json.loads(raw.decode('utf-8'))
@@ -299,7 +299,7 @@ class BinanceHistoricalFetcher:
             pass
 
         if not spot_dfs:
-            print("[WARN] No spot klines fetched.")
+            print(f"[WARN] No spot klines fetched for {symbol}.")
             return pd.DataFrame()
 
         master = pd.concat(spot_dfs, ignore_index=True)
@@ -311,32 +311,32 @@ class BinanceHistoricalFetcher:
             "volume": "spot_volume",
             "taker_buy_volume": "spot_taker_buy_volume"
         }, inplace=True)
-        print(f"[FETCHER] Total Spot Klines loaded: {len(master):,} bars")
+        print(f"[FETCHER] Total Spot Klines loaded for {symbol}: {len(master):,} bars")
         return master
 
     # --------------------------------------------------------------------------
     # 2. Daily Metrics Ingestion (Sept 2020 -> Present)
     # --------------------------------------------------------------------------
-    def fetch_all_metrics(self, start_date: str = "2020-09-01") -> pd.DataFrame:
+    def fetch_all_metrics(self, symbol: str = "BTCUSDT", start_date: str = "2020-09-01") -> pd.DataFrame:
         """
         Fetches all daily metrics archives (Open Interest, L/S Ratios, Whale Index)
-        for both BTCUSDT and BTCUSDC (for stablecoin-margined OI aggregation).
+        for the specified symbol (and USDC companion if applicable).
         """
-        print(f"[FETCHER] Fetching Historical Daily Metrics from {start_date}...")
+        print(f"[FETCHER] Fetching Historical Daily Metrics for {symbol} from {start_date}...")
         now = datetime.now(timezone.utc)
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         
         day_diff = (now - start_dt).days
         all_dates = [(start_dt + pd.Timedelta(days=i)).strftime("%Y-%m-%d") for i in range(day_diff + 1)]
 
-        def _get_daily_metric(symbol: str, ymd: str) -> Optional[pd.DataFrame]:
-            cache_file = os.path.join(self.metrics_dir, f"{symbol}-metrics-{ymd}.csv")
+        def _get_daily_metric(sym: str, ymd: str) -> Optional[pd.DataFrame]:
+            cache_file = os.path.join(self.metrics_dir, f"{sym}-metrics-{ymd}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
                     return pd.read_csv(cache_file)
                 except Exception:
                     pass
-            url = f"https://data.binance.vision/data/futures/um/daily/metrics/{symbol}/{symbol}-metrics-{ymd}.zip"
+            url = f"https://data.binance.vision/data/futures/um/daily/metrics/{sym}/{sym}-metrics-{ymd}.zip"
             data = self._fetch_url(url)
             if data:
                 try:
@@ -349,75 +349,143 @@ class BinanceHistoricalFetcher:
                     pass
             return None
 
-        # Fetch BTCUSDT
-        metric_dfs_usdt: List[pd.DataFrame] = []
+        # Fetch Primary Symbol Metrics
+        metric_dfs_primary: List[pd.DataFrame] = []
+        total_targets = len(all_dates)
+        completed_count = 0
+        
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_date = {executor.submit(_get_daily_metric, "BTCUSDT", d): d for d in all_dates}
+            future_to_date = {executor.submit(_get_daily_metric, symbol, d): d for d in all_dates}
             for future in as_completed(future_to_date):
+                completed_count += 1
+                if completed_count % 250 == 0 or completed_count == total_targets:
+                    print(f"  [FETCHER] {symbol} daily metrics progress: {completed_count}/{total_targets} ({completed_count*100//total_targets}%)")
                 res = future.result()
                 if res is not None and not res.empty:
-                    metric_dfs_usdt.append(res)
+                    metric_dfs_primary.append(res)
                     
-        # Fetch BTCUSDC
+        # Optional companion USDC metrics
+        usdc_symbol = symbol.replace("USDT", "USDC") if symbol.endswith("USDT") else None
         metric_dfs_usdc: List[pd.DataFrame] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_date = {executor.submit(_get_daily_metric, "BTCUSDC", d): d for d in all_dates}
-            for future in as_completed(future_to_date):
-                res = future.result()
-                if res is not None and not res.empty:
-                    metric_dfs_usdc.append(res)
+        if usdc_symbol and usdc_symbol != symbol:
+            completed_usdc = 0
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_date = {executor.submit(_get_daily_metric, usdc_symbol, d): d for d in all_dates}
+                for future in as_completed(future_to_date):
+                    completed_usdc += 1
+                    res = future.result()
+                    if res is not None and not res.empty:
+                        metric_dfs_usdc.append(res)
 
-        if not metric_dfs_usdt:
-            print("[WARN] No historical metrics archives found for BTCUSDT. Will use smooth interpolation.")
-            return pd.DataFrame()
+        if not metric_dfs_primary:
+            print(f"[WARN] No historical metrics archives found for {symbol}. Will use smooth interpolation / REST fallback.")
+            master_metrics = pd.DataFrame()
+        else:
+            master_metrics_usdt = pd.concat(metric_dfs_primary, ignore_index=True)
+            master_metrics_usdt["create_time"] = pd.to_datetime(master_metrics_usdt["create_time"], utc=True)
+            master_metrics_usdt["timestamp_ms"] = (master_metrics_usdt["create_time"] - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta("1ms")
+            master_metrics_usdt.drop_duplicates(subset=["timestamp_ms"], inplace=True)
+            master_metrics_usdt.sort_values(by="timestamp_ms", inplace=True)
+            master_metrics_usdt.reset_index(drop=True, inplace=True)
+            
+            master_metrics = master_metrics_usdt.copy()
+            
+            if metric_dfs_usdc:
+                master_metrics_usdc = pd.concat(metric_dfs_usdc, ignore_index=True)
+                master_metrics_usdc["create_time"] = pd.to_datetime(master_metrics_usdc["create_time"], utc=True)
+                master_metrics_usdc["timestamp_ms"] = (master_metrics_usdc["create_time"] - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta("1ms")
+                master_metrics_usdc.drop_duplicates(subset=["timestamp_ms"], inplace=True)
+                master_metrics_usdc.sort_values(by="timestamp_ms", inplace=True)
+                
+                # Rename USDC columns and merge
+                usdc_sub = master_metrics_usdc[["timestamp_ms", "sum_open_interest", "sum_open_interest_value"]].copy()
+                usdc_sub.rename(columns={
+                    "sum_open_interest": "sum_open_interest_usdc",
+                    "sum_open_interest_value": "sum_open_interest_value_usdc"
+                }, inplace=True)
+                
+                master_metrics = pd.merge(master_metrics, usdc_sub, on="timestamp_ms", how="left")
+                
+                # Combine STABLECOIN-margined OI
+                master_metrics["sum_open_interest"] = master_metrics["sum_open_interest"].fillna(0) + master_metrics["sum_open_interest_usdc"].fillna(0)
+                master_metrics["sum_open_interest_value"] = master_metrics["sum_open_interest_value"].fillna(0) + master_metrics["sum_open_interest_value_usdc"].fillna(0)
+                master_metrics.drop(columns=["sum_open_interest_usdc", "sum_open_interest_value_usdc"], inplace=True)
 
-        master_metrics_usdt = pd.concat(metric_dfs_usdt, ignore_index=True)
-        master_metrics_usdt["create_time"] = pd.to_datetime(master_metrics_usdt["create_time"], utc=True)
-        master_metrics_usdt["timestamp_ms"] = (master_metrics_usdt["create_time"] - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta("1ms")
-        master_metrics_usdt.drop_duplicates(subset=["timestamp_ms"], inplace=True)
-        master_metrics_usdt.sort_values(by="timestamp_ms", inplace=True)
-        master_metrics_usdt.reset_index(drop=True, inplace=True)
-        
-        master_metrics = master_metrics_usdt.copy()
-        
-        if metric_dfs_usdc:
-            master_metrics_usdc = pd.concat(metric_dfs_usdc, ignore_index=True)
-            master_metrics_usdc["create_time"] = pd.to_datetime(master_metrics_usdc["create_time"], utc=True)
-            master_metrics_usdc["timestamp_ms"] = (master_metrics_usdc["create_time"] - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta("1ms")
-            master_metrics_usdc.drop_duplicates(subset=["timestamp_ms"], inplace=True)
-            master_metrics_usdc.sort_values(by="timestamp_ms", inplace=True)
-            
-            # Rename USDC columns and merge
-            usdc_sub = master_metrics_usdc[["timestamp_ms", "sum_open_interest", "sum_open_interest_value"]].copy()
-            usdc_sub.rename(columns={
-                "sum_open_interest": "sum_open_interest_usdc",
-                "sum_open_interest_value": "sum_open_interest_value_usdc"
-            }, inplace=True)
-            
-            master_metrics = pd.merge(master_metrics, usdc_sub, on="timestamp_ms", how="left")
-            
-            # Combine STABLECOIN-margined OI
-            master_metrics["sum_open_interest"] = master_metrics["sum_open_interest"].fillna(0) + master_metrics["sum_open_interest_usdc"].fillna(0)
-            master_metrics["sum_open_interest_value"] = master_metrics["sum_open_interest_value"].fillna(0) + master_metrics["sum_open_interest_value_usdc"].fillna(0)
-            master_metrics.drop(columns=["sum_open_interest_usdc", "sum_open_interest_value_usdc"], inplace=True)
+        # ----------------------------------------------------------------------
+        # BRIDGE LIVE REST METRICS FOR TODAY'S MISSING HOURS
+        # ----------------------------------------------------------------------
+        try:
+            print(f"[FETCHER] Bridging recent hours for {symbol} via live Binance Futures REST API...")
+            rest_oi_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/openInterestHist?symbol={symbol}&period=15m&limit=500")
+            rest_ls_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=15m&limit=500")
+            rest_top_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={symbol}&period=15m&limit=500")
+            rest_top_acc_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol={symbol}&period=15m&limit=500")
+            rest_tk_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/takerlongshortRatio?symbol={symbol}&period=15m&limit=500")
 
-        print(f"[FETCHER] Total Historical Metrics records loaded: {len(master_metrics):,} rows")
+            if rest_oi_raw and rest_ls_raw:
+                df_roi = pd.DataFrame(json.loads(rest_oi_raw.decode('utf-8')))
+                df_rls = pd.DataFrame(json.loads(rest_ls_raw.decode('utf-8')))
+                df_rtop = pd.DataFrame(json.loads(rest_top_raw.decode('utf-8'))) if rest_top_raw else pd.DataFrame()
+                df_rtop_acc = pd.DataFrame(json.loads(rest_top_acc_raw.decode('utf-8'))) if rest_top_acc_raw else pd.DataFrame()
+                df_rtk = pd.DataFrame(json.loads(rest_tk_raw.decode('utf-8'))) if rest_tk_raw else pd.DataFrame()
+
+                # Normalize columns
+                df_roi.rename(columns={
+                    "timestamp": "timestamp_ms",
+                    "sumOpenInterest": "sum_open_interest",
+                    "sumOpenInterestValue": "sum_open_interest_value"
+                }, inplace=True)
+                df_rls.rename(columns={"timestamp": "timestamp_ms", "longShortRatio": "count_long_short_ratio"}, inplace=True)
+                
+                rest_merged = df_roi[["timestamp_ms", "sum_open_interest", "sum_open_interest_value", "symbol"]].copy()
+                rest_merged = pd.merge(rest_merged, df_rls[["timestamp_ms", "count_long_short_ratio"]], on="timestamp_ms", how="left")
+                
+                if not df_rtop.empty:
+                    df_rtop.rename(columns={"timestamp": "timestamp_ms", "longShortRatio": "sum_toptrader_long_short_ratio"}, inplace=True)
+                    rest_merged = pd.merge(rest_merged, df_rtop[["timestamp_ms", "sum_toptrader_long_short_ratio"]], on="timestamp_ms", how="left")
+                
+                if not df_rtop_acc.empty:
+                    df_rtop_acc.rename(columns={"timestamp": "timestamp_ms", "longShortRatio": "count_toptrader_long_short_ratio"}, inplace=True)
+                    rest_merged = pd.merge(rest_merged, df_rtop_acc[["timestamp_ms", "count_toptrader_long_short_ratio"]], on="timestamp_ms", how="left")
+
+                if not df_rtk.empty:
+                    df_rtk.rename(columns={"timestamp": "timestamp_ms", "buySellRatio": "sum_taker_long_short_vol_ratio"}, inplace=True)
+                    rest_merged = pd.merge(rest_merged, df_rtk[["timestamp_ms", "sum_taker_long_short_vol_ratio"]], on="timestamp_ms", how="left")
+
+                rest_merged["create_time"] = pd.to_datetime(rest_merged["timestamp_ms"], unit="ms", utc=True)
+                for col in ["sum_open_interest", "sum_open_interest_value", "count_long_short_ratio", "sum_toptrader_long_short_ratio", "count_toptrader_long_short_ratio", "sum_taker_long_short_vol_ratio"]:
+                    if col in rest_merged.columns:
+                        rest_merged[col] = rest_merged[col].astype(float)
+
+                # Filter REST rows that are newer than the vision archives
+                max_archived_ts = master_metrics["timestamp_ms"].max() if not master_metrics.empty else 0
+                new_rest_rows = rest_merged[rest_merged["timestamp_ms"] > max_archived_ts].copy()
+                if not new_rest_rows.empty:
+                    master_metrics = pd.concat([master_metrics, new_rest_rows], ignore_index=True)
+                    master_metrics.drop_duplicates(subset=["timestamp_ms"], inplace=True)
+                    master_metrics.sort_values(by="timestamp_ms", inplace=True)
+                    master_metrics.reset_index(drop=True, inplace=True)
+                    print(f"  [FETCHER] Successfully stitched {len(new_rest_rows)} live REST metrics bars for {symbol} up to {master_metrics['create_time'].iloc[-1]} UTC.")
+        except Exception as e:
+            print(f"  [WARN] Live REST metrics bridge for {symbol} encountered non-fatal error: {e}")
+
+        print(f"[FETCHER] Total Historical Metrics records loaded for {symbol}: {len(master_metrics):,} rows")
         return master_metrics
 
     # --------------------------------------------------------------------------
     # 3. Continuous Funding Rates Ingestion (2020 -> Present)
     # --------------------------------------------------------------------------
-    def fetch_all_funding_rates(self, start_time_ms: int = 1577836800000) -> pd.DataFrame:
+    def fetch_all_funding_rates(self, symbol: str = "BTCUSDT", start_time_ms: int = 1577836800000) -> pd.DataFrame:
         """
         Fetches all 8h funding rates via paginated REST API.
         """
-        cache_file = os.path.join(self.funding_dir, "funding_rates_master.csv")
-        print("[FETCHER] Fetching Historical Funding Rates...")
+        cache_file = os.path.join(self.funding_dir, f"{symbol}_funding_rates_master.csv")
+        print(f"[FETCHER] Fetching Historical Funding Rates for {symbol}...")
         
         all_rates = []
         cur_start = start_time_ms
         while True:
-            url = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&startTime={cur_start}&limit=1000"
+            url = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol}&startTime={cur_start}&limit=1000"
             raw = self._fetch_url(url)
             if not raw:
                 break
@@ -442,7 +510,7 @@ class BinanceHistoricalFetcher:
             df.sort_values(by="fundingTime", inplace=True)
             df.reset_index(drop=True, inplace=True)
             df.to_csv(cache_file, index=False)
-            print(f"[FETCHER] Total Historical Funding Rates loaded: {len(df):,} events")
+            print(f"[FETCHER] Total Historical Funding Rates loaded for {symbol}: {len(df):,} events")
             return df
         elif os.path.exists(cache_file):
             return pd.read_csv(cache_file)

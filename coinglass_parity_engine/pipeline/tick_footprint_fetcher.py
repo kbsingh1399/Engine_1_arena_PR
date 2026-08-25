@@ -37,22 +37,34 @@ class TickFootprintFetcher:
                 time.sleep(1.0 * (attempt + 1))
         return None
 
-    def fetch_footprint(self, start_date: str = "2026-08-20") -> pd.DataFrame:
-        print(f"[FOOTPRINT] Fetching daily aggTrades from {start_date} and aggregating to 15m footprint...")
+    def fetch_footprint(self, symbol: str = "BTCUSDT", start_date: str = "2026-08-20") -> pd.DataFrame:
+        print(f"[FOOTPRINT] Fetching daily aggTrades for {symbol} from {start_date} and aggregating to 15m footprint...")
         now = datetime.now(timezone.utc)
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         day_diff = (now - start_dt).days
         all_dates = [(start_dt + pd.Timedelta(days=i)).strftime("%Y-%m-%d") for i in range(day_diff + 1)]
 
+        # Determine sensible price bin step for Footprint POC
+        if "BTC" in symbol:
+            bin_step = 25.0
+        elif "ETH" in symbol:
+            bin_step = 1.0
+        elif any(c in symbol for c in ["SOL", "BNB", "BCH", "AVAX", "LTC", "APT", "LINK"]):
+            bin_step = 0.1
+        elif any(c in symbol for c in ["DOT", "NEAR", "UNI", "SUI", "OP", "ARB"]):
+            bin_step = 0.01
+        else:
+            bin_step = 0.0001
+
         def _process_daily_ticks(ymd: str) -> Optional[pd.DataFrame]:
-            cache_file = os.path.join(self.fp_dir, f"BTCUSDT-footprint-15m-{ymd}.parquet")
+            cache_file = os.path.join(self.fp_dir, f"{symbol}-footprint-15m-{ymd}.parquet")
             if os.path.exists(cache_file):
                 try:
                     return pd.read_parquet(cache_file)
                 except Exception:
                     pass
             
-            url = f"https://data.binance.vision/data/futures/um/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-{ymd}.zip"
+            url = f"https://data.binance.vision/data/futures/um/daily/aggTrades/{symbol}/{symbol}-aggTrades-{ymd}.zip"
             data = self._fetch_url(url)
             if not data:
                 return None
@@ -64,7 +76,7 @@ class TickFootprintFetcher:
                 # agg_trade_id, price, quantity, first_trade_id, last_trade_id, transact_time, is_buyer_maker
                 df = pd.read_csv(io.StringIO(raw_text), header=None, names=[
                     "agg_trade_id", "price", "quantity", "first_trade_id", "last_trade_id", "transact_time", "is_buyer_maker"
-                ])
+                ], dtype=str)
                 
                 # For safety, if there's a header row inadvertently present
                 df = df[pd.to_numeric(df['transact_time'], errors='coerce').notnull()]
@@ -85,9 +97,9 @@ class TickFootprintFetcher:
                 # Align timestamps to 15m boundary
                 df["open_time_ms"] = (df["transact_time"] // 900000) * 900000
                 
-                # Compute real POC: bin prices to canonical $25.0 increments matching CoinGlass ladder
+                # Compute real POC: bin prices
                 df["price"] = df["price"].astype(np.float64)
-                df["price_bin"] = (df["price"] / 25.0).round() * 25.0
+                df["price_bin"] = (df["price"] / bin_step).round() * bin_step
                 
                 grouped = df.groupby("open_time_ms").agg(
                     total_vol_coin=pd.NamedAgg(column="quantity", aggfunc="sum"),
@@ -107,7 +119,7 @@ class TickFootprintFetcher:
                 grouped.to_parquet(cache_file, index=False)
                 return grouped
             except Exception as e:
-                print(f"[WARN] Error processing {ymd}: {e}")
+                print(f"[WARN] Error processing {symbol} {ymd}: {e}")
                 return None
 
         dfs = []
@@ -119,12 +131,12 @@ class TickFootprintFetcher:
                     dfs.append(res)
                     
         if not dfs:
-            print("[WARN] No footprint data loaded.")
+            print(f"[WARN] No footprint data loaded for {symbol}.")
             return pd.DataFrame()
             
         master = pd.concat(dfs, ignore_index=True)
         master.drop_duplicates(subset=["open_time_ms"], inplace=True)
         master.sort_values("open_time_ms", inplace=True)
         master.reset_index(drop=True, inplace=True)
-        print(f"[FOOTPRINT] Total footprint rows loaded: {len(master):,}")
+        print(f"[FOOTPRINT] Total footprint rows loaded for {symbol}: {len(master):,}")
         return master

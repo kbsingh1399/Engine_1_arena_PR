@@ -34,19 +34,20 @@ class HistoricalMetricsProcessor:
         metrics_df: pd.DataFrame,
         funding_df: pd.DataFrame,
         footprint_df: pd.DataFrame = None,
-        spot_df: pd.DataFrame = None
+        spot_df: pd.DataFrame = None,
+        symbol: str = "BTCUSDT"
     ) -> pd.DataFrame:
         """
         Executes end-to-end indicator calculation and produces a canonical multi-indicator DataFrame.
         """
-        print("[PROCESSOR] Processing Master Historical Dataset...")
+        print(f"[PROCESSOR] Processing Master Historical Dataset for {symbol}...")
         df = klines_df.copy()
         
         # 1. Base Timestamps and Symbol
         df["open_time_ms"] = df["open_time"].astype(np.int64)
         df["close_time_ms"] = df["close_time"].astype(np.int64)
         df["datetime_utc"] = pd.to_datetime(df["open_time_ms"], unit="ms", utc=True).dt.strftime("%Y-%m-%d %H:%M:%S")
-        df["symbol"] = "BTCUSDT"
+        df["symbol"] = symbol
 
         # 2. OHLCV Core
         df["open"] = df["open"].astype(np.float64)

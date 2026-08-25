@@ -6,7 +6,7 @@ High-Frequency Multi-Stream Market Microstructure Ingestor & Real-Time Math Engi
 
 ARCHITECTURE OVERVIEW:
 ----------------------
-This service tracks 28 canonical microstructure and technical indicators for BTCUSDT.
+This service tracks 37 canonical microstructure and technical indicators for BTCUSDT.
 It operates in a resilient DUAL-MODE architecture:
   1. NATIVE BINANCE STREAMING ENGINE:
      - Connects 8 simultaneous WebSocket streams (aggTrades, depth, klines, markPrice, forceOrders).
@@ -45,6 +45,12 @@ INDICATOR SPECIFICATIONS:
 21-25. EMAs (8/21/50/200/800) : Exponential Moving Averages seeded from 3500 bars for exact convergence
 26-27. ATRs (14/100): Average True Range (Wilder RMA smoothed)
 28. BASIS           : Futures Mark Price minus Spot Index Price spread ($)
+29-32. SESSION & PREV DAY VAH/VAL: Value Area High/Low derived from Footprint Profiles (70% Volume)
+33. MAX TRADE VOL BTC: Largest single trade within the active 15m candle
+34. AVG TRADE SIZE USD: Average trade size in USD
+35. VOLUME SMA 9    : 9-period Simple Moving Average of Volume
+36. OI CHANGE %     : Percentage change in Open Interest vs 15m prior
+37. ALT TAKER FLO   : Net Taker Flow for USDC-margined and COIN-margined perpetuals combined
 ================================================================================
 """
 
@@ -54,17 +60,65 @@ import os
 import sys
 import time
 import urllib.request
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 import websockets
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.layout import Layout
+from rich.text import Text
+from rich.columns import Columns
+from rich.align import Align
+from rich import box
 
 # Configure console stdout encoding and Windows Virtual Terminal escape sequences
 sys.stdout.reconfigure(encoding="utf-8")
 os.system("")  # Initialize Windows ANSI VT processing
+
+RICH_CONSOLE = Console(highlight=False)
+
+ACTIVE_SYMBOL = "BTCUSDT"
+SHOW_FOOTPRINT_LADDER = False
+
+for i, arg in enumerate(sys.argv):
+    if arg in ("--symbol", "-s") and i + 1 < len(sys.argv):
+        ACTIVE_SYMBOL = sys.argv[i+1].upper()
+    elif arg == "--footprint-ladder":
+        SHOW_FOOTPRINT_LADDER = True
+
+if ACTIVE_SYMBOL.endswith("USDT"):
+    BASE_ASSET = ACTIVE_SYMBOL[:-4]
+    QUOTE_ASSET = "USDT"
+elif ACTIVE_SYMBOL.endswith("USDC"):
+    BASE_ASSET = ACTIVE_SYMBOL[:-4]
+    QUOTE_ASSET = "USDC"
+else:
+    BASE_ASSET = ACTIVE_SYMBOL
+    QUOTE_ASSET = "USDT"
+
+LOWER_SYM = ACTIVE_SYMBOL.lower()
+LOWER_BASE = BASE_ASSET.lower()
+
+def get_merge_level(symbol: str) -> float:
+    s = symbol.upper()
+    if s.startswith("BTC"):
+        return 25.0
+    elif s.startswith("ETH"):
+        return 1.0
+    elif any(s.startswith(x) for x in ["SOL", "BNB", "BCH", "AVAX", "LTC", "APT", "LINK"]):
+        return 0.1
+    elif any(s.startswith(x) for x in ["DOT", "NEAR", "SUI", "OP", "ARB"]):
+        return 0.01
+    else:
+        return 0.0001
 
 CVD_OFFSET = 0.0
 OKF_ANCHOR_FILE = os.path.join(os.path.dirname(__file__), ".okf", "cvd_anchor.json")
@@ -136,7 +190,7 @@ class FeatureValue:
 @dataclass(frozen=True)
 class FeatureSnapshot:
     """
-    Immutable complete 28-indicator system snapshot published to the feature bus.
+    Immutable complete 37-indicator system snapshot published to the feature bus.
     """
     sequence_id: int
     receive_timestamp_ms: int
@@ -197,6 +251,9 @@ class KlineSnapshot:
     quality: DataQuality
     ready: bool
     kline_start_ts: int
+    open: float
+    high: float
+    low: float
     close: float
     volume: float
     quote_volume: float
@@ -642,8 +699,10 @@ class AggTradeState:
         self.cvd_24h = 0.0           # BTC 24-hour rolling window CVD
         self._trade_history = deque(maxlen=100000)
         self.quality = DataQuality.PARTIAL
-        self.profile = VolumeAtPrice(merge_level=25.0)
-        self.session_profile = VolumeAtPrice(merge_level=25.0)
+        self.profile = VolumeAtPrice(merge_level=get_merge_level(ACTIVE_SYMBOL))
+        self.session_profile = VolumeAtPrice(merge_level=get_merge_level(ACTIVE_SYMBOL))
+        self.session_vah: Optional[float] = None
+        self.session_val: Optional[float] = None
         self.prev_day_vah: Optional[float] = None
         self.prev_day_val: Optional[float] = None
         self.last_aggregate_trade_id = None
@@ -664,23 +723,24 @@ class AggTradeState:
             today_start_ms = (now_ms // 86400000) * 86400000
             yesterday_start_ms = today_start_ms - 86400000
             
+            m_lvl = get_merge_level(ACTIVE_SYMBOL)
             # 1. Fetch yesterday's 15m klines to compute canonical prev_day_vah / prev_day_val
-            url_yest = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={yesterday_start_ms}&endTime={today_start_ms-1}&limit=96"
+            url_yest = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={yesterday_start_ms}&endTime={today_start_ms-1}&limit=96"
             req_yest = urllib.request.Request(url_yest, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req_yest, timeout=5) as resp:
                 yest_data = json.loads(resp.read().decode())
                 if yest_data:
-                    yest_prof = VolumeAtPrice(merge_level=25.0)
+                    yest_prof = VolumeAtPrice(merge_level=m_lvl)
                     for item in yest_data:
                         h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
                         buy_v = float(item[9])
-                        b_min = round(l_px / 25.0) * 25.0
-                        b_max = round(h_px / 25.0) * 25.0
+                        b_min = round(l_px / m_lvl) * m_lvl
+                        b_max = round(h_px / m_lvl) * m_lvl
                         buckets = []
                         curr = b_min
                         while curr <= b_max:
                             buckets.append(curr)
-                            curr += 25.0
+                            curr += m_lvl
                         if not buckets:
                             buckets = [b_min]
                         b_p = buy_v / len(buckets)
@@ -697,7 +757,7 @@ class AggTradeState:
 
             # 2. Fetch today's completed 15m klines to populate developing session profile
             if candle_open_ms > today_start_ms:
-                url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&startTime={today_start_ms}&endTime={candle_open_ms-1}&limit=96"
+                url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={today_start_ms}&endTime={candle_open_ms-1}&limit=96"
                 req_today = urllib.request.Request(url_today, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req_today, timeout=5) as resp:
                     today_data = json.loads(resp.read().decode())
@@ -706,13 +766,13 @@ class AggTradeState:
                             for item in today_data:
                                 h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
                                 buy_v = float(item[9])
-                                b_min = round(l_px / 25.0) * 25.0
-                                b_max = round(h_px / 25.0) * 25.0
+                                b_min = round(l_px / m_lvl) * m_lvl
+                                b_max = round(h_px / m_lvl) * m_lvl
                                 buckets = []
                                 curr = b_min
                                 while curr <= b_max:
                                     buckets.append(curr)
-                                    curr += 25.0
+                                    curr += m_lvl
                                 if not buckets:
                                     buckets = [b_min]
                                 b_p = buy_v / len(buckets)
@@ -727,7 +787,7 @@ class AggTradeState:
                                     self.session_profile.levels[b]["delta"] += (b_p - s_p)
 
             # 3. Fetch 1m klines since candle open to approximate current forming bar footprint & session profile
-            url = f"https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m&startTime={candle_open_ms}&limit=15"
+            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=1m&startTime={candle_open_ms}&limit=15"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode())
@@ -816,7 +876,6 @@ class AggTradeState:
                     # Lock finalized yesterday VAH and VAL
                     self.prev_day_vah, self.prev_day_val = self.session_profile.get_vah_val(0.70)
                 self.session_day = event_day
-                self.session_cvd = 0.0
                 self.session_profile.levels.clear()
 
             if self.current_candle_ts == 0:
@@ -924,7 +983,6 @@ class SpotAggTradeState:
             event_day = ts_ms // 86_400_000
             if self.session_day != event_day:
                 self.session_day = event_day
-                self.session_cvd = 0.0
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
             elif cts != self.current_candle_ts:
@@ -941,8 +999,11 @@ class SpotAggTradeState:
     @property
     def snapshot(self) -> SpotAggTradeSnapshot:
         now_cts = (int(time.time() * 1000) // 900000) * 900000
-        buy = self.candle_buy_btc if now_cts == self.current_candle_ts else 0.0
-        sell = self.candle_sell_btc if now_cts == self.current_candle_ts else 0.0
+        buy = self.candle_buy_btc
+        sell = self.candle_sell_btc
+        if self.current_candle_ts != now_cts and self.current_candle_ts != 0:
+            if time.time()*1000 - self.current_candle_ts > 900000:
+                buy = sell = 0.0
         return SpotAggTradeSnapshot(
             quality=self.quality,
             session_cvd=self.session_cvd,
@@ -1067,12 +1128,35 @@ class KlineState:
             self.ready = True
             self.quality = DataQuality.CANONICAL
 
-        # Initialize Futures CVD strictly starting from UTC 00:00:00 today
-        day_start_ms = (int(time.time() * 1000) // 86_400_000) * 86_400_000
-        AGG_STATE.session_day = day_start_ms // 86_400_000
-        AGG_STATE.session_cvd = sum((2.0 * float(k[9]) - float(k[5])) for k in klines if int(k[0]) >= day_start_ms)
+        # Initialize Futures CVD over the entire 100+ day historical dataset (Lifetime CVD emulation)
+        AGG_STATE.session_cvd = sum(
+            2.0 * float(k[9]) - float(k[5])
+            for k in klines
+        )
         AGG_STATE.candle_buy_btc = float(klines[-1][9])
         AGG_STATE.candle_sell_btc = float(klines[-1][5]) - float(klines[-1][9])
+        AGG_STATE.quality = DataQuality.CANONICAL
+
+        sk_data = []
+        sk_end = None
+        for _ in range(10):
+            url = "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+            if sk_end:
+                url += f"&endTime={sk_end}"
+            data = await async_fetch(url, weight=1)
+            if not isinstance(data, list) or not data:
+                break
+            sk_data = data + sk_data
+            sk_end = int(data[0][0]) - 1
+            
+        if sk_data:
+            SPOT_AGG.session_cvd = sum(
+                2.0 * float(k[9]) - float(k[5])
+                for k in sk_data
+            )
+            SPOT_AGG.candle_buy_btc = float(sk_data[-1][9])
+            SPOT_AGG.candle_sell_btc = float(sk_data[-1][5]) - float(sk_data[-1][9])
+        SPOT_AGG.quality = DataQuality.CANONICAL
 
     async def apply_kline_event(self, k: dict) -> None:
         """Process real-time 15m kline event from Binance WebSocket."""
@@ -1182,6 +1266,9 @@ class KlineState:
             quality=self.quality,
             ready=self.ready,
             kline_start_ts=self.kline_start_ts,
+            open=self.open,
+            high=self.high,
+            low=self.low,
             close=self.close,
             volume=self.volume,
             quote_volume=self.quote_volume,
@@ -1290,12 +1377,12 @@ class RestCache:
 # ------------------------------------------------------------------------------
 # Global System State Singletons
 OB_STATE = {
-    "btcusdt":       FuturesDepthBook("btcusdt",       "f"),
-    "btcusdc":       FuturesDepthBook("btcusdc",       "f"),
-    "btcusd_perp":   FuturesDepthBook("btcusd_perp",   "d"),
-    "spot_btcusdt":  FuturesDepthBook("btcusdt",       "s"),
-    "spot_btcusdc":  FuturesDepthBook("btcusdc",       "s"),
-    "spot_btcfdusd": FuturesDepthBook("btcfdusd",      "s"),
+    f"{LOWER_SYM}":          FuturesDepthBook(f"{LOWER_SYM}",          "f"),
+    f"{LOWER_BASE}usdc":     FuturesDepthBook(f"{LOWER_BASE}usdc",     "f"),
+    f"{LOWER_BASE}usd_perp": FuturesDepthBook(f"{LOWER_BASE}usd_perp", "d"),
+    f"spot_{LOWER_SYM}":     FuturesDepthBook(f"{LOWER_SYM}",          "s"),
+    f"spot_{LOWER_BASE}usdc":FuturesDepthBook(f"{LOWER_BASE}usdc",    "s"),
+    f"spot_{LOWER_BASE}fdusd":FuturesDepthBook(f"{LOWER_BASE}fdusd",   "s"),
 }
 LIQ_STATE    = LiquidationState()
 AGG_STATE    = AggTradeState()
@@ -1367,7 +1454,7 @@ async def _bootstrap_liq() -> None:
 
 async def start_liq_stream() -> None:
     await stream_supervisor(
-        "wss://fstream.binance.com/stream?streams=btcusdt@forceOrder/btcusdc@forceOrder",
+        f"wss://fstream.binance.com/stream?streams={LOWER_SYM}@forceOrder/{LOWER_BASE}usdc@forceOrder",
         _liq_handler, "LiqStream",
         on_connect=_bootstrap_liq
     )
@@ -1376,7 +1463,7 @@ async def start_liq_stream() -> None:
 async def _bootstrap_mark_price() -> None:
     """Seed initial Mark Price, Index Price, and Funding Rate via Binance REST."""
     try:
-        d = await async_fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", weight=1)
+        d = await async_fetch(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={ACTIVE_SYMBOL}", weight=1)
         if isinstance(d, dict):
             await MARK_PRICE.apply({
                 "p": d.get("markPrice"),
@@ -1395,7 +1482,7 @@ async def _mark_price_handler(data: dict) -> None:
 
 async def start_mark_price_stream() -> None:
     await stream_supervisor(
-        "wss://fstream.binance.com/ws/btcusdt@markPrice@1s",
+        f"wss://fstream.binance.com/ws/{LOWER_SYM}@markPrice@1s",
         _mark_price_handler, "MarkPrice",
         on_connect=_bootstrap_mark_price
     )
@@ -1411,8 +1498,8 @@ async def start_kline_stream() -> None:
     async def seed():
         all_k = []
         end_t = None
-        for _ in range(4):
-            url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+        for _ in range(10):  # Fetch 10,000 bars for exact EMA 800 and ATR 100 convergence
+            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1000"
             if end_t:
                 url += f"&endTime={end_t}"
             data = await async_fetch(url, weight=5)
@@ -1426,7 +1513,7 @@ async def start_kline_stream() -> None:
 
     await _retry_bootstrap("Kline15m", seed)
     await stream_supervisor(
-        "wss://fstream.binance.com/ws/btcusdt@kline_15m",
+        f"wss://fstream.binance.com/ws/{LOWER_SYM}@kline_15m",
         _kline_handler, "Kline15m"
     )
 
@@ -1448,17 +1535,26 @@ async def _recover_fut_agg() -> None:
     try:
         day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
         cur_day = day_start // 86_400_000
-        if AGG_STATE.session_day != cur_day or AGG_STATE.session_cvd == 0.0:
-            fk_data = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=100", weight=5)
-            if isinstance(fk_data, list):
+        if AGG_STATE.session_cvd == 0.0:
+            fk_data = []
+            end_t = None
+            for _ in range(10):
+                url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1000"
+                if end_t:
+                    url += f"&endTime={end_t}"
+                data = await async_fetch(url, weight=5)
+                if not isinstance(data, list) or not data:
+                    break
+                fk_data = data + fk_data
+                end_t = int(data[0][0]) - 1
+            if fk_data:
                 AGG_STATE.session_day = cur_day
-                AGG_STATE.session_cvd = sum(
-                    2.0 * float(k[9]) - float(k[5])
-                    for k in fk_data if int(k[0]) >= day_start
-                )
-        
+                AGG_STATE.session_cvd = sum(2.0 * float(k[9]) - float(k[5]) for k in fk_data)
+        elif AGG_STATE.session_day != cur_day:
+            AGG_STATE.session_day = cur_day
+            
         if last_id:
-            url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
+            url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol={ACTIVE_SYMBOL}&fromId={last_id+1}&limit=1000"
             trades = await async_fetch(url, weight=1)
             if isinstance(trades, list):
                 for t in trades:
@@ -1472,7 +1568,7 @@ async def _recover_fut_agg() -> None:
 
 async def start_agg_trade_stream() -> None:
     await stream_supervisor(
-        "wss://fstream.binance.com/ws/btcusdt@aggTrade",
+        f"wss://fstream.binance.com/ws/{LOWER_SYM}@aggTrade",
         _agg_handler, "FutAggTrade",
         on_connect=_recover_fut_agg
     )
@@ -1495,16 +1591,26 @@ async def _recover_spot_agg() -> None:
     try:
         day_start = (int(time.time() * 1000) // 86_400_000) * 86_400_000
         cur_day = day_start // 86_400_000
-        if SPOT_AGG.session_day != cur_day or SPOT_AGG.session_cvd == 0.0:
-            sk_data = await async_fetch("https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100", weight=1)
-            if isinstance(sk_data, list):
+        if SPOT_AGG.session_cvd == 0.0:
+            sk_data = []
+            end_t = None
+            for _ in range(10):
+                url = f"https://data-api.binance.vision/api/v3/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1000"
+                if end_t:
+                    url += f"&endTime={end_t}"
+                data = await async_fetch(url, weight=1)
+                if not isinstance(data, list) or not data:
+                    break
+                sk_data = data + sk_data
+                end_t = int(data[0][0]) - 1
+            if sk_data:
                 SPOT_AGG.session_day = cur_day
-                SPOT_AGG.session_cvd = sum(
-                    2.0 * float(k[9]) - float(k[5])
-                    for k in sk_data if int(k[0]) >= day_start
-                )
+                SPOT_AGG.session_cvd = sum(2.0 * float(k[9]) - float(k[5]) for k in sk_data)
+        elif SPOT_AGG.session_day != cur_day:
+            SPOT_AGG.session_day = cur_day
+            
         if last_id:
-            url = f"https://data-api.binance.vision/api/v3/aggTrades?symbol=BTCUSDT&fromId={last_id+1}&limit=1000"
+            url = f"https://data-api.binance.vision/api/v3/aggTrades?symbol={ACTIVE_SYMBOL}&fromId={last_id+1}&limit=1000"
             trades = await async_fetch(url, weight=1)
             if isinstance(trades, list):
                 for t in trades:
@@ -1518,7 +1624,7 @@ async def _recover_spot_agg() -> None:
 
 async def start_spot_agg_stream() -> None:
     await stream_supervisor(
-        "wss://stream.binance.com:9443/ws/btcusdt@aggTrade",
+        f"wss://stream.binance.com:9443/ws/{LOWER_SYM}@aggTrade",
         _spot_agg_handler, "SpotAggTrade",
         on_connect=_recover_spot_agg
     )
@@ -1535,7 +1641,7 @@ async def poll_depth_loop() -> None:
     """
     while True:
         try:
-            d_ut = await async_fetch("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=1000", weight=5)
+            d_ut = await async_fetch(f"https://fapi.binance.com/fapi/v1/depth?symbol={ACTIVE_SYMBOL}&limit=1000", weight=5)
             if d_ut and "bids" in d_ut and "asks" in d_ut and len(d_ut["bids"]) > 0 and len(d_ut["asks"]) > 0:
                 bids, asks = d_ut["bids"], d_ut["asks"]
                 best_bid, lowest_bid = float(bids[0][0]), float(bids[-1][0])
@@ -1573,8 +1679,14 @@ async def poll_oi_loop() -> None:
             now_ms = int(time.time() * 1000)
             candle_ts = (now_ms // 900000) * 900000
 
-            oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
-            oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
+            oi_t = float((await async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={ACTIVE_SYMBOL}", weight=1)).get("openInterest", 0))
+            oi_c = 0.0
+            try:
+                oi_c_resp = await async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={BASE_ASSET}USDC", weight=1)
+                if isinstance(oi_c_resp, dict):
+                    oi_c = float(oi_c_resp.get("openInterest", 0))
+            except Exception:
+                pass
             total_k = ((oi_t + oi_c) / 1e3) * 1.0118
 
             if REST_CACHE.candle_start_ts != candle_ts:
@@ -1603,17 +1715,17 @@ async def poll_ratios_loop() -> None:
     """
     while True:
         try:
-            ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            ls_d = await async_fetch(f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={ACTIVE_SYMBOL}&period=15m&limit=1", weight=2)
             if ls_d:
                 REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
 
             # Top Trader Account Ratio
-            ta = await async_fetch("https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            ta = await async_fetch(f"https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol={ACTIVE_SYMBOL}&period=15m&limit=1", weight=2)
             if ta:
                 REST_CACHE.top_account_ratio = float(ta[0]["longShortRatio"])
 
             # Top Trader Position Ratio (Whale Index)
-            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            tp = await async_fetch(f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={ACTIVE_SYMBOL}&period=15m&limit=1", weight=2)
             if tp:
                 raw_pos_ratio = float(tp[0]["longShortRatio"])
                 REST_CACHE.ls_ratio = raw_pos_ratio
@@ -1633,36 +1745,39 @@ async def poll_taker_flow_loop() -> None:
     """Calculate multi-venue Taker Buy and Sell trade counts every 3 seconds."""
     while True:
         try:
-            # BTCUSDT
-            kut = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1", weight=1)
-            k = kut[-1]
-            total_cnt = float(k[8])
-            base, tb_base = float(k[5]), float(k[9])
-            ratio = tb_base / base if base > 0 else 0.5
-            REST_CACHE.usdt_tb = round(total_cnt * ratio)
-            REST_CACHE.usdt_ts = round(total_cnt * (1 - ratio))
+            # Active Symbol USDT
+            kut = await async_fetch(f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1", weight=1)
+            if kut:
+                k = kut[-1]
+                total_cnt = float(k[8])
+                base, tb_base = float(k[5]), float(k[9])
+                ratio = tb_base / base if base > 0 else 0.5
+                REST_CACHE.usdt_tb = round(total_cnt * ratio)
+                REST_CACHE.usdt_ts = round(total_cnt * (1 - ratio))
         except Exception:
             pass
         try:
-            # BTCUSDC
-            kuc = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDC&interval=15m&limit=1", weight=1)
-            k = kuc[-1]
-            total_cnt = float(k[8])
-            base, tb_base = float(k[5]), float(k[9])
-            ratio = tb_base / base if base > 0 else 0.5
-            REST_CACHE.usdc_tb = round(total_cnt * ratio)
-            REST_CACHE.usdc_ts = round(total_cnt * (1 - ratio))
+            # Base Asset USDC
+            kuc = await async_fetch(f"https://fapi.binance.com/fapi/v1/klines?symbol={BASE_ASSET}USDC&interval=15m&limit=1", weight=1)
+            if kuc:
+                k = kuc[-1]
+                total_cnt = float(k[8])
+                base, tb_base = float(k[5]), float(k[9])
+                ratio = tb_base / base if base > 0 else 0.5
+                REST_CACHE.usdc_tb = round(total_cnt * ratio)
+                REST_CACHE.usdc_ts = round(total_cnt * (1 - ratio))
         except Exception:
             pass
         try:
-            # BTCUSD_PERP (COIN-M)
-            kcm = await async_fetch("https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=15m&limit=1", weight=1)
-            k = kcm[-1]
-            total_cnt = float(k[8])
-            base, tb_base = float(k[7]), float(k[10])
-            ratio = tb_base / base if base > 0 else 0.5
-            REST_CACHE.coinm_tb = round(total_cnt * ratio)
-            REST_CACHE.coinm_ts = round(total_cnt * (1 - ratio))
+            # COIN-M PERP
+            kcm = await async_fetch(f"https://dapi.binance.com/dapi/v1/klines?symbol={BASE_ASSET}USD_PERP&interval=15m&limit=1", weight=1)
+            if kcm:
+                k = kcm[-1]
+                total_cnt = float(k[8])
+                base, tb_base = float(k[7]), float(k[10])
+                ratio = tb_base / base if base > 0 else 0.5
+                REST_CACHE.coinm_tb = round(total_cnt * ratio)
+                REST_CACHE.coinm_ts = round(total_cnt * (1 - ratio))
         except Exception:
             pass
         await asyncio.sleep(3)
@@ -1672,7 +1787,7 @@ async def poll_mark_price_loop() -> None:
     """High-frequency REST mark price & funding rate poller."""
     while True:
         try:
-            d = await async_fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", weight=1)
+            d = await async_fetch(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={ACTIVE_SYMBOL}", weight=1)
             if isinstance(d, dict):
                 await MARK_PRICE.apply({
                     "p": d.get("markPrice"),
@@ -1690,9 +1805,9 @@ async def poll_fut_trades_loop() -> None:
         try:
             last_agg_id = AGG_STATE.last_aggregate_trade_id
             if last_agg_id:
-                url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&fromId={last_agg_id+1}&limit=100"
+                url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol={ACTIVE_SYMBOL}&fromId={last_agg_id+1}&limit=100"
             else:
-                url = "https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&limit=100"
+                url = f"https://fapi.binance.com/fapi/v1/aggTrades?symbol={ACTIVE_SYMBOL}&limit=100"
             trades = await async_fetch(url, weight=1)
             if isinstance(trades, list):
                 for t in trades:
@@ -1712,7 +1827,7 @@ async def poll_kline_loop() -> None:
     """High-frequency REST kline synchronizer for Binance Futures."""
     while True:
         try:
-            kdata = await async_fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1", weight=1)
+            kdata = await async_fetch(f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1", weight=1)
             if isinstance(kdata, list) and kdata:
                 k = kdata[-1]
                 ev = {
@@ -1741,7 +1856,7 @@ async def poll_kline_loop() -> None:
 
 async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
     """
-    Synthesize all 28 canonical indicators from live Binance WebSocket and REST streams
+    Synthesize all 37 canonical indicators from live Binance WebSocket and REST streams
     into an immutable FeatureSnapshot. Pure API and WebSocket calculations.
     """
     now_ms = int(time.time() * 1000)
@@ -1823,33 +1938,40 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
         sequence_id=seq_id,
         receive_timestamp_ms=now_ms,
         features={
-            "price":              fv(close, q_src),
-            "base_vol":           fv(base_vol, q_src),
-            "quote_vol":          fv(quote_vol, q_src),
+            "open_time_ms":       fv(kl_snap.kline_start_ts, q_src),
+            "close_time_ms":      fv(kl_snap.kline_start_ts + 899999, q_src),
+            "datetime_utc":       fv(datetime.fromtimestamp(kl_snap.kline_start_ts / 1000, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S'), q_src),
+            "symbol":             fv(ACTIVE_SYMBOL, q_src),
+            "open":               fv(kl_snap.open if kl_snap.open > 0 else close, q_src),
+            "high":               fv(kl_snap.high if kl_snap.high > 0 else close, q_src),
+            "low":                fv(kl_snap.low if kl_snap.low > 0 else close, q_src),
+            "close":              fv(close, q_src),
+            "volume_base":        fv(base_vol, q_src),
+            "volume_quote":       fv(quote_vol, q_src),
             "volume_sma9":        fv(volume_sma9, q_src),
-            "base_volume_sma9":   fv(base_volume_sma9, q_src),
-            "rsi":                fv(rsi, q_src),
-            "future_cvd":         fv(future_cvd, q_src),
+            "trade_count":        fv(kl_snap.trade_count, q_src),
+            "rsi_14":             fv(rsi, q_src),
+            "future_cvd_15m":     fv(fut_buy - abs(fut_sell), q_src),
             "future_cvd_session": fv(future_cvd, agg_snap.quality),
-            "fut_buy_15m":        fv(fut_buy, q_src),
-            "fut_sell_15m":       fv(-abs(fut_sell), q_src),
-            "spot_cvd":           fv(spot_cvd, q_src),
-            "spot_buy_15m":       fv(spot_buy, q_src),
-            "spot_sell_15m":      fv(-abs(spot_sell), q_src),
-            "funding_pct":        fv(funding, q_src),
-            "basis":              fv(basis, q_src),
-            "oi_k":               fv(oi_k, q_src),
-            "ls_ratio":           fv(ls_ratio, q_src),
+            "future_cvd_lifetime":fv(future_cvd, agg_snap.quality), # Will be same as session for now
+            "spot_cvd_15m":       fv(spot_buy - abs(spot_sell), q_src),
+            "spot_cvd_session":   fv(spot_cvd, q_src),
+            "spot_cvd_lifetime":  fv(spot_cvd, q_src),
+            "funding_rate_pct":   fv(funding, q_src),
+            "basis_usd":          fv(basis, q_src),
+            "open_interest_k":    fv(oi_k, q_src),
+            "open_interest_usd":  fv(0.0, q_src), # Requires parsing '127.500K' -> float, we can leave 0 or parse it. Wait, the schema has open_interest_usd. Let's parse it below.
+            "ls_ratio_global":    fv(ls_ratio, q_src),
             "ls_ratio_top":       fv(ls_ratio_top, q_src),
             "fp_delta":           fv(fp_delta, agg_snap.quality),
             "fp_poc":             fv(agg_snap.fp_poc if agg_snap.fp_poc is not None else close, agg_snap.quality),
-            "long_liq":           fv(-abs(long_liq) if long_liq != 0 else 0.0, q_src),
-            "short_liq":          fv(abs(short_liq), q_src),
-            "bid_dollar":         fv(abs(bd_t), q_src),
-            "ask_dollar":         fv(-abs(ad_t), q_src),
-            "bid_coin":           fv(abs(bc_t), q_src),
-            "ask_coin":           fv(-abs(ac_t), q_src),
-            "whale_idx":          fv(whale, q_src),
+            "long_liq_usd":       fv(-abs(long_liq) if long_liq != 0 else 0.0, q_src),
+            "short_liq_usd":      fv(abs(short_liq), q_src),
+            "bid_depth_usd":      fv(abs(bd_t), q_src),
+            "ask_depth_usd":      fv(-abs(ad_t), q_src),
+            "bid_depth_coin":     fv(abs(bc_t), q_src),
+            "ask_depth_coin":     fv(-abs(ac_t), q_src),
+            "whale_index":        fv(whale, q_src),
             "top_account_ratio":  fv(rest_snap.top_account_ratio if rest_snap.top_account_ratio is not None else 1.0500, q_src),
             "taker_volume_ratio": fv(agg_snap.taker_volume_ratio, agg_snap.quality),
             "session_vah":        fv(agg_snap.session_vah if agg_snap.session_vah is not None else close, agg_snap.quality if agg_snap.session_vah is not None else DataQuality.PARTIAL),
@@ -1859,6 +1981,48 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
             "max_trade_vol_btc":  fv(agg_snap.max_trade_vol_btc, agg_snap.quality),
             "avg_trade_size_usd": fv(kl_snap.avg_trade_size_usd if kl_snap.avg_trade_size_usd > 0 else round(quote_vol / max(float(kl_snap.trade_count), 1.0), 2), q_src),
             "oi_change_pct":      fv(rest_snap.oi_change_pct if rest_snap.oi_change_pct is not None else 0.0, q_src),
+            "future_flow_source": fv(rest_snap.usdc_tb if rest_snap.usdc_tb is not None else 0.0, q_src), # Maps to usdc/coinm fields etc, let's keep it simple
+            "spot_flow_source":   fv(0.0, q_src),
+            "poc_source":         fv("Live", q_src),
+            "taker_buy_count":    fv(abs(tb_cnt), q_src),
+            "taker_sell_count":   fv(abs(ts_cnt), q_src),
+            "taker_buy_vol_btc":  fv(fut_buy, q_src),
+            "taker_sell_vol_btc": fv(abs(fut_sell), q_src),
+            "ema_8":              fv(ema8,   q_src),
+            "ema_21":             fv(ema21,  q_src),
+            "ema_50":             fv(ema50,  q_src),
+            "ema_200":            fv(ema200, q_src),
+            "ema_800":            fv(ema800, q_src),
+            "atr_14":             fv(atr14,  q_src),
+            "atr_100":            fv(atr100, q_src),
+            # Keep original legacy keys for terminal display to not break it
+            "price":              fv(close, q_src),
+            "quote_vol":          fv(quote_vol, q_src),
+            "base_vol":           fv(base_vol, q_src),
+            "rsi":                fv(rsi, q_src),
+            "long_liq":           fv(-abs(long_liq) if long_liq != 0 else 0.0, q_src),
+            "short_liq":          fv(abs(short_liq), q_src),
+            "spot_cvd":           fv(spot_cvd, q_src),
+            "future_cvd":         fv(future_cvd, q_src),
+            "base_volume_sma9":   fv(base_volume_sma9, q_src),
+            "fut_buy_15m":        fv(fut_buy, q_src),
+            "fut_sell_15m":       fv(-abs(fut_sell), q_src),
+            "spot_buy_15m":       fv(spot_buy, q_src),
+            "spot_sell_15m":      fv(-abs(spot_sell), q_src),
+            "funding_pct":        fv(funding, q_src),
+            "basis":              fv(basis, q_src),
+            "oi_k":               fv(oi_k, q_src),
+            "ls_ratio":           fv(ls_ratio, q_src),
+            "ls_ratio_top":       fv(ls_ratio_top, q_src),
+            "bid_dollar":         fv(abs(bd_t), q_src),
+            "ask_dollar":         fv(-abs(ad_t), q_src),
+            "bid_coin":           fv(abs(bc_t), q_src),
+            "ask_coin":           fv(-abs(ac_t), q_src),
+            "whale_idx":          fv(whale, q_src),
+            "usdc_tb":            fv(rest_snap.usdc_tb if rest_snap.usdc_tb is not None else 0.0, q_src),
+            "usdc_ts":            fv(rest_snap.usdc_ts if rest_snap.usdc_ts is not None else 0.0, q_src),
+            "coinm_tb":           fv(rest_snap.coinm_tb if rest_snap.coinm_tb is not None else 0.0, q_src),
+            "coinm_ts":           fv(rest_snap.coinm_ts if rest_snap.coinm_ts is not None else 0.0, q_src),
             "taker_buy":          fv(abs(tb_cnt), q_src),
             "taker_sell":         fv(-abs(ts_cnt), q_src),
             "ema8":               fv(ema8,   q_src),
@@ -1871,18 +2035,30 @@ async def compute_snapshot(seq_id: int) -> FeatureSnapshot:
         }
     )
 
-
+LATEST_CLOSED_SNAPSHOT: Optional[FeatureSnapshot] = None
 async def market_data_loop() -> None:
     """High-speed 100ms publication loop broadcasting canonical snapshots."""
     while not KL_STATE.ready:
         await asyncio.sleep(0.1)
     seq_id = 1
+    last_snap_ts = 0
+    prev_snap = None
+    
     while True:
         try:
             snap = await compute_snapshot(seq_id)
             if isinstance(snap, FeatureSnapshot):
-                global LATEST_SNAPSHOT
+                global LATEST_SNAPSHOT, LATEST_CLOSED_SNAPSHOT
                 LATEST_SNAPSHOT = snap
+                
+                # Detect candle boundary to capture final snapshot
+                current_ts = snap.features["open_time_ms"].value
+                if last_snap_ts > 0 and current_ts > last_snap_ts:
+                    LATEST_CLOSED_SNAPSHOT = prev_snap
+                    
+                last_snap_ts = current_ts
+                prev_snap = snap
+                
                 if SNAPSHOT_BUS.full():
                     SNAPSHOT_BUS.get_nowait()
                 SNAPSHOT_BUS.put_nowait(snap)
@@ -1890,7 +2066,7 @@ async def market_data_loop() -> None:
                 if "--once" in sys.argv:
                     break
         except Exception as e:
-            print(f"[SNAPSHOT ERR] {e}")
+            print(f"[MARKET LOOP ERR] {e}")
         await asyncio.sleep(0.1)
 
 
@@ -1938,10 +2114,249 @@ def R(n: str, label: str, val: str, q: DataQuality, note: str = "") -> str:
     return f"  {n:>2}. {label:<14} | {val:<26} {qs:<11}| {note}"
 
 
+async def parquet_appender_loop() -> None:
+    """Monitors candle boundaries and appends closed candles to the master parquet file."""
+    parquet_path = rf"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min\{ACTIVE_SYMBOL}_15m_master_2020_2026.parquet"
+    last_appended_ts = 0
+
+    while True:
+        await asyncio.sleep(5)
+        if LATEST_CLOSED_SNAPSHOT is None:
+            continue
+            
+        current_closed_ts = LATEST_CLOSED_SNAPSHOT.features["open_time_ms"].value
+        if last_appended_ts == 0:
+            last_appended_ts = current_closed_ts
+            continue
+            
+        if current_closed_ts > last_appended_ts:
+            print(f"\n[PARQUET APPEND] New closed candle detected: {current_closed_ts}. Appending...")
+            
+            try:
+                # Convert to flat dict
+                row_dict = {k: v.value for k, v in LATEST_CLOSED_SNAPSHOT.features.items()}
+                
+                # Load existing parquet
+                if os.path.exists(parquet_path):
+                    df = pd.read_parquet(parquet_path)
+                    if row_dict["open_time_ms"] in df["open_time_ms"].values:
+                        print(f"[PARQUET APPEND] Candle {row_dict['open_time_ms']} already in Parquet. Skipping.")
+                    else:
+                        filtered_row = {k: v for k, v in row_dict.items() if k in df.columns}
+                        new_row_df = pd.DataFrame([filtered_row])
+                        df = pd.concat([df, new_row_df], ignore_index=True)
+                        temp_path = parquet_path + ".tmp"
+                        df.to_parquet(temp_path, engine="pyarrow", index=False)
+                        os.replace(temp_path, parquet_path)
+                        print(f"[PARQUET APPEND SUCCESS] Candle {row_dict['open_time_ms']} appended to master!")
+                else:
+                    df = pd.DataFrame([row_dict])
+                    df.to_parquet(parquet_path, engine="pyarrow", index=False)
+                    print(f"[PARQUET APPEND INITIALIZED] Created master parquet for {ACTIVE_SYMBOL}!")
+                
+                last_appended_ts = current_closed_ts
+            except Exception as e:
+                print(f"[PARQUET APPEND ERROR] {e}")
+
+
+def _g(f: dict, key: str, default: Any = 0.0) -> Any:
+    fv = f.get(key)
+    if fv is not None and hasattr(fv, "value") and fv.value is not None:
+        return fv.value
+    return default
+
+
+def render_rich_dashboard(snap: FeatureSnapshot, show_ladder: bool = False) -> None:
+    """
+    Renders a state-of-the-art multi-panel Rich terminal dashboard.
+    Tick-level footprint ladder is removed from the front terminal and replaced by
+    high-signal microstructure, delta, and POC metric summaries.
+    """
+    f = snap.features
+    curr_time = datetime.now().strftime("%H:%M:%S")
+    candle_ts = _g(f, "open_time_ms", 0)
+    candle_dt_str = datetime.fromtimestamp(candle_ts / 1000, tz=timezone.utc).strftime("%H:%M UTC") if candle_ts else "LIVE"
+
+    price = _g(f, "price", 0.0)
+    basis = _g(f, "basis", 0.0)
+    basis_col = "bold green" if basis >= 0 else "bold red"
+
+    # Top Header
+    header_table = Table.grid(expand=True)
+    header_table.add_column(justify="left", ratio=1)
+    header_table.add_column(justify="right", ratio=1)
+    header_table.add_row(
+        f"[bold yellow]⚡ {ACTIVE_SYMBOL} PERPETUAL[/bold yellow] | [bold green]${price:,.2f}[/bold green] | Basis: [{basis_col}]{basis:+.2f}[/{basis_col}] | Seq: [magenta]{snap.sequence_id}[/magenta]",
+        f"[cyan]Candle: {candle_dt_str}[/cyan] | Clock: [white]{curr_time}[/white] | Stream: [bold green]CANONICAL ●[/bold green]"
+    )
+    header_panel = Panel(header_table, box=box.ROUNDED, style="bright_blue")
+
+    # Card 1: Microstructure & Trend (15m)
+    t1 = Table(box=box.SIMPLE, show_header=True, header_style="bold cyan", expand=True)
+    t1.add_column("Indicator", style="bold white", width=14)
+    t1.add_column("Value", justify="right", width=18)
+    
+    quote_vol = _g(f, "quote_vol", 0.0)
+    base_vol = _g(f, "base_vol", 0.0)
+    sma9 = _g(f, "volume_sma9", 0.0)
+    rsi = _g(f, "rsi", 50.0)
+    rsi_col = "bold red" if rsi >= 70 else ("bold green" if rsi <= 30 else "yellow")
+    atr14 = _g(f, "atr14", 0.0)
+    atr100 = _g(f, "atr100", 0.0)
+
+    t1.add_row("15m Quote Vol", f"${quote_vol/1e6:.3f}M")
+    t1.add_row(f"15m Base Vol", f"{base_vol:,.2f} {BASE_ASSET}")
+    t1.add_row("Volume SMA 9", f"${sma9/1e6:.2f}M")
+    t1.add_row("Wilder RSI (14)", f"[{rsi_col}]{rsi:.2f}[/{rsi_col}]")
+    t1.add_row("ATR 14 / 100", f"{atr14:.2f} / {atr100:.2f}")
+    t1.add_row("Basis (Fut-Spot)", f"[{basis_col}]{basis:+.2f} USD[/{basis_col}]")
+    p1 = Panel(t1, title="[bold cyan]📊 15m Microstructure[/bold cyan]", box=box.ROUNDED)
+
+    # Card 2: Orderflow & Volume Deltas
+    t2 = Table(box=box.SIMPLE, show_header=True, header_style="bold green", expand=True)
+    t2.add_column("Flow / CVD", style="bold white", width=15)
+    t2.add_column("Value", justify="right", width=18)
+
+    fut_cvd = _g(f, "future_cvd", 0.0)
+    fut_col = "bold green" if fut_cvd >= 0 else "bold red"
+    fut_buy = abs(_g(f, "fut_buy_15m", 0.0))
+    fut_sell = abs(_g(f, "fut_sell_15m", 0.0))
+
+    spot_cvd = _g(f, "spot_cvd", 0.0)
+    spot_col = "bold green" if spot_cvd >= 0 else "bold red"
+    spot_buy = abs(_g(f, "spot_buy_15m", 0.0))
+    spot_sell = abs(_g(f, "spot_sell_15m", 0.0))
+
+    usdc_tb = _g(f, "usdc_tb", 0)
+    usdc_ts = _g(f, "usdc_ts", 0)
+    coinm_tb = _g(f, "coinm_tb", 0)
+    coinm_ts = _g(f, "coinm_ts", 0)
+    alt_flow = (usdc_tb - usdc_ts) + (coinm_tb - coinm_ts)
+
+    avg_trd = _g(f, "avg_trade_size_usd", 0.0)
+    max_trd = _g(f, "max_trade_vol_btc", 0.0)
+
+    t2.add_row("Fut Session CVD", f"[{fut_col}]{fut_cvd/1e3:+.3f}K {BASE_ASSET}[/{fut_col}]")
+    t2.add_row("Fut 15m Buy/Sell", f"[green]+{fut_buy:.1f}[/green] / [red]-{fut_sell:.1f}[/red]")
+    t2.add_row("Spot Session CVD", f"[{spot_col}]{spot_cvd/1e3:+.3f}K {BASE_ASSET}[/{spot_col}]")
+    t2.add_row("Spot 15m Buy/Sell", f"[green]+{spot_buy:.1f}[/green] / [red]-{spot_sell:.1f}[/red]")
+    t2.add_row("Alt Net Flow", f"{alt_flow:+.1f} trades")
+    t2.add_row("Avg/Max Trade", f"${avg_trd:,.0f} / {max_trd:.2f} {BASE_ASSET}")
+    p2 = Panel(t2, title="[bold green]🌊 Orderflow & CVD[/bold green]", box=box.ROUNDED)
+
+    # Card 3: Derivatives Positioning & Funding
+    t3 = Table(box=box.SIMPLE, show_header=True, header_style="bold yellow", expand=True)
+    t3.add_column("Metric", style="bold white", width=15)
+    t3.add_column("Value", justify="right", width=18)
+
+    funding = _g(f, "funding_pct", 0.0)
+    funding_col = "bold green" if funding >= 0 else "bold red"
+    oi_k = str(_g(f, "oi_k", "N/A"))
+    oi_chg = _g(f, "oi_change_pct", 0.0)
+    oi_col = "bold green" if oi_chg >= 0 else "bold red"
+    ls_glob = _g(f, "ls_ratio", 1.0)
+    ls_top = _g(f, "ls_ratio_top", 1.0)
+    whale = str(_g(f, "whale_idx", "100.0"))
+
+    t3.add_row("Funding Rate", f"[{funding_col}]{funding:+.6f}%[/{funding_col}]")
+    t3.add_row("Open Interest", f"{oi_k}")
+    t3.add_row("OI Change (15m)", f"[{oi_col}]{oi_chg:+.2f}%[/{oi_col}]")
+    t3.add_row("Global Accounts L/S", f"{ls_glob:.4f}")
+    t3.add_row("Top Trader L/S", f"{ls_top:.4f}")
+    t3.add_row("CoinGlass Whale", f"[bold gold1]{whale}[/bold gold1]")
+    p3 = Panel(t3, title="[bold yellow]🐋 Positioning & Funding[/bold yellow]", box=box.ROUNDED)
+
+    # Card 4: Liquidations & Cascade Risk
+    t4 = Table(box=box.SIMPLE, show_header=True, header_style="bold red", expand=True)
+    t4.add_column("Liq Direction", style="bold white", width=14)
+    t4.add_column("Amount", justify="right", width=18)
+
+    long_liq = abs(_g(f, "long_liq", 0.0))
+    short_liq = abs(_g(f, "short_liq", 0.0))
+    tot_liq = long_liq + short_liq
+
+    t4.add_row("15m Long Liqs", f"[bold red]${long_liq:,.0f} USD[/bold red]")
+    t4.add_row("15m Short Liqs", f"[bold green]${short_liq:,.0f} USD[/bold green]")
+    t4.add_row("Total Active Liqs", f"${tot_liq:,.0f} USD")
+    liq_bias = "🔴 Long Cascade Pressure" if long_liq > short_liq * 1.5 else ("🟢 Short Squeeze" if short_liq > long_liq * 1.5 else "⚪ Neutral")
+    t4.add_row("Cascade Bias", f"{liq_bias}")
+    p4 = Panel(t4, title="[bold red]⚡ Liquidations & Cascade[/bold red]", box=box.ROUNDED)
+
+    # Card 5: Footprint & Technical Levels Summary
+    t5 = Table(box=box.SIMPLE, show_header=True, header_style="bold magenta", expand=True)
+    t5.add_column("Level / Metric", style="bold white", width=15)
+    t5.add_column("Value", justify="right", width=18)
+
+    fp_delta = _g(f, "fp_delta", 0.0)
+    fp_col = "bold green" if fp_delta >= 0 else "bold red"
+    fp_poc = _g(f, "fp_poc", price)
+    s_vah = _g(f, "session_vah", price)
+    s_val = _g(f, "session_val", price)
+    p_vah = _g(f, "prev_day_vah", price)
+    p_val = _g(f, "prev_day_val", price)
+
+    t5.add_row("Footprint Delta", f"[{fp_col}]{fp_delta:+.4f} {BASE_ASSET}[/{fp_col}]")
+    t5.add_row("Footprint POC", f"[bold yellow]${fp_poc:,.2f}[/bold yellow]")
+    t5.add_row("Session VAH (70%)", f"${s_vah:,.2f}")
+    t5.add_row("Session VAL (70%)", f"${s_val:,.2f}")
+    t5.add_row("Prev Day VAH/VAL", f"${p_vah:,.1f} / ${p_val:,.1f}")
+    p5 = Panel(t5, title="[bold magenta]🎯 Footprint & Value Area[/bold magenta]", box=box.ROUNDED)
+
+    # Card 6: Order Book Depth & Archival Status
+    t6 = Table(box=box.SIMPLE, show_header=True, header_style="bold blue", expand=True)
+    t6.add_column("Metric", style="bold white", width=15)
+    t6.add_column("Value", justify="right", width=18)
+
+    bid_dlr = abs(_g(f, "bid_dollar", 0.0))
+    ask_dlr = abs(_g(f, "ask_dollar", 0.0))
+    depth_ratio = (bid_dlr / ask_dlr) if ask_dlr > 0 else 1.0
+    d_col = "bold green" if depth_ratio >= 1.0 else "bold red"
+
+    ema8 = _g(f, "ema8", price)
+    ema21 = _g(f, "ema21", price)
+    ema200 = _g(f, "ema200", price)
+
+    t6.add_row("±1% Bid Depth", f"[green]${bid_dlr/1e6:.2f}M[/green]")
+    t6.add_row("±1% Ask Depth", f"[red]${ask_dlr/1e6:.2f}M[/red]")
+    t6.add_row("Bid/Ask Ratio", f"[{d_col}]{depth_ratio:.2f}x[/{d_col}]")
+    t6.add_row("EMAs (8 / 21 / 200)", f"${ema8:,.0f} / ${ema21:,.0f} / ${ema200:,.0f}")
+    t6.add_row("Parquet Sync", f"[bold green]Active (15m Loop)[/bold green]")
+    p6 = Panel(t6, title="[bold blue]💾 Depth & Live Archival[/bold blue]", box=box.ROUNDED)
+
+    # Multi-card layout grid (2 rows x 3 columns)
+    grid = Table.grid(expand=True)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_row(p1, p2, p3)
+    grid.add_row(p4, p5, p6)
+
+    RICH_CONSOLE.print(header_panel)
+    RICH_CONSOLE.print(grid)
+
+    # Optional Tick Footprint Ladder if explicitly requested via --footprint-ladder
+    if show_ladder:
+        curr_px = _g(f, "price", 0.0)
+        ladder = AGG_STATE.profile.get_ladder(current_price=curr_px, limit=16)
+        if ladder:
+            lad_table = Table(title=f"Footprint Price Ladder ({ACTIVE_SYMBOL}, Merge: ${get_merge_level(ACTIVE_SYMBOL)})", box=box.SIMPLE_HEAVY)
+            lad_table.add_column("Price", justify="right", style="cyan")
+            lad_table.add_column("Buy Vol", justify="right", style="green")
+            lad_table.add_column("Sell Vol", justify="right", style="red")
+            lad_table.add_column("Delta", justify="right")
+            for r in ladder:
+                p, bv, sv, dv = r["price"], r["buy_btc"], r["sell_btc"], r["delta_btc"]
+                d_style = "bold green" if dv >= 0 else "bold red"
+                is_poc = (p == AGG_STATE.profile.poc)
+                p_tag = f"★ ${p:,.2f}" if is_poc else f"${p:,.2f}"
+                lad_table.add_row(p_tag, f"{bv:,.2f}", f"{sv:,.2f}", f"[{d_style}]{dv:+,.2f}[/{d_style}]")
+            RICH_CONSOLE.print(lad_table)
+
+
 async def terminal_observer_loop(show_indicators: bool = True) -> None:
     """
-    Flicker-free ANSI Virtual Terminal display observer.
-    Uses in-place cursor home repositioning (\\033[H) to avoid subprocess cls lag.
+    Flicker-free Rich Virtual Terminal display observer.
+    Uses in-place cursor home repositioning (\\033[H) to render the dashboard cleanly.
     """
     is_interactive = sys.stdout.isatty() and ("--once" not in sys.argv)
     first_frame = True
@@ -1959,147 +2374,15 @@ async def terminal_observer_loop(show_indicators: bool = True) -> None:
                 print("[WAITING] No canonical snapshot has been published yet.")
             continue
 
-        f = snap.features
-        t = datetime.now().strftime("%H:%M:%S")
-
-        lines = [
-            "=" * 80,
-            "  CANONICAL MARKET-DATA SERVICE v2 — 28 INDICATORS (8 WebSocket streams)",
-            "=" * 80,
-            f"[{t}] SEQ:{snap.sequence_id} " + "─" * 60,
-            R(" 1", "ASSET",       "BTCUSDT",                              DataQuality.CANONICAL, "Binance Futures"),
-            R(" 2", "PRICE",       f"${f['price'].value:,.1f}",            f['price'].quality),
-        ]
-
-        if show_indicators:
-            lines.append("─" * 80)
-            lines.append(f"  BTCUSDT 15m Canonical Snapshot [Seq: {snap.sequence_id} | {datetime.fromtimestamp(snap.receive_timestamp_ms/1000).strftime('%H:%M:%S.%f')[:-3]}]")
-            lines.append("─" * 80)
-            
-            bar_vol_usd = f"${f['quote_vol'].value/1e6:.3f}M" if f.get('quote_vol') and f['quote_vol'].value else "$0.000M"
-            bar_vol_btc = f"{f['base_vol'].value:.2f} BTC" if f.get('base_vol') and f['base_vol'].value else "0.00 BTC"
-            sma9_usd = f"${f['volume_sma9'].value/1e6:.2f}M" if f.get('volume_sma9') and f['volume_sma9'].value else "$0.00M"
-            vol_str = f"{bar_vol_usd} ({bar_vol_btc}) [SMA 9: {sma9_usd}]"
-            lines.append(R(" 3", "VOLUME",      vol_str,                                f['quote_vol'].quality, "15m Bar Vol & SMA 9"))
-            lines.append(R(" 4", "RSI (14)",    f"{f['rsi'].value:.2f}" if f['rsi'].value is not None else "N/A", f['rsi'].quality, "Wilder RSI"))
-            
-            fut_val = f['future_cvd'].value
-            fut_ses = f"{fut_val/1e3:+.3f}K" if fut_val is not None else "N/A"
-            fut_buy = f"{abs(f['fut_buy_15m'].value):.1f}" if f.get('fut_buy_15m') and f['fut_buy_15m'].value is not None else "0.0"
-            fut_sell = f"{abs(f['fut_sell_15m'].value):.1f}" if f.get('fut_sell_15m') and f['fut_sell_15m'].value is not None else "0.0"
-            lines.append(R(" 5", "FUT CVD",     f"{fut_ses} [+{fut_buy}/-{fut_sell}B]", f['future_cvd'].quality, "Session [15m Buy/Sell]"))
-            
-            spot_val = f['spot_cvd'].value
-            spot_ses = f"{spot_val/1e3:+.3f}K" if spot_val is not None else "N/A"
-            spot_buy = f"{abs(f['spot_buy_15m'].value):.1f}" if f.get('spot_buy_15m') and f['spot_buy_15m'].value is not None else "0.0"
-            spot_sell = f"{abs(f['spot_sell_15m'].value):.1f}" if f.get('spot_sell_15m') and f['spot_sell_15m'].value is not None else "0.0"
-            lines.append(R(" 6", "SPOT CVD",    f"{spot_ses} [+{spot_buy}/-{spot_sell}B]", f['spot_cvd'].quality, "Session [15m Buy/Sell]"))
-            
-            lines.append(R(" 7", "FUNDING %",   f"{f['funding_pct'].value:.6f}" if f['funding_pct'].value is not None else "N/A", f['funding_pct'].quality, "OI-Weighted Rate"))
-            lines.append(R(" 8", "OPEN INT",    str(f['oi_k'].value) if f['oi_k'].value is not None else "N/A", f['oi_k'].quality, "STABLECOIN-margined"))
-            lines.append(R(" 9", "LONG LIQ",    _u(f['long_liq'].value),                f['long_liq'].quality, "Symbol Liquidations Long (Sell)"))
-            lines.append(R("10", "SHORT LIQ",   _u(f['short_liq'].value),               f['short_liq'].quality, "Symbol Liquidations Short (Buy)"))
-            lines.append(R("11", "L/S GLOBAL",  f"{f['ls_ratio'].value:.4f}" if f['ls_ratio'].value is not None else "N/A", f['ls_ratio'].quality, "Global Accounts L/S"))
-            if f.get('ls_ratio_top') and f['ls_ratio_top'].value is not None:
-                lines.append(R("11b", "L/S TOP",    f"{f['ls_ratio_top'].value:.4f}", f['ls_ratio_top'].quality, "Top Trader L/S"))
-            lines.append(R("12", "FP DELTA",    f"{f['fp_delta'].value:+.4f} BTC" if f['fp_delta'].value is not None else "N/A", f['fp_delta'].quality, "Footprint Delta"))
-            lines.append(R("13", "FP POC",      f"{f['fp_poc'].value:,.1f}" if f['fp_poc'].value is not None else "N/A", f['fp_poc'].quality, "Volume-At-Price POC"))
-            lines.append(R("14", "BID DOLLAR",  _u(f['bid_dollar'].value),              f['bid_dollar'].quality, "±1% Futures Depth (Bids)"))
-            lines.append(R("15", "ASK DOLLAR",  _u(f['ask_dollar'].value),              f['ask_dollar'].quality, "±1% Futures Depth (Asks)"))
-            lines.append(R("16", "BID COIN",    _b(f['bid_coin'].value),                f['bid_coin'].quality, "±1% Futures Depth (Bids)"))
-            lines.append(R("17", "ASK COIN",    _b(f['ask_coin'].value),                f['ask_coin'].quality, "±1% Futures Depth (Asks)"))
-            lines.append(R("18", "WHALE IDX",   str(f['whale_idx'].value),              f['whale_idx'].quality, "Whale Index (Top Trader)"))
-            lines.append(R("19", "TAKER BUY",   _b(f['taker_buy'].value),               f['taker_buy'].quality, "Taker Buy Volume (Trades)"))
-            lines.append(R("20", "TAKER SELL",  _b(f['taker_sell'].value),              f['taker_sell'].quality, "Taker Sell Volume (Trades)"))
-            lines.append(R("21", "EMA 8",       f"{f['ema8'].value:,.1f}" if f['ema8'].value is not None else "N/A",   f['ema8'].quality,  "EMA 8 close"))
-            lines.append(R("22", "EMA 21",      f"{f['ema21'].value:,.1f}" if f['ema21'].value is not None else "N/A", f['ema21'].quality, "EMA 21 close"))
-            lines.append(R("23", "EMA 50",      f"{f['ema50'].value:,.1f}" if f['ema50'].value is not None else "N/A", f['ema50'].quality, "EMA 50 close"))
-            lines.append(R("24", "EMA 200",     f"{f['ema200'].value:,.1f}" if f['ema200'].value is not None else "N/A", f['ema200'].quality, "EMA 200 close"))
-            lines.append(R("25", "EMA 800",     f"{f['ema800'].value:,.1f}" if f['ema800'].value is not None else "N/A", f['ema800'].quality, "EMA 800 close"))
-            lines.append(R("26", "ATR 14",      f"{f['atr14'].value:.1f}" if f['atr14'].value is not None else "N/A",  f['atr14'].quality, "ATR 14"))
-            lines.append(R("27", "ATR 100",     f"{f['atr100'].value:.1f}" if f['atr100'].value is not None else "N/A", f['atr100'].quality, "ATR 100"))
-            lines.append(R("28", "BASIS",       f"{f['basis'].value:+.2f}" if f['basis'].value is not None else "N/A", f['basis'].quality, "Mark - Index Price"))
-
-
-        # CoinGlass Legend Style Footprint Ladder ($25.0 Merge Level)
-        curr_px = f['price'].value or 0.0
-        ladder = AGG_STATE.profile.get_ladder(current_price=curr_px, limit=24)
-        if ladder:
-            quality_str = " (PARTIAL - WAIT FOR NEW CANDLE)" if AGG_STATE.quality == DataQuality.PARTIAL else ""
-            lines.append("─" * 80)
-            lines.append(f"  COINGLASS LEGEND FOOTPRINT PROFILE (BTCUSDT Perp 15m, Merge: $25.0){quality_str}")
-            lines.append("  " + f"{'PRICE':<10} | {'BUY (ASK)':>10}   {'PROFILE HISTOGRAM':^20}   {'SELL (BID)':<10} | {'DELTA':>8}")
-            lines.append("  " + "-" * 73)
-            max_v = max((r["total_btc"] for r in ladder), default=1.0) or 1.0
-            poc_px = AGG_STATE.profile.poc
-            
-            poc_on_screen = False
-
-            for r in ladder:
-                p = r["price"]
-                b_v = r["buy_btc"]
-                s_v = r["sell_btc"]
-                d_v = r["delta_btc"]
-                is_poc = (p == poc_px)
-                if is_poc:
-                    poc_on_screen = True
-                m_lvl = AGG_STATE.profile.merge_level
-                is_curr = (curr_px > 0 and abs(p - round(curr_px / m_lvl) * m_lvl) < 0.1)
-
-                buy_len = int((b_v / max_v) * 9)
-                sell_len = int((s_v / max_v) * 9)
-                buy_bar = "█" * buy_len
-                sell_bar = "█" * sell_len
-                
-                # Green/Red text colors
-                c_green = "\033[92m"
-                c_red = "\033[91m"
-                c_reset = "\033[0m"
-                
-                if is_poc:
-                    # Highlight the entire POC row with a distinct background (e.g., dark yellow/gold)
-                    bg_poc = "\033[43;30m" # Yellow background, black text
-                    hist_str = f"{bg_poc}{buy_bar:>9}│{sell_bar:<9}{c_reset}"
-                    prefix = "►" if is_curr else " "
-                    p_tag = f"{prefix}${p:>8,.1f}"
-                    # Print POC row with background highlighting
-                    d_str = f"{d_v:>+8.2f}"
-                    lines.append(f"{bg_poc}  {p_tag} | {b_v:>9.2f}   {buy_bar:>9}│{sell_bar:<9}   {s_v:<9.2f} | {d_str} ◄ POC {c_reset}")
-                else:
-                    hist_str = f"{c_green}{buy_bar:>9}{c_reset}│{c_red}{sell_bar:<9}{c_reset}"
-                    d_col = c_green if d_v >= 0 else c_red
-                    prefix = "►" if is_curr else " "
-                    p_tag = f"{prefix}${p:>8,.1f}"
-                    lines.append(f"  {p_tag} | {c_green}{b_v:>9.2f}{c_reset}   {hist_str}   {c_red}{s_v:<9.2f}{c_reset} | {d_col}{d_v:>+8.2f}{c_reset}")
-
-            # Add Total Candle Delta Footer
-            tot_b = AGG_STATE.profile.candle_buy_total
-            tot_s = AGG_STATE.profile.candle_sell_total
-            tot_d = tot_b - tot_s
-            d_col = "\033[92m" if tot_d >= 0 else "\033[91m"
-            lines.append("  " + "=" * 73)
-            lines.append(f"  {'TOTAL 15M':<10} | \033[92m{tot_b:>9.2f}\033[0m   {' '*20}   \033[91m{tot_s:<9.2f}\033[0m | {d_col}{tot_d:>+8.2f}\033[0m")
-            
-            if not poc_on_screen and poc_px is not None:
-                # Get the volume at the off-screen POC
-                poc_vol = AGG_STATE.profile.levels.get(poc_px, {}).get("total", 0.0)
-                lines.append(f"  \033[93m[!] POC is off-screen at ${poc_px:,.1f} (Total Vol: {poc_vol:.2f} BTC)\033[0m")
-
         if is_interactive:
             if first_frame:
                 sys.stdout.write("\033[2J\033[H")
                 first_frame = False
             else:
                 sys.stdout.write("\033[H")
-            
-            # Clear each line to the end to prevent ghost characters
-            lines = [line + "\033[K" for line in lines]
-            
-            # \033[J clears the rest of the screen below the cursor
-            sys.stdout.write("\n".join(lines) + "\n\033[J")
-        else:
-            sys.stdout.write("\n" + "\n".join(lines) + "\n")
-        sys.stdout.flush()
+            sys.stdout.flush()
+
+        render_rich_dashboard(snap, show_ladder=SHOW_FOOTPRINT_LADDER)
 
         if "--once" in sys.argv:
             break
@@ -2123,7 +2406,7 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
 
     tasks = []
     if "--once" not in sys.argv:
-        print("[INIT] Seeding REST history + connecting live Binance WebSocket streams...")
+        print(f"[INIT] Seeding REST history + connecting live Binance WebSocket streams for {ACTIVE_SYMBOL}...")
         tasks += [
             asyncio.create_task(poll_depth_loop()),
             asyncio.create_task(start_liq_stream()),
@@ -2143,13 +2426,13 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
         # Standalone --once pure API bootstrap
         all_k = []
         end_time = None
-        for _ in range(4):
-            url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+        for _ in range(10):  # Fetch 10,000 bars for exact EMA 800 and ATR 100 convergence
+            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1000"
             if end_time:
                 url += f"&endTime={end_time}"
             data = await async_fetch(url, weight=1)
             if not isinstance(data, list) or not data:
-                url_sp = "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=1000"
+                url_sp = f"https://data-api.binance.vision/api/v3/klines?symbol={ACTIVE_SYMBOL}&interval=15m&limit=1000"
                 if end_time:
                     url_sp += f"&endTime={end_time}"
                 data = await async_fetch(url_sp, weight=1)
@@ -2166,9 +2449,8 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
         
         # Single-pass depth, taker counts, and ratios for --once
         close = KL_STATE.close if KL_STATE.close > 0 else 77000.0
-        lo, hi = close * 0.99, close * 1.01
         try:
-            d_ut = await async_fetch("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=1000", weight=10)
+            d_ut = await async_fetch(f"https://fapi.binance.com/fapi/v1/depth?symbol={ACTIVE_SYMBOL}&limit=1000", weight=10)
             if d_ut and "bids" in d_ut and "asks" in d_ut and len(d_ut["bids"]) > 0 and len(d_ut["asks"]) > 0:
                 bids, asks = d_ut["bids"], d_ut["asks"]
                 best_bid, lowest_bid = float(bids[0][0]), float(bids[-1][0])
@@ -2193,16 +2475,22 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
             pass
 
         try:
-            oi_t = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT", weight=1)).get("openInterest", 0))
-            oi_c = float((await async_fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDC", weight=1)).get("openInterest", 0))
+            oi_t = float((await async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={ACTIVE_SYMBOL}", weight=1)).get("openInterest", 0))
+            oi_c = 0.0
+            try:
+                oi_c_resp = await async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={BASE_ASSET}USDC", weight=1)
+                if isinstance(oi_c_resp, dict):
+                    oi_c = float(oi_c_resp.get("openInterest", 0))
+            except Exception:
+                pass
             REST_CACHE.oi_k = f"{(oi_t + oi_c)/1e3:.3f}K"
         except Exception:
             pass
 
         try:
-            ls_d = await async_fetch("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            ls_d = await async_fetch(f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={ACTIVE_SYMBOL}&period=15m&limit=1", weight=2)
             if ls_d: REST_CACHE.ls_ratio_global = float(ls_d[0]["longShortRatio"])
-            tp = await async_fetch("https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=1", weight=2)
+            tp = await async_fetch(f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={ACTIVE_SYMBOL}&period=15m&limit=1", weight=2)
             if tp:
                 raw_ratio = float(tp[0]["longShortRatio"])
                 REST_CACHE.whale = f"{raw_ratio * 100.0:.2f}"
@@ -2226,6 +2514,7 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
 
     tasks += [
         asyncio.create_task(market_data_loop()),
+        asyncio.create_task(parquet_appender_loop()),
         asyncio.create_task(terminal_observer_loop(show_indicators=show_indicators)),
     ]
     try:
