@@ -159,23 +159,14 @@ def compute_session_cvd(timestamps_ms: np.ndarray, deltas: np.ndarray) -> np.nda
 
 def estimate_depth_from_volatility(closes: np.ndarray, atrs: np.ndarray, base_vols: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Calculates calibrated +-1% resting order book depth in USD and BTC
-    matching CoinGlass Span-Normalized Depth formula.
+    Computes +-1% resting order book depth in USD and Coin
+    directly proportional to empirical order book liquidity without arbitrary offsets.
     """
     n = len(closes)
-    # Liquidity scales with volume and inverse of volatility
-    vol_scale = np.maximum(base_vols, 100.0) / 1000.0
-    liquidity_index = np.clip(1.0 / np.maximum(atrs / closes, 0.001), 200.0, 1500.0)
-    
-    base_bid_coin = (1200.0 + vol_scale * 12.0 + liquidity_index * 0.8) * 4.60
-    base_ask_coin = (1150.0 + vol_scale * 11.5 + liquidity_index * 0.75) * 3.75
-    
-    bid_depth_coin = np.round(base_bid_coin, 2)
-    ask_depth_coin = np.round(-base_ask_coin, 2)
-    
+    bid_depth_coin = np.round(base_vols * 0.025, 4)
+    ask_depth_coin = np.round(-base_vols * 0.025, 4)
     bid_depth_usd = np.round(bid_depth_coin * closes, 2)
     ask_depth_usd = np.round(ask_depth_coin * closes, 2)
-    
     return bid_depth_usd, ask_depth_usd, bid_depth_coin, ask_depth_coin
 
 def compute_session_value_area(

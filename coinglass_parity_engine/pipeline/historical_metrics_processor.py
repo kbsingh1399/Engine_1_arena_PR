@@ -230,43 +230,46 @@ class HistoricalMetricsProcessor:
                 right_on="timestamp_ms",
                 direction="backward"
             )
-            raw_oi_btc = merged["sum_open_interest"].ffill().values
-            oi_btc = np.nan_to_num(raw_oi_btc, nan=125000.0)
+            raw_oi_btc = merged["sum_open_interest"].ffill().bfill().values
+            oi_btc = np.nan_to_num(raw_oi_btc, nan=0.0)
 
-            raw_oi_usd = merged["sum_open_interest_value"].ffill().values
+            raw_oi_usd = merged["sum_open_interest_value"].ffill().bfill().values
             oi_usd = np.where(np.isnan(raw_oi_usd), oi_btc * closes, raw_oi_usd)
 
-            raw_ls_glob = merged["count_long_short_ratio"].ffill().values
-            ls_glob = np.nan_to_num(raw_ls_glob, nan=1.035)
+            raw_ls_glob = merged["count_long_short_ratio"].ffill().bfill().values
+            ls_glob = np.nan_to_num(raw_ls_glob, nan=1.0)
 
-            raw_ls_top = merged["sum_toptrader_long_short_ratio"].ffill().values
-            ls_top = np.nan_to_num(raw_ls_top, nan=1.076)
+            raw_ls_top = merged["sum_toptrader_long_short_ratio"].ffill().bfill().values
+            ls_top = np.nan_to_num(raw_ls_top, nan=1.0)
 
             df["open_interest_k"] = np.round(oi_btc / 1000.0, 3)
             df["open_interest_usd"] = np.round(oi_usd, 2)
             df["ls_ratio_global"] = np.round(ls_glob, 4)
             df["ls_ratio_top"] = np.round(ls_top, 4)
-            df["whale_index"] = np.round(ls_top * 100.0, 4)
+            # CoinGlass Whale Index = (Top Trader Long % / Global Trader Long %) * 100
+            top_long_p = ls_top / (1.0 + ls_top)
+            glob_long_p = ls_glob / (1.0 + ls_glob)
+            df["whale_index"] = np.round((top_long_p / np.maximum(glob_long_p, 0.0001)) * 100.0, 4)
 
             if "count_toptrader_long_short_ratio" in merged.columns:
-                raw_top_acc = merged["count_toptrader_long_short_ratio"].ffill().values
-                df["top_account_ratio"] = np.round(np.nan_to_num(raw_top_acc, nan=1.050), 4)
+                raw_top_acc = merged["count_toptrader_long_short_ratio"].ffill().bfill().values
+                df["top_account_ratio"] = np.round(np.nan_to_num(raw_top_acc, nan=1.0), 4)
             else:
-                df["top_account_ratio"] = np.round(ls_glob * 1.02, 4)
+                df["top_account_ratio"] = np.round(ls_glob, 4)
 
             if "sum_taker_long_short_vol_ratio" in merged.columns:
-                raw_taker_ratio = merged["sum_taker_long_short_vol_ratio"].ffill().values
+                raw_taker_ratio = merged["sum_taker_long_short_vol_ratio"].ffill().bfill().values
                 fallback_taker = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
                 df["taker_volume_ratio"] = np.round(np.where(np.isnan(raw_taker_ratio), fallback_taker, raw_taker_ratio), 4)
             else:
                 df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
         else:
-            df["open_interest_k"] = 127.500
-            df["open_interest_usd"] = df["open_interest_k"] * 1000.0 * closes
-            df["ls_ratio_global"] = 1.0350
-            df["ls_ratio_top"] = 1.0769
-            df["top_account_ratio"] = 1.0500
-            df["whale_index"] = 107.6900
+            df["open_interest_k"] = 0.0
+            df["open_interest_usd"] = 0.0
+            df["ls_ratio_global"] = 1.0
+            df["ls_ratio_top"] = 1.0
+            df["top_account_ratio"] = 1.0
+            df["whale_index"] = 100.0
             df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
 
         # OI rate of change (% per 15m bar)

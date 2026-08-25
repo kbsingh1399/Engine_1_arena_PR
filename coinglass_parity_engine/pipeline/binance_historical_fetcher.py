@@ -417,6 +417,7 @@ class BinanceHistoricalFetcher:
         try:
             print(f"[FETCHER] Bridging recent hours for {symbol} via live Binance Futures REST API...")
             rest_oi_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/openInterestHist?symbol={symbol}&period=15m&limit=500")
+            rest_oi_usdc_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/openInterestHist?symbol={usdc_symbol}&period=15m&limit=500") if usdc_symbol else None
             rest_ls_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=15m&limit=500")
             rest_top_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={symbol}&period=15m&limit=500")
             rest_top_acc_raw = self._fetch_url(f"https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol={symbol}&period=15m&limit=500")
@@ -424,6 +425,19 @@ class BinanceHistoricalFetcher:
 
             if rest_oi_raw and rest_ls_raw:
                 df_roi = pd.DataFrame(json.loads(rest_oi_raw.decode('utf-8')))
+                if rest_oi_usdc_raw:
+                    try:
+                        df_roi_usdc = pd.DataFrame(json.loads(rest_oi_usdc_raw.decode('utf-8')))
+                        if not df_roi_usdc.empty:
+                            df_roi_usdc.rename(columns={
+                                "sumOpenInterest": "sumOpenInterest_usdc",
+                                "sumOpenInterestValue": "sumOpenInterestValue_usdc"
+                            }, inplace=True)
+                            df_roi = pd.merge(df_roi, df_roi_usdc[["timestamp", "sumOpenInterest_usdc", "sumOpenInterestValue_usdc"]], on="timestamp", how="left")
+                            df_roi["sumOpenInterest"] = df_roi["sumOpenInterest"].astype(float) + df_roi["sumOpenInterest_usdc"].fillna(0).astype(float)
+                            df_roi["sumOpenInterestValue"] = df_roi["sumOpenInterestValue"].astype(float) + df_roi["sumOpenInterestValue_usdc"].fillna(0).astype(float)
+                    except Exception:
+                        pass
                 df_rls = pd.DataFrame(json.loads(rest_ls_raw.decode('utf-8')))
                 df_rtop = pd.DataFrame(json.loads(rest_top_raw.decode('utf-8'))) if rest_top_raw else pd.DataFrame()
                 df_rtop_acc = pd.DataFrame(json.loads(rest_top_acc_raw.decode('utf-8'))) if rest_top_acc_raw else pd.DataFrame()

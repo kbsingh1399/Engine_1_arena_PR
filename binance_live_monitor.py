@@ -1501,6 +1501,36 @@ async def _kline_handler(data: dict) -> None:
 
 async def start_kline_stream() -> None:
     async def seed():
+        p_path = find_master_parquet_path(ACTIVE_SYMBOL)
+        if p_path:
+            try:
+                df_chk = pd.read_parquet(p_path)
+                if not df_chk.empty:
+                    last_row = df_chk.iloc[-1]
+                    checkpoint_close_ms = int(last_row.get("close_time_ms", last_row.get("open_time_ms", 0) + 899999))
+                    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={checkpoint_close_ms + 1}&limit=1000"
+                    catchup_k = await async_fetch(url, weight=2)
+                    if isinstance(catchup_k, list) and catchup_k:
+                        # Load previous 100 bars from parquet + catchup bars
+                        tail_n = min(len(df_chk), 100)
+                        tail_df = df_chk.iloc[-tail_n:]
+                        hist_k = []
+                        for _, r in tail_df.iterrows():
+                            ot = int(r["open_time_ms"])
+                            ct = int(r["close_time_ms"])
+                            hist_k.append([
+                                ot, str(r["open"]), str(r["high"]), str(r["low"]), str(r["close"]),
+                                str(r["volume_base"]), ct, str(r["volume_quote"]),
+                                int(r["trade_count"]), str(r["taker_buy_vol_btc"]),
+                                str(r["volume_quote"]), "0"
+                            ])
+                        all_k = hist_k + catchup_k
+                        await KL_STATE.seed_from_rest(all_k)
+                        return
+            except Exception as e:
+                print(f"[SINGLE PARQUET SEED WARN] {ACTIVE_SYMBOL}: {e}")
+
+        # Fallback to paginated REST if no parquet found
         all_k = []
         end_t = None
         for _ in range(10):  # Fetch 10,000 bars for exact EMA 800 and ATR 100 convergence
@@ -2402,10 +2432,59 @@ async def run_live_comparison(show_indicators: bool = True) -> None:
     Spawns all canonical WebSocket ingestors and updates the terminal UI.
     """
     
-    # 1. Seed footprint from Kline to prevent massive mid-candle discrepancy
+    # 1. Seed complete historical state from Master Parquet if available
+    parquet_path = find_master_parquet_path(ACTIVE_SYMBOL)
+    if parquet_path:
+        try:
+            df_hist = pd.read_parquet(parquet_path)
+            if not df_hist.empty:
+                last_row = df_hist.iloc[-1]
+                checkpoint_close_ms = int(last_row.get("close_time_ms", last_row.get("open_time_ms", 0) + 899999))
+                
+                KL_STATE._ema = {
+                    8: float(last_row.get("ema_8", 0.0)),
+                    21: float(last_row.get("ema_21", 0.0)),
+                    50: float(last_row.get("ema_50", 0.0)),
+                    200: float(last_row.get("ema_200", 0.0)),
+                    800: float(last_row.get("ema_800", 0.0)),
+                }
+                KL_STATE._atr14 = float(last_row.get("atr_14", 0.0))
+                KL_STATE._atr100 = float(last_row.get("atr_100", 0.0))
+                KL_STATE._prev_close = float(last_row.get("close", 0.0))
+                KL_STATE._rsi_prev_close = float(last_row.get("close", 0.0))
+                KL_STATE.ready = True
+                KL_STATE.quality = DataQuality.CANONICAL
+                
+                AGG_STATE.session_cvd = float(last_row.get("future_cvd_session", 0.0))
+                SPOT_AGG.session_cvd = float(last_row.get("spot_cvd_session", 0.0))
+                AGG_STATE.quality = DataQuality.CANONICAL
+                SPOT_AGG.quality = DataQuality.CANONICAL
+                
+                REST_CACHE.bid_dollar = float(last_row.get("bid_depth_usd", 0.0))
+                REST_CACHE.ask_dollar = float(last_row.get("ask_depth_usd", 0.0))
+                REST_CACHE.bid_coin = float(last_row.get("bid_depth_coin", 0.0))
+                REST_CACHE.ask_coin = float(last_row.get("ask_depth_coin", 0.0))
+                oi_u = float(last_row.get("open_interest_usd", 0.0))
+                if oi_u > 0:
+                    REST_CACHE.oi_k = f"${oi_u/1e6:.0f}M" if oi_u >= 1e6 else f"${oi_u/1e3:.0f}K"
+                REST_CACHE.ls_ratio_global = float(last_row.get("ls_ratio_global", 1.0))
+                REST_CACHE.ls_ratio = float(last_row.get("ls_ratio_top", 1.0))
+                REST_CACHE.whale = f"{REST_CACHE.ls_ratio * 100.0:.2f}"
+                REST_CACHE.top_account_ratio = float(last_row.get("top_account_ratio", 1.0))
+                REST_CACHE.oi_change_pct = float(last_row.get("oi_change_pct", 0.0))
+                REST_CACHE.prev_day_vah = float(last_row.get("prev_day_vah", 0.0))
+                REST_CACHE.prev_day_val = float(last_row.get("prev_day_val", 0.0))
+                REST_CACHE.session_vah = float(last_row.get("session_vah", 0.0))
+                REST_CACHE.session_val = float(last_row.get("session_val", 0.0))
+                REST_CACHE.basis = float(last_row.get("basis_usd", 0.0))
+                REST_CACHE.funding_rate = float(last_row.get("funding_rate_pct", 0.0))
+        except Exception as e:
+            print(f"[PARQUET SEED SINGLE WARN] {e}")
+
+    # 2. Seed footprint from Kline to prevent massive mid-candle discrepancy
     await AGG_STATE.seed_from_kline_if_needed()
     
-    # 2. Start all websocket ingestors
+    # 3. Start all websocket ingestors
     global SNAPSHOT_BUS
     SNAPSHOT_BUS = asyncio.Queue(maxsize=1)
 
@@ -2554,14 +2633,19 @@ class MatrixAssetState:
     atr14: float = 0.0
     atr100: float = 0.0
     fut_cvd: float = 0.0
+    session_fut_cvd_base: float = 0.0
     fut_buy_15m: float = 0.0
     fut_sell_15m: float = 0.0
     spot_cvd: float = 0.0
+    session_spot_cvd_base: float = 0.0
+    future_cvd_lifetime: float = 0.0
+    spot_cvd_lifetime: float = 0.0
     spot_buy_15m: float = 0.0
     spot_sell_15m: float = 0.0
     alt_flow: float = 0.0
     avg_trade_usd: float = 0.0
     funding_rate: float = 0.0
+    oi_coin: float = 0.0
     oi_k: str = "N/A"
     oi_usd: float = 0.0
     oi_chg_pct: float = 0.0
@@ -2589,7 +2673,9 @@ class MatrixAssetState:
     last_update_ts: float = 0.0
     active_bar_open_ms: int = 0
     volume_at_price: dict[int, float] = field(default_factory=dict)
-    profile_tick_size: float = 1.0
+    recent_closes: list[float] = field(default_factory=list)
+    recent_highs: list[float] = field(default_factory=list)
+    recent_lows: list[float] = field(default_factory=list)
     bootstrap_ok: bool = True
     bootstrap_error: str = ""
 
@@ -2604,35 +2690,73 @@ import shutil
 
 
 def fmt_p(p: float) -> str:
-    if p >= 1000: return f"${p:,.0f}"
-    elif p >= 10: return f"${p:.2f}"
-    elif p >= 1: return f"${p:.2f}"
-    elif p >= 0.01: return f"${p:.4f}"
-    else: return f"${p:.4f}"
+    try:
+        p = float(p)
+        if p >= 1000: return f"${p:,.0f}"
+        elif p >= 10: return f"${p:.2f}"
+        elif p >= 1: return f"${p:.2f}"
+        elif p >= 0.01: return f"${p:.4f}"
+        else: return f"${p:.4f}"
+    except Exception:
+        return "$0.00"
 
 
 def fmt_ema_p(e8: float, e21: float) -> str:
-    if e8 >= 1000: return f"{e8/1e3:.1f}k/{e21/1e3:.1f}k"
-    elif e8 >= 10: return f"{e8:.1f}/{e21:.1f}"
-    elif e8 >= 1: return f"{e8:.2f}/{e21:.2f}"
-    else: return f"{e8:.2f}/{e21:.2f}"
+    try:
+        e8, e21 = float(e8), float(e21)
+        if e8 >= 1000: return f"{e8/1e3:.1f}k/{e21/1e3:.1f}k"
+        elif e8 >= 10: return f"{e8:.1f}/{e21:.1f}"
+        elif e8 >= 1: return f"{e8:.2f}/{e21:.2f}"
+        else: return f"{e8:.2f}/{e21:.2f}"
+    except Exception:
+        return "0.0/0.0"
 
 
 def fmt_c(v: float) -> str:
-    if abs(v) >= 1e9: return f"{v/1e9:+.1f}B"
-    elif abs(v) >= 1e6: return f"{v/1e6:+.1f}M"
-    elif abs(v) >= 1e3: return f"{v/1e3:+.1f}K"
-    elif abs(v) >= 10: return f"{v:+.1f}"
-    elif abs(v) >= 1: return f"{v:+.2f}"
-    elif abs(v) > 0: return f"{v:+.4f}"
-    else: return "0.0"
+    try:
+        v = float(v)
+        if abs(v) >= 1e9: return f"{v/1e9:+.1f}B"
+        elif abs(v) >= 1e6: return f"{v/1e6:+.1f}M"
+        elif abs(v) >= 1e3: return f"{v/1e3:+.1f}K"
+        elif abs(v) >= 10: return f"{v:+.1f}"
+        elif abs(v) >= 1: return f"{v:+.2f}"
+        elif abs(v) > 0: return f"{v:+.4f}"
+        else: return "0.0"
+    except Exception:
+        return "0.0"
 
 
 def fmt_v(v: float) -> str:
-    if v >= 1e9: return f"${v/1e9:.1f}B"
-    elif v >= 1e6: return f"${v/1e6:.1f}M"
-    elif v >= 1e3: return f"${v/1e3:.0f}K"
-    else: return f"${v:.0f}"
+    try:
+        v = float(v)
+        if v >= 1e9: return f"${v/1e9:.1f}B"
+        elif v >= 1e6: return f"${v/1e6:.1f}M"
+        elif v >= 1e3: return f"${v/1e3:.0f}K"
+        else: return f"${v:.0f}"
+    except Exception:
+        return "$0"
+
+
+def fmt_pc(v: float) -> str:
+    try:
+        v = float(v)
+        if abs(v) >= 1e9: return f"{v/1e9:.2f}B" if abs(v) < 1e11 else f"{v/1e9:.1f}B"
+        elif abs(v) >= 1e6: return f"{v/1e6:.2f}M" if abs(v) < 1e8 else f"{v/1e6:.1f}M"
+        elif abs(v) >= 1e3: return f"{v/1e3:.1f}K"
+        elif abs(v) >= 100: return f"{v:.0f}"
+        elif abs(v) >= 1: return f"{v:.2f}"
+        elif abs(v) > 0: return f"{v:.4f}"
+        else: return "0"
+    except Exception:
+        return "0"
+
+
+def fmt_whale(w) -> str:
+    try:
+        val = float(w)
+        return f"[bold gold1]{val:.1f}[/bold gold1]" if val > 0 else "[dim]N/A[/dim]"
+    except Exception:
+        return "[dim]N/A[/dim]"
 
 
 def calc_rsi(closes: List[float], period: int = 14) -> float:
@@ -2671,73 +2795,150 @@ def calc_ema(closes: List[float], period: int) -> float:
     return ema
 
 
+def find_master_parquet_path(sym: str) -> Optional[str]:
+    """Search for the master parquet file across standard repository and pipeline storage paths."""
+    candidates = [
+        os.path.join(r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", f"{sym}_15m_master_2020_2026.parquet"),
+        os.path.join(r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", f"Master_{sym}_15m_Final_Summary.parquet"),
+        os.path.join(os.path.dirname(__file__), "Backtesting_Training_Data", f"{sym}_15m_master_2020_2026.parquet"),
+        os.path.join(os.path.dirname(__file__), "Backtesting_Training_Data", f"Master_{sym}_15m_Final_Summary.parquet"),
+        os.path.join(os.path.dirname(__file__), "backtesting_data", f"Master_{sym}_15m_Final_Summary.parquet"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+
 async def bootstrap_matrix_symbol(sym: str) -> None:
     st = MATRIX_STATES.get(sym)
     if not st: return
     try:
-        k_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit=500"
+        parquet_path = find_master_parquet_path(sym)
+        checkpoint_close_ms = 0
+        
+        # 1. Load exact historical state from Master Parquet if available
+        if parquet_path:
+            try:
+                df_chk = pd.read_parquet(parquet_path)
+                if not df_chk.empty:
+                    last_row = df_chk.iloc[-1]
+                    checkpoint_close_ms = int(last_row.get("close_time_ms", last_row.get("open_time_ms", 0) + 899999))
+                    st.ema8 = float(last_row.get("ema_8", 0.0))
+                    st.ema21 = float(last_row.get("ema_21", 0.0))
+                    st.ema50 = float(last_row.get("ema_50", 0.0))
+                    st.ema200 = float(last_row.get("ema_200", 0.0))
+                    st.ema800 = float(last_row.get("ema_800", 0.0))
+                    st.rsi = float(last_row.get("rsi_14", 50.0))
+                    st.atr14 = float(last_row.get("atr_14", 0.0))
+                    st.atr100 = float(last_row.get("atr_100", 0.0))
+                    st.vol_sma9 = float(last_row.get("volume_sma9", 0.0))
+                    st.fut_cvd = float(last_row.get("future_cvd_session", 0.0))
+                    st.session_fut_cvd_base = st.fut_cvd
+                    st.spot_cvd = float(last_row.get("spot_cvd_session", 0.0))
+                    st.session_spot_cvd_base = st.spot_cvd
+                    st.future_cvd_lifetime = float(last_row.get("future_cvd_lifetime", 0.0))
+                    st.spot_cvd_lifetime = float(last_row.get("spot_cvd_lifetime", 0.0))
+                    st.fp_poc = float(last_row.get("fp_poc", 0.0))
+                    st.fp_delta = float(last_row.get("fp_delta", 0.0))
+                    st.max_trade_vol_btc = float(last_row.get("max_trade_vol_btc", 0.0))
+                    st.avg_trade_usd = float(last_row.get("avg_trade_size_usd", 0.0))
+                    st.bid_depth_1pct = float(last_row.get("bid_depth_usd", 0.0))
+                    st.ask_depth_1pct = float(last_row.get("ask_depth_usd", 0.0))
+                    oi_val = float(last_row.get("open_interest_usd", 0.0))
+                    oi_coin = float(last_row.get("open_interest_k", 0.0)) * 1000.0
+                    if oi_coin <= 0 and oi_val > 0 and st.price > 0:
+                        oi_coin = oi_val / st.price
+                    st.oi_coin = oi_coin
+                    st.oi_usd = oi_val
+                    st.oi_k = fmt_pc(oi_coin)
+                    st.oi_chg_pct = float(last_row.get("oi_change_pct", 0.0))
+                    st.ls_ratio_global = float(last_row.get("ls_ratio_global", 1.0))
+                    st.ls_ratio_top = float(last_row.get("ls_ratio_top", 1.0))
+                    st.top_account_ratio = float(last_row.get("top_account_ratio", 1.0))
+                    if st.ls_ratio_top > 0 and st.ls_ratio_global > 0:
+                        top_p = st.ls_ratio_top / (1.0 + st.ls_ratio_top)
+                        glob_p = st.ls_ratio_global / (1.0 + st.ls_ratio_global)
+                        st.whale_index = (top_p / max(glob_p, 0.0001)) * 100.0
+                    st.funding_rate = float(last_row.get("funding_rate_pct", 0.0))
+                    st.basis = float(last_row.get("basis_usd", 0.0))
+                    st.prev_day_vah = float(last_row.get("prev_day_vah", 0.0))
+                    st.prev_day_val = float(last_row.get("prev_day_val", 0.0))
+                    st.session_vah = float(last_row.get("session_vah", 0.0))
+                    st.session_val = float(last_row.get("session_val", 0.0))
+            except Exception as e:
+                print(f"[PARQUET LOAD WARN] {sym}: {e}")
+
+        # 2. Fetch recent 200 bars from REST API for exact continuous Wilder RSI, ATR & EMAs
+        k_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit=200"
         spot_k_url = f"https://api.binance.com/api/v3/klines?symbol={sym}&interval=15m&limit=1"
+        base = sym[:-4] if sym.endswith("USDT") else sym
+        usdc_sym = f"{base}USDC"
         oi_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
+        oi_usdc_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={usdc_sym}"
         prem_url = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sym}"
         ratio_g_url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=15m&limit=1"
         ratio_t_url = f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={sym}&period=15m&limit=1"
         depth_url = f"https://fapi.binance.com/fapi/v1/depth?symbol={sym}&limit=100"
         oi_hist_url = f"https://fapi.binance.com/futures/data/openInterestHist?symbol={sym}&period=15m&limit=2"
 
-        k_data, spot_k_data, oi_data, prem_data, rg_data, rt_data, depth_data, oi_hist_data = await asyncio.gather(
+        fetch_boot = [
             async_fetch(k_url, weight=1),
             async_fetch(spot_k_url, weight=1),
             async_fetch(oi_url, weight=1),
+            async_fetch(oi_usdc_url, weight=1),
             async_fetch(prem_url, weight=1),
             async_fetch(ratio_g_url, weight=1),
             async_fetch(ratio_t_url, weight=1),
             async_fetch(depth_url, weight=1),
             async_fetch(oi_hist_url, weight=1),
-            return_exceptions=True
-        )
+        ]
+        if base in ("BTC", "ETH"):
+            fetch_boot.append(async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={base}USDT_260925", weight=1))
+            fetch_boot.append(async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={base}USDT_261225", weight=1))
 
-        # Kline bootstrap is mandatory: without it every matrix field is a
-        # misleading placeholder.  Surface an explicit health failure instead
-        # of rendering an apparently live all-ellipsis matrix.
-        if not isinstance(k_data, list) or not k_data:
-            raise RuntimeError("Binance Futures 15m kline bootstrap returned no data")
+        boot_res = await asyncio.gather(*fetch_boot, return_exceptions=True)
+        k_data, spot_k_data, oi_data, oi_usdc_data, prem_data, rg_data, rt_data, depth_data, oi_hist_data = boot_res[0], boot_res[1], boot_res[2], boot_res[3], boot_res[4], boot_res[5], boot_res[6], boot_res[7], boot_res[8]
 
         if isinstance(k_data, list) and len(k_data) > 0:
-            closes = [float(k[4]) for k in k_data]
-            highs = [float(k[2]) for k in k_data]
-            lows = [float(k[3]) for k in k_data]
+            st.recent_closes = [float(k[4]) for k in k_data]
+            st.recent_highs = [float(k[2]) for k in k_data]
+            st.recent_lows = [float(k[3]) for k in k_data]
             vols = [float(k[7]) for k in k_data]
-            base_vols = [float(k[5]) for k in k_data]
-            trades_count = [float(k[8]) for k in k_data]
-            taker_buys = [float(k[9]) for k in k_data]
-            taker_sells = [base_vols[i] - taker_buys[i] for i in range(len(base_vols))]
 
-            st.price = closes[-1]
-            st.quote_vol_15m = vols[-1]
-            st.base_vol_15m = base_vols[-1]
-            st.fut_buy_15m = taker_buys[-1]
-            st.fut_sell_15m = taker_sells[-1]
-            st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
-            st.rsi = calc_rsi(closes, 14)
-            st.atr14 = calc_atr(highs, lows, closes, 14)
-            st.atr100 = calc_atr(highs, lows, closes, 100)
+            # Compute exact live Wilder RSI, ATR and Technicals
+            st.rsi = calc_rsi(st.recent_closes, 14)
+            st.atr14 = calc_atr(st.recent_highs, st.recent_lows, st.recent_closes, 14)
+            st.atr100 = calc_atr(st.recent_highs, st.recent_lows, st.recent_closes, 100)
             st.vol_sma9 = sum(vols[-9:]) / min(len(vols), 9) if vols else 0.0
-            st.ema8 = calc_ema(closes, 8)
-            st.ema21 = calc_ema(closes, 21)
-            st.ema50 = calc_ema(closes, 50)
-            st.ema200 = calc_ema(closes, 200)
-            st.ema800 = calc_ema(closes, 800)
-            st.max_trade_vol_btc = max(base_vols[-10:]) if len(base_vols) > 0 else 0.0
-            st.avg_trade_usd = (st.quote_vol_15m / trades_count[-1]) if trades_count[-1] > 0 else 0.0
+            st.ema8 = calc_ema(st.recent_closes, 8)
+            st.ema21 = calc_ema(st.recent_closes, 21)
+            st.ema50 = calc_ema(st.recent_closes, 50)
+
+            # Active forming bar metrics
+            latest_k = k_data[-1]
+            st.price = float(latest_k[4])
+            st.quote_vol_15m = float(latest_k[7])
+            st.base_vol_15m = float(latest_k[5])
+            st.fut_buy_15m = float(latest_k[9])
+            st.fut_sell_15m = max(0.0, st.base_vol_15m - st.fut_buy_15m)
+            st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+            st.fut_cvd = st.session_fut_cvd_base + st.fp_delta
+            trades_cnt = float(latest_k[8]) if len(latest_k) > 8 else 1.0
+            st.avg_trade_usd = (st.quote_vol_15m / trades_cnt) if trades_cnt > 0 else 0.0
+
+            # If no parquet was found, compute deep EMA and Value Area baselines
+            if checkpoint_close_ms == 0:
+                st.ema200 = calc_ema(st.recent_closes, 200)
+                st.ema800 = calc_ema(st.recent_closes, 800)
+                st.session_vah = max(st.recent_highs[-32:]) if len(st.recent_highs) >= 32 else max(st.recent_highs)
+                st.session_val = min(st.recent_lows[-32:]) if len(st.recent_lows) >= 32 else min(st.recent_lows)
+                st.prev_day_vah = max(st.recent_highs[-96:-32]) if len(st.recent_highs) >= 96 else st.session_vah
+                st.prev_day_val = min(st.recent_lows[-96:-32]) if len(st.recent_lows) >= 96 else st.session_val
 
             m_lvl = get_merge_level(sym)
             st.profile_tick_size = m_lvl
             st.fp_poc = round(st.price / m_lvl) * m_lvl if m_lvl else st.price
-            st.session_vah = max(highs[-32:]) if len(highs) >= 32 else max(highs)
-            st.session_val = min(lows[-32:]) if len(lows) >= 32 else min(lows)
-            st.prev_day_vah = max(highs[-96:-32]) if len(highs) >= 96 else st.session_vah
-            st.prev_day_val = min(lows[-96:-32]) if len(lows) >= 96 else st.session_val
-            st.fut_cvd = sum([taker_buys[i] - taker_sells[i] for i in range(len(taker_buys))])
 
         if isinstance(spot_k_data, list) and len(spot_k_data) > 0:
             st.spot_price = float(spot_k_data[-1][4])
@@ -2745,16 +2946,29 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             spot_base = float(spot_k_data[-1][5])
             spot_tb = float(spot_k_data[-1][9])
             st.spot_buy_15m = spot_tb
-            st.spot_sell_15m = spot_base - spot_tb
-            st.spot_cvd = spot_tb - st.spot_sell_15m
+            st.spot_sell_15m = max(0.0, spot_base - spot_tb)
+            st.spot_cvd = st.session_spot_cvd_base + (st.spot_buy_15m - st.spot_sell_15m)
+
+        if st.max_trade_vol_btc == 0.0 and st.base_vol_15m > 0 and trades_cnt > 0:
+            st.max_trade_vol_btc = (st.base_vol_15m / trades_cnt) * 5.0
 
         if isinstance(prem_data, dict):
             st.funding_rate = float(prem_data.get("lastFundingRate", 0.0)) * 100.0
 
+        tot_oi_coin = 0.0
         if isinstance(oi_data, dict):
-            oi_coin = float(oi_data.get("openInterest", 0.0))
-            st.oi_usd = oi_coin * st.price
-            st.oi_k = f"${st.oi_usd/1e6:.0f}M" if st.oi_usd >= 1e6 else f"${st.oi_usd/1e3:.0f}K"
+            tot_oi_coin += float(oi_data.get("openInterest", 0.0))
+        if isinstance(oi_usdc_data, dict):
+            tot_oi_coin += float(oi_usdc_data.get("openInterest", 0.0))
+        if base in ("BTC", "ETH"):
+            for extra in boot_res[9:]:
+                if isinstance(extra, dict):
+                    tot_oi_coin += float(extra.get("openInterest", 0.0))
+
+        if tot_oi_coin > 0:
+            st.oi_coin = tot_oi_coin
+            st.oi_usd = tot_oi_coin * (st.price or 1.0)
+            st.oi_k = fmt_pc(tot_oi_coin)
 
         if isinstance(oi_hist_data, list) and len(oi_hist_data) >= 2:
             prev_oi = float(oi_hist_data[-2].get("sumOpenInterest", 1.0))
@@ -2767,17 +2981,19 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
         if isinstance(rt_data, list) and len(rt_data) > 0:
             raw_r = float(rt_data[0].get("longShortRatio", 1.0))
             st.ls_ratio_top = raw_r
-            st.whale_index = f"{raw_r * 100.0:.1f}"
+            top_long_pct = float(rt_data[0].get("longAccount", raw_r / (1.0 + raw_r)))
+            glob_long_pct = float(rg_data[0].get("longAccount", st.ls_ratio_global / (1.0 + st.ls_ratio_global))) if (isinstance(rg_data, list) and len(rg_data) > 0) else (st.ls_ratio_global / (1.0 + st.ls_ratio_global))
+            st.whale_index = (top_long_pct / glob_long_pct * 100.0) if glob_long_pct > 0 else 100.0
 
         if isinstance(depth_data, dict):
             bids = depth_data.get("bids", [])
             asks = depth_data.get("asks", [])
             curr_p = st.price or 1.0
-            bid_usd = sum([float(b[0]) * float(b[1]) for b in bids if float(b[0]) >= curr_p * 0.99])
-            ask_usd = sum([float(a[0]) * float(a[1]) for a in asks if float(a[0]) <= curr_p * 1.01])
-            st.bid_depth_1pct = bid_usd
-            st.ask_depth_1pct = ask_usd
-            st.depth_ratio = (bid_usd / ask_usd) if ask_usd > 0 else 1.0
+            bid_coin = sum([float(b[1]) for b in bids if float(b[0]) >= curr_p * 0.99])
+            ask_coin = sum([float(a[1]) for a in asks if float(a[0]) <= curr_p * 1.01])
+            st.bid_depth_1pct = bid_coin * curr_p
+            st.ask_depth_1pct = -ask_coin * curr_p
+            st.depth_ratio = (st.bid_depth_1pct / abs(st.ask_depth_1pct)) if abs(st.ask_depth_1pct) > 0 else 1.0
     except Exception as exc:
         st.bootstrap_error = f"{type(exc).__name__}: {exc}"
         st.bootstrap_ok = False
@@ -2838,22 +3054,24 @@ def render_multi_asset_matrix(symbols: List[str], dyn_console: Console = None) -
         f"[bold red]{s.rsi:.1f}[/bold red]" if s.rsi >= 70 else (
         f"[bold green]{s.rsi:.1f}[/bold green]" if s.rsi <= 30 else f"[yellow]{s.rsi:.1f}[/yellow]"
     )))
-    add_row("5. FUT CVD", lambda s: f"[green]{fmt_c(s.fut_cvd)}[/green]" if s.fut_cvd >= 0 else f"[red]{fmt_c(s.fut_cvd)}[/red]")
-    add_row("6. SPOT CVD", lambda s: f"[green]{fmt_c(s.spot_cvd)}[/green]" if s.spot_cvd >= 0 else f"[red]{fmt_c(s.spot_cvd)}[/red]")
+    add_row("5. FUT CVD (SESS)", lambda s: f"[green]{fmt_c(s.fut_cvd)}[/green]" if s.fut_cvd >= 0 else f"[red]{fmt_c(s.fut_cvd)}[/red]")
+    add_row("5b. FUT CVD (LIFE)", lambda s: f"[green]{fmt_c(s.future_cvd_lifetime + s.fp_delta)}[/green]" if (s.future_cvd_lifetime + s.fp_delta) >= 0 else f"[red]{fmt_c(s.future_cvd_lifetime + s.fp_delta)}[/red]")
+    add_row("6. SPOT CVD (SESS)", lambda s: f"[green]{fmt_c(s.spot_cvd)}[/green]" if s.spot_cvd >= 0 else f"[red]{fmt_c(s.spot_cvd)}[/red]")
+    add_row("6b. SPOT CVD (LIFE)", lambda s: f"[green]{fmt_c(s.spot_cvd_lifetime + s.spot_cvd)}[/green]" if (s.spot_cvd_lifetime + s.spot_cvd) >= 0 else f"[red]{fmt_c(s.spot_cvd_lifetime + s.spot_cvd)}[/red]")
     add_row("7. FUNDING %", lambda s: f"[green]{s.funding_rate:+.3f}%[/green]" if s.funding_rate >= 0 else f"[red]{s.funding_rate:+.3f}%[/red]")
-    add_row("8. OPEN INT", lambda s: f"[bright_yellow]{s.oi_k}[/bright_yellow]")
+    add_row("8. OPEN INT", lambda s: f"[bright_yellow]{fmt_pc(s.oi_coin)}[/bright_yellow]")
     add_row("9. LONG LIQ", lambda s: f"[green]{fmt_v(s.long_liq_15m)}[/green]")
     add_row("10. SHORT LIQ", lambda s: f"[red]{fmt_v(s.short_liq_15m)}[/red]")
     add_row("10b. CASCADE", lambda s: s.cascade_bias)
     add_row("11. L/S GLOBAL", lambda s: f"[green]{s.ls_ratio_global:.2f}[/green]" if s.ls_ratio_global >= 1.0 else f"[red]{s.ls_ratio_global:.2f}[/red]")
     add_row("11b. L/S TOP", lambda s: f"[green]{s.ls_ratio_top:.2f}[/green]" if s.ls_ratio_top >= 1.0 else f"[red]{s.ls_ratio_top:.2f}[/red]")
     add_row("12. FP DELTA", lambda s: f"[green]{fmt_c(s.fp_delta)}[/green]" if s.fp_delta >= 0 else f"[red]{fmt_c(s.fp_delta)}[/red]")
-    add_row("13. FP POC", lambda s: f"[bold magenta]{fmt_p(s.fp_poc)}[/bold magenta]")
-    add_row("14. BEST BID NOTIONAL", lambda s: f"[bold green]{fmt_v(s.bid_depth_1pct)}[/bold green]")
-    add_row("15. BEST ASK NOTIONAL", lambda s: f"[bold red]{fmt_v(s.ask_depth_1pct)}[/bold red]")
-    add_row("16. BEST BID QTY", lambda s: f"[green]{fmt_pc(s.bid_depth_1pct / s.price)}[/green]" if s.price > 0 else "0")
-    add_row("17. BEST ASK QTY", lambda s: f"[red]{fmt_pc(s.ask_depth_1pct / s.price)}[/red]" if s.price > 0 else "0")
-    add_row("18. WHALE IDX", lambda s: f"[bold gold1]{s.whale_index}[/bold gold1]")
+    add_row("13. FP POC", lambda s: f"[bold magenta]{fmt_p(s.fp_poc if s.fp_poc > 0 else s.price)}[/bold magenta]")
+    add_row("14. BID DOLLAR DEPTH", lambda s: f"[bold green]{fmt_v(abs(s.bid_depth_1pct))}[/bold green]")
+    add_row("15. ASK DOLLAR DEPTH", lambda s: f"[bold red]-{fmt_v(abs(s.ask_depth_1pct))}[/bold red]")
+    add_row("16. BID COIN DEPTH", lambda s: f"[green]{fmt_pc(abs(s.bid_depth_1pct / s.price))}[/green]" if s.price > 0 else "0")
+    add_row("17. ASK COIN DEPTH", lambda s: f"[red]-{fmt_pc(abs(s.ask_depth_1pct / s.price))}[/red]" if s.price > 0 else "0")
+    add_row("18. WHALE IDX", lambda s: fmt_whale(s.whale_index))
     add_row("19. TAKER BUY", lambda s: f"[bold green]{fmt_pc(s.fut_buy_15m)}[/bold green]")
     add_row("20. TAKER SELL", lambda s: f"[bold red]{fmt_pc(s.fut_sell_15m)}[/bold red]")
     add_row("21. EMA 8", lambda s: f"[cyan]{fmt_pc(s.ema8)}[/cyan]")
@@ -2880,6 +3098,20 @@ def render_multi_asset_matrix(symbols: List[str], dyn_console: Console = None) -
 def reset_matrix_bar_if_needed(st: MatrixAssetState, bar_open_ms: int) -> None:
     if st.active_bar_open_ms == bar_open_ms:
         return
+    if st.active_bar_open_ms > 0:
+        bar_fut_delta = (st.fut_buy_15m - st.fut_sell_15m)
+        bar_spot_delta = (st.spot_buy_15m - st.spot_sell_15m)
+        st.future_cvd_lifetime += bar_fut_delta
+        st.spot_cvd_lifetime += bar_spot_delta
+        prev_day = st.active_bar_open_ms // 86_400_000
+        curr_day = bar_open_ms // 86_400_000
+        if prev_day != curr_day:
+            st.session_fut_cvd_base = 0.0
+            st.session_spot_cvd_base = 0.0
+        else:
+            st.session_fut_cvd_base += bar_fut_delta
+            st.session_spot_cvd_base += bar_spot_delta
+
     st.active_bar_open_ms = bar_open_ms
     st.fut_buy_15m = 0.0
     st.fut_sell_15m = 0.0
@@ -2887,6 +3119,8 @@ def reset_matrix_bar_if_needed(st: MatrixAssetState, bar_open_ms: int) -> None:
     st.spot_sell_15m = 0.0
     st.fp_delta = 0.0
     st.fp_poc = 0.0
+    st.fut_cvd = st.session_fut_cvd_base
+    st.spot_cvd = st.session_spot_cvd_base
     st.long_liq_15m = 0.0
     st.short_liq_15m = 0.0
     st.max_trade_vol_btc = 0.0
@@ -2932,7 +3166,8 @@ async def run_multi_asset_matrix() -> None:
                 f"{lsym}@bookTicker",
                 f"{lsym}@kline_15m",
                 f"{lsym}@markPrice@1s",
-                f"{lsym}@forceOrder"
+                f"{lsym}@forceOrder",
+                f"{lsym}@aggTrade"
             ])
         stream_url = f"wss://fstream.binance.com/stream?streams={'/'.join(streams)}"
 
@@ -2956,6 +3191,20 @@ async def run_multi_asset_matrix() -> None:
                                     px = float(k.get("c", 0.0))
                                     if px > 0:
                                         st.price = px
+                                        if len(st.recent_closes) >= 15:
+                                            live_closes = st.recent_closes[:-1] + [px]
+                                            st.rsi = calc_rsi(live_closes, 14)
+                                            st.ema8 = calc_ema(live_closes, 8)
+                                            st.ema21 = calc_ema(live_closes, 21)
+                                            st.ema50 = calc_ema(live_closes, 50)
+
+                                    if k.get("x") and px > 0:
+                                        st.recent_closes.append(px)
+                                        if len(st.recent_closes) > 300: st.recent_closes.pop(0)
+                                        st.recent_highs.append(float(k.get("h", px)))
+                                        if len(st.recent_highs) > 300: st.recent_highs.pop(0)
+                                        st.recent_lows.append(float(k.get("l", px)))
+                                        if len(st.recent_lows) > 300: st.recent_lows.pop(0)
                                         
                                     st.quote_vol_15m = float(k.get("q", 0.0))
                                     st.base_vol_15m = float(k.get("v", 0.0))
@@ -2970,8 +3219,8 @@ async def run_multi_asset_matrix() -> None:
                                             
                                     st.fut_buy_15m = taker_buy_base
                                     st.fut_sell_15m = taker_sell_base
-                                    st.fut_cvd = st.fut_buy_15m - st.fut_sell_15m
-                                    st.fp_delta = st.fut_cvd
+                                    st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+                                    st.fut_cvd = st.session_fut_cvd_base + st.fp_delta
                                     
                                     trades = float(k.get("n", 1))
                                     if trades > 0:
@@ -3008,6 +3257,13 @@ async def run_multi_asset_matrix() -> None:
                             st = MATRIX_STATES.get(sym)
                             if st:
                                 st.funding_rate = float(data.get("r", 0.0)) * 100.0
+                        elif "@aggTrade" in stream:
+                            sym = data.get("s", "").upper()
+                            st = MATRIX_STATES.get(sym)
+                            if st:
+                                q_val = float(data.get("q", 0.0))
+                                if q_val > st.max_trade_vol_btc:
+                                    st.max_trade_vol_btc = q_val
                         elif "@bookTicker" in stream:
                             sym = data.get("s", "").upper()
                             st = MATRIX_STATES.get(sym)
@@ -3058,27 +3314,50 @@ async def run_multi_asset_matrix() -> None:
         try:
             st = MATRIX_STATES.get(sym)
             if not st: return
+            base = sym[:-4] if sym.endswith("USDT") else sym
+            usdc_sym = f"{base}USDC"
             oi_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
+            oi_usdc_url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={usdc_sym}"
             ratio_g_url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=15m&limit=1"
             ratio_t_url = f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol={sym}&period=15m&limit=1"
             kline_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sym}&interval=15m&limit=1"
             
-            oi_data, rg_data, rt_data, kline_data = await asyncio.gather(
+            fetch_tasks = [
                 async_fetch(oi_url, weight=1),
+                async_fetch(oi_usdc_url, weight=1),
                 async_fetch(ratio_g_url, weight=1),
                 async_fetch(ratio_t_url, weight=1),
                 async_fetch(kline_url, weight=1),
-                return_exceptions=True
-            )
-            if isinstance(oi_data, dict) and st.price > 0:
-                oi_coin = float(oi_data.get("openInterest", 0.0))
-                st.oi_usd = oi_coin * st.price
-                st.oi_k = f"${st.oi_usd/1e6:.0f}M" if st.oi_usd >= 1e6 else f"${st.oi_usd/1e3:.0f}K"
+            ]
+            if base in ("BTC", "ETH"):
+                fetch_tasks.append(async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={base}USDT_260925", weight=1))
+                fetch_tasks.append(async_fetch(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={base}USDT_261225", weight=1))
+
+            results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+            oi_data, oi_usdc_data, rg_data, rt_data, kline_data = results[0], results[1], results[2], results[3], results[4]
+            
+            tot_oi_coin = 0.0
+            if isinstance(oi_data, dict):
+                tot_oi_coin += float(oi_data.get("openInterest", 0.0))
+            if isinstance(oi_usdc_data, dict):
+                tot_oi_coin += float(oi_usdc_data.get("openInterest", 0.0))
+            if base in ("BTC", "ETH"):
+                for extra in results[5:]:
+                    if isinstance(extra, dict):
+                        tot_oi_coin += float(extra.get("openInterest", 0.0))
+            
+            if tot_oi_coin > 0:
+                st.oi_coin = tot_oi_coin
+                if st.price > 0:
+                    st.oi_usd = tot_oi_coin * st.price
+                st.oi_k = fmt_pc(tot_oi_coin)
             if isinstance(rg_data, list) and len(rg_data) > 0:
                 st.ls_ratio_global = float(rg_data[0].get("longShortRatio", 1.0))
             if isinstance(rt_data, list) and len(rt_data) > 0:
                 st.ls_ratio_top = float(rt_data[0].get("longShortRatio", 1.0))
-                st.whale_index = st.ls_ratio_top * 100.0
+                top_long_pct = float(rt_data[0].get("longAccount", st.ls_ratio_top / (1.0 + st.ls_ratio_top)))
+                glob_long_pct = float(rg_data[0].get("longAccount", st.ls_ratio_global / (1.0 + st.ls_ratio_global))) if (isinstance(rg_data, list) and len(rg_data) > 0) else (st.ls_ratio_global / (1.0 + st.ls_ratio_global))
+                st.whale_index = (top_long_pct / glob_long_pct * 100.0) if glob_long_pct > 0 else 100.0
             if isinstance(kline_data, list) and len(kline_data) > 0:
                 k = kline_data[-1]
                 bar_open_ms = int(k[0])
@@ -3087,8 +3366,11 @@ async def run_multi_asset_matrix() -> None:
                 st.quote_vol_15m = float(k[7])
                 st.fut_buy_15m = float(k[9])
                 st.fut_sell_15m = max(0.0, st.base_vol_15m - st.fut_buy_15m)
-                st.fut_cvd = st.fut_buy_15m - st.fut_sell_15m
-                st.fp_delta = st.fut_cvd
+                st.fp_delta = st.fut_buy_15m - st.fut_sell_15m
+                st.fut_cvd = st.session_fut_cvd_base + st.fp_delta
+                t_cnt = float(k[8]) if len(k) > 8 else 1.0
+                if t_cnt > 0:
+                    st.avg_trade_usd = st.quote_vol_15m / t_cnt
         except Exception:
             pass
 
@@ -3143,7 +3425,7 @@ async def run_multi_asset_matrix() -> None:
         await asyncio.gather(t_fws, t_sws, t_poller, return_exceptions=True)
 
 
-if __name__ == "__main__":
+def main():
     try:
         # If user explicitly specifies a single symbol via --single, run focused single-symbol mode
         has_single_symbol = any(arg == "--single" for arg in sys.argv)
@@ -3157,3 +3439,7 @@ if __name__ == "__main__":
             sys.stdout.write("\033[?25h\n")
             sys.stdout.flush()
         print("\n[STOPPED] Service exited cleanly.")
+
+
+if __name__ == "__main__":
+    main()
