@@ -2696,6 +2696,12 @@ async def bootstrap_matrix_symbol(sym: str) -> None:
             return_exceptions=True
         )
 
+        # Kline bootstrap is mandatory: without it every matrix field is a
+        # misleading placeholder.  Surface an explicit health failure instead
+        # of rendering an apparently live all-ellipsis matrix.
+        if not isinstance(k_data, list) or not k_data:
+            raise RuntimeError("Binance Futures 15m kline bootstrap returned no data")
+
         if isinstance(k_data, list) and len(k_data) > 0:
             closes = [float(k[4]) for k in k_data]
             highs = [float(k[2]) for k in k_data]
