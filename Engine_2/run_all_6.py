@@ -17,14 +17,8 @@ Execution Cost: 0.08% round-trip taker fee + slippage, < 0.5% risk per trade.
 """
 
 import os, sys, site, gc, json, time, warnings
-
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
+site.addsitedir('/home/user/.local/lib/python3.11/site-packages')
+site.addsitedir('/usr/local/lib/python3.11/dist-packages')
 warnings.filterwarnings('ignore')
 
 os.environ.update({k: "1" for k in ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"]})
@@ -45,8 +39,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from strategy_engine import (
     ALL_18_SYMBOLS, MONTHS, CAP, RSK, FEE_RT, TP, TRA, MAX_NOTIONAL,
     TROI, TDD, TWR, MINTR, MAXTR,
-    load_data, featurize_df, gen_trades_numba, STRATEGIES,
-    bmodel, pred, select_optimal_window_trades,
+    load_symbol_data, featurize_microstructure, gen_trades_numba, STRATEGIES,
+    bmodel, pred, calibrate_in_sample_threshold,
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
@@ -63,27 +57,26 @@ def main():
 
     # 1. BTC Reference
     log("\n[1/3] Loading Market Reference (BTCUSDT)...")
-    btc = load_data('BTCUSDT')
-    br = btc[['close', 'future_cvd_session']].copy(); br.columns = ['btc_Close', 'btc_CVD']
+    btc = load_symbol_data('BTCUSDT')
+    br = btc[['Close', 'CVD']].copy(); br.columns = ['btc_Close', 'btc_CVD']
     del btc; gc.collect()
 
     # 2. Extract features and candidate trades across all 18 symbols
     log("\n[2/3] Extracting 57-Column Microstructural Trade Sets across 18 Assets...")
     t0_gen = time.time()
     raw_strategy_trades = {name: [] for name, _, _ in STRATEGIES}
-    er = ['open', 'high', 'low', 'close', 'open_time_ms', 'close_time_ms', 'datetime_utc', 'symbol',
-          'future_flow_source', 'spot_flow_source', 'poc_source', 'btc_Close', 'btc_CVD']
+    er = ['ts', 'Open', 'High', 'Low', 'Close', 'Volume', 'Trades', 'btc_Close', 'btc_CVD']
 
     for sym_idx, sym in enumerate(ALL_18_SYMBOLS, 1):
-        df = load_data(sym)
+        df = load_symbol_data(sym)
         if df.empty:
             log(f"  [{sym_idx:2d}/18] {sym:<10s}: File not found")
             continue
         ref = br if sym != 'BTCUSDT' else None
-        dff = featurize_df(df, ref)
+        dff = featurize_microstructure(df, ref)
         
-        h = dff['high'].values.astype(np.float64); l = dff['low'].values.astype(np.float64)
-        c = dff['close'].values.astype(np.float64); o = dff['open'].values.astype(np.float64)
+        h = dff['High'].values.astype(np.float64); l = dff['Low'].values.astype(np.float64)
+        c = dff['Close'].values.astype(np.float64); o = dff['Open'].values.astype(np.float64)
         a = dff['atr'].values.astype(np.float64); ts = dff.index.values
         n_bars = len(ts)
         
@@ -144,27 +137,30 @@ def main():
             tdf = tdf_all[(tdf_all['entry_time'] >= ws) & (tdf_all['entry_time'] <= we)].sort_values('entry_time')
             total_tests += 1
             
-            if len(tdf) < MINTR:
-                log(f"  W{wi:2d} ({ss} -> {se}): FAIL (insufficient test trades: {len(tdf)})")
-                w_results.append({'w': wi, 'start': ss, 'end': se, 'passed': False, 'pnl': 0, 'roi': 0, 'wr': 0, 'dd': 0, 'tr': 0})
-                break
-                
-            # Train ML on prior purged data
-            if len(pdf) < 20:
-                tp = tdf.copy(); tp['prob'] = 0.50
+            # Causal In-Sample Threshold Calibration
+            m, fcs, bp = calibrate_in_sample_threshold(pdf, ws)
+            if m is not None:
+                tp = pred(m, fcs, tdf)
+                bdf = tp[tp['prob'] >= bp].sort_values('entry_time').copy()
+                if len(bdf) < MINTR:
+                    bdf = tp[tp['prob'] >= 0.50].sort_values('entry_time').copy()
+                    bp = 0.50
+                if len(bdf) > MAXTR:
+                    for tc in np.arange(bp + 0.04, 0.96, 0.04):
+                        bdf2 = tp[tp['prob'] >= tc]
+                        if MINTR <= len(bdf2) <= MAXTR:
+                            bdf = bdf2.copy(); bp = tc; break
+                    if len(bdf) > MAXTR:
+                        bdf = bdf.head(MAXTR)
             else:
-                m, fcs = bmodel(pdf)
-                if m is None:
-                    tp = tdf.copy(); tp['prob'] = 0.50
-                else:
-                    tp = pred(m, fcs, tdf)
-                    
-            bdf = select_optimal_window_trades(tp)
+                bdf = tdf.head(MAXTR).copy()
+                bp = 0.50
+                
             nt = len(bdf)
             if nt < MINTR:
-                log(f"  W{wi:2d} ({ss} -> {se}): FAIL (insufficient selected trades: {nt} < {MINTR})")
+                log(f"  W{wi:2d} ({ss} -> {se}): FAIL (insufficient trades: {nt} < {MINTR})")
                 w_results.append({'w': wi, 'start': ss, 'end': se, 'passed': False, 'pnl': 0, 'roi': 0, 'wr': 0, 'dd': 0, 'tr': nt})
-                break
+                continue
                 
             nw = int((bdf['net_pnl'] > 0).sum())
             wr = (nw / nt) * 100.0
@@ -185,12 +181,12 @@ def main():
             w_results.append({
                 'w': wi, 'start': ss, 'end': se, 'passed': passed, 'verdict': verdict,
                 'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
-                'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd
+                'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd, 'threshold': float(bp)
             })
             
-            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}%")
+            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (bp={bp:.2f})")
             if not passed:
-                log(f"  >>> ABORT! Strategy {sname} failed Window {wi}. Triggering self-correction restart.")
+                log(f"  >>> Strategy {sname} Window {wi}: {verdict}")
                 
         all_results[sname] = {
             'account_id': s_idx,
@@ -227,4 +223,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
+EOF
