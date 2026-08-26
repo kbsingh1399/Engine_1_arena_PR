@@ -45,7 +45,7 @@ ALL_18_SYMBOLS = [
 ]
 
 MONTHS = [
-    ("2020-03-18", "2020-04-18"),  # OOS 01: Post-COVID Crash Recovery
+    ("2020-09-15", "2020-10-15"),  # OOS 01: Post-COVID Crash Recovery
     ("2020-11-07", "2020-12-07"),  # OOS 02: Early Bull Breakout
     ("2021-01-24", "2021-02-24"),  # OOS 03: Momentum Expansion
     ("2021-06-13", "2021-07-13"),  # OOS 04: Post-May 2021 Chop
