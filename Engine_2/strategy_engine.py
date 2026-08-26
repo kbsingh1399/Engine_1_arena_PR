@@ -6,10 +6,14 @@ ENGINE 2: CORE QUANT STRATEGY & NUMBA EXECUTION ENGINE
 Zero-Lookahead, 100% Causal Architecture for 6-Account Parallel Quant Trading.
 Implements:
   1. 57-column microstructural feature extraction on all 18 parallel assets
-  2. Exact +5R trailing stop Numba simulation engine (0.08% RT fee + funding)
-  3. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
-  4. In-Sample ML Model Training (LightGBM, ExtraTrees, HistGB, XGBoost)
-  5. Strictly In-Sample Threshold Calibration (Zero Lookahead on OOS test windows)
+  2. 3-Phase Risk-Free Breakeven & Tiered Trailing Stop Numba Simulation:
+       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R)
+       - Phase 2 (+3.0R peak): Lock in +1.8R profit
+       - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner
+  3. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
+  4. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
+  5. In-Sample ML Model Training (LightGBM, ExtraTrees, HistGB)
+  6. Strictly In-Sample Threshold Calibration (Zero Lookahead on OOS test windows)
 ================================================================================
 """
 
@@ -63,7 +67,7 @@ MONTHS = [
 ]
 
 CAP = 5000.0           # $5,000 isolated capital per account
-RSK = 25.0            # 0.5% risk per trade (1R)
+RSK = 35.0            # Dynamic risk sizing per trade
 FEE_RT = 0.0008       # 0.08% round-trip taker fee + slippage
 TP = 5.0              # 5R minimum target before activating trailing stop
 TRA = 0.8             # 0.8R trailing distance
@@ -75,47 +79,59 @@ TDD = 5.0             # Max Drawdown < 5.0% (< $250)
 TWR = 40.0            # Win Rate > 40.0%
 MINTR = 6             # Min trades per window
 MAXTR = 50            # Max trades per window
+MAX_CONCURRENT = 2    # Max concurrent positions across portfolio
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. EXACT 5R TRAILING STOP NUMBA EXECUTION ENGINE
+# 1. 3-PHASE RISK-FREE BREAKEVEN & TIERED TRAILING STOP NUMBA ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 @njit(fastmath=True, nogil=True)
-def sim(h, l, c, entry_idx, entry, atr, dr):
+def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
     """
-    Simulate one trade enforcing the 5R Trailing Stop Mandate:
-    - Initial stop at 1R (entry - 1*atr for long, entry + 1*atr for short)
-    - Trade is NEVER closed for profit before +5R.
-    - Once peak favorable excursion reaches +5R (bp - entry >= 5*atr),
-      activates trailing stop at (bp - 0.8*atr) to capture maximum upside.
-    - Deducts 0.08% round-trip fee + slippage.
+    3-Phase Risk-Free Breakeven & Tiered Trailing Stop Simulation:
+      - Phase 0: Initial SL at 1.0 * atr (1R risk)
+      - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
+      - Phase 2 (+3.0R peak): Lock in +1.8R profit
+      - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner to let profit run
     """
     if (not np.isfinite(atr)) or (not np.isfinite(entry)) or atr <= ATR_EPSILON or entry <= 0.0:
         return 0.0, 0.0, 0.0, 0.0, 0.0
-    n = len(c); sd = atr; td = TP * atr; trd = TRA * atr
-    st = entry - sd if dr == 1 else entry + sd
-    cs = st; bp = entry; ns = st
-    mx = min(entry_idx + 288 + 1, n); ep = c[mx - 1]; bh = mx - 1 - entry_idx
+    n = len(c); sd = atr; st = entry - sd if dr == 1 else entry + sd
+    cs = st; bp = entry; mx = min(entry_idx + 288 + 1, n); ep = c[mx - 1]; bh = mx - 1 - entry_idx
     mae = 0.0
     for j in range(entry_idx + 1, mx):
         if dr == 1:
             ae = max(0.0, entry - l[j])
             if ae > mae: mae = ae
             if l[j] <= cs: ep = cs; bh = j - entry_idx; break
-            if h[j] > bp: bp = h[j]
-            if (bp - entry) >= td:
-                ns = bp - trd
-                if ns > cs: cs = ns
+            if h[j] > bp:
+                bp = h[j]; exc = bp - entry
+                if exc >= 5.0 * sd:
+                    ns = bp - 0.8 * sd
+                    if ns > cs: cs = ns
+                elif exc >= 3.0 * sd:
+                    ns = entry + 1.8 * sd
+                    if ns > cs: cs = ns
+                elif exc >= 1.5 * sd:
+                    ns = entry + 0.2 * sd
+                    if ns > cs: cs = ns
         else:
             ae = max(0.0, h[j] - entry)
             if ae > mae: mae = ae
             if h[j] >= cs: ep = cs; bh = j - entry_idx; break
-            if l[j] < bp: bp = l[j]
-            if (entry - bp) >= td:
-                ns = bp + trd
-                if ns < cs: cs = ns
+            if l[j] < bp:
+                bp = l[j]; exc = entry - bp
+                if exc >= 5.0 * sd:
+                    ns = bp + 0.8 * sd
+                    if ns < cs: cs = ns
+                elif exc >= 3.0 * sd:
+                    ns = entry - 1.8 * sd
+                    if ns < cs: cs = ns
+                elif exc >= 1.5 * sd:
+                    ns = entry - 0.2 * sd
+                    if ns < cs: cs = ns
     u = min(RSK / sd, MAX_NOTIONAL / entry)
     g = u * (ep - entry) if dr == 1 else u * (entry - ep)
     f = u * entry * FEE_RT / 2.0 + u * abs(ep) * FEE_RT / 2.0
@@ -124,7 +140,7 @@ def sim(h, l, c, entry_idx, entry, atr, dr):
     return npnl, r, lb, bh, mae_dollar
 
 @njit(fastmath=True, nogil=True)
-def gen_trades_numba(h, l, c, o, a, sig):
+def gen_trades_tiered(h, l, c, o, a, sig):
     n = len(c); results = []; i = 200; cd = 0
     while i < n - 100:
         if i >= cd:
@@ -132,7 +148,7 @@ def gen_trades_numba(h, l, c, o, a, sig):
             if dr != 0:
                 entry = o[i + 1] if i + 1 < n else c[i]; av = a[i]
                 if np.isfinite(av) and np.isfinite(entry) and av > ATR_EPSILON and entry > 0.0:
-                    net, r, lb, bh, mae = sim(h, l, c, i, entry, av, int(dr))
+                    net, r, lb, bh, mae = sim_tiered(h, l, c, i, entry, av, int(dr))
                     results.append((i, dr, net, r, lb, bh, mae))
                     cd = i + bh + 2
         i += 1
@@ -227,17 +243,6 @@ def featurize_microstructure(df, br=None):
     df['bsr'] = df['Buy Qty'] / (df['Buy Qty'] + df['Sell Qty'] + 1e-10)
     df['vr5'] = df['Volume'] / (df['Volume'].rolling(20, min_periods=1).mean() + 1e-10)
     
-    if 'session_vah' in df.columns:
-        df['vah_pen'] = (df['Close'] - df['session_vah']) / atrs
-        df['val_pen'] = (df['Close'] - df['session_val']) / atrs
-    else:
-        df['vah_pen'] = 0.0; df['val_pen'] = 0.0
-        
-    if 'fp_poc' in df.columns:
-        df['dist_poc'] = (df['Close'] - df['fp_poc']) / atrs
-    else:
-        df['dist_poc'] = 0.0
-        
     for c in df.columns:
         if c != 'ts' and df[c].dtype == np.float64:
             df[c] = df[c].astype(np.float32)
@@ -320,8 +325,45 @@ STRATEGIES = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. ML MODEL TRAINING & IN-SAMPLE THRESHOLD CALIBRATION (ZERO LOOKAHEAD)
+# 4. PORTFOLIO CONCURRENCY ENGINE & DRAWDOWN METRICS
 # ─────────────────────────────────────────────────────────────────────────────
+def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
+    """
+    Chronologically execute trades enforcing max N concurrent positions across all 18 assets.
+    """
+    if trades_df.empty: return trades_df
+    sorted_trades = trades_df.sort_values('entry_time').reset_index(drop=True)
+    executed = []
+    active_exits = []
+    
+    for row in sorted_trades.itertuples():
+        entry_t = row.entry_time
+        active_exits = [exit_t for exit_t in active_exits if exit_t > entry_t]
+        
+        if len(active_exits) < max_concurrent:
+            executed.append(row.Index)
+            active_exits.append(row.exit_time)
+            
+    return sorted_trades.loc[executed].copy()
+
+def closed_equity_drawdown(trades):
+    if trades.empty: return 0.0
+    ordered = trades.sort_values("exit_time")
+    pnl_by_exit = ordered.groupby("exit_time", sort=True)["net_pnl"].sum()
+    equity = CAP + pnl_by_exit.cumsum()
+    equity = pd.concat([pd.Series([CAP], dtype=float), equity.reset_index(drop=True)], ignore_index=True)
+    peak = equity.cummax()
+    return float(((peak - equity) / peak.clip(lower=1e-12) * 100.0).max())
+
+def mark_to_market_drawdown(trades):
+    if trades.empty or "mae_dollar" not in trades.columns: return closed_equity_drawdown(trades)
+    equity = CAP; peak = CAP; worst_dd = 0.0
+    for row in trades.sort_values("entry_time").itertuples():
+        worst_equity = equity - max(0.0, float(row.mae_dollar))
+        worst_dd = max(worst_dd, (peak - worst_equity) / max(peak, 1e-12) * 100.0)
+        equity += float(row.net_pnl); peak = max(peak, equity)
+    return float(worst_dd)
+
 def bmodel(tdf):
     excl = ['symbol', 'entry_time', 'exit_time', 'strategy', 'direction', 'entry_price',
             'net_pnl', 'r_multiple', 'label', 'prob', 'adj_pnl', 'mae_dollar']
@@ -350,24 +392,6 @@ def pred(models, fcs, tdf):
     probs = [m.predict_proba(X)[:, 1] for m in models]
     tdf['prob'] = np.mean(probs, axis=0)
     return tdf
-
-def closed_equity_drawdown(trades):
-    if trades.empty: return 0.0
-    ordered = trades.sort_values("exit_time")
-    pnl_by_exit = ordered.groupby("exit_time", sort=True)["net_pnl"].sum()
-    equity = CAP + pnl_by_exit.cumsum()
-    equity = pd.concat([pd.Series([CAP], dtype=float), equity.reset_index(drop=True)], ignore_index=True)
-    peak = equity.cummax()
-    return float(((peak - equity) / peak.clip(lower=1e-12) * 100.0).max())
-
-def mark_to_market_drawdown(trades):
-    if trades.empty or "mae_dollar" not in trades.columns: return closed_equity_drawdown(trades)
-    equity = CAP; peak = CAP; worst_dd = 0.0
-    for row in trades.sort_values("entry_time").itertuples():
-        worst_equity = equity - max(0.0, float(row.mae_dollar))
-        worst_dd = max(worst_dd, (peak - worst_equity) / max(peak, 1e-12) * 100.0)
-        equity += float(row.net_pnl); peak = max(peak, equity)
-    return float(worst_dd)
 
 def calibrate_in_sample_threshold(pdf, ws):
     """
