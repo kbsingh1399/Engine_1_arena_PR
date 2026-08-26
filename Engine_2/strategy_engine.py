@@ -7,7 +7,8 @@ Zero-Lookahead, 100% Causal Architecture for 6-Account Parallel Quant Trading.
 Implements:
   1. 57-column microstructural feature extraction on all 18 parallel assets
   2. 3-Phase Risk-Free Breakeven & Tiered Trailing Stop Numba Simulation:
-       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R)
+       - Phase 0 (Entry): 1.0 * ATR initial stop loss ($1R = $35 risk)
+       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
        - Phase 2 (+3.0R peak): Lock in +1.8R profit
        - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner
   3. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
@@ -24,13 +25,6 @@ warnings.filterwarnings('ignore')
 
 os.environ.update({k: "1" for k in ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"]})
 
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
 from pathlib import Path
 from datetime import datetime
 import numpy as np
@@ -39,11 +33,8 @@ from numba import njit
 import lightgbm as lgb
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent
-DATA_DIR = SCRIPT_DIR / 'binance_backtesting_data'
-if not DATA_DIR.exists():
-    DATA_DIR = PROJECT_ROOT / 'Engine_2' / 'binance_backtesting_data'
+ROOT = Path('/home/user/Engine_1_arena_PR')
+DATA_DIR = ROOT / 'Engine_2' / 'binance_backtesting_data'
 if not DATA_DIR.exists():
     DATA_DIR = Path('./Engine_2/binance_backtesting_data')
 
@@ -92,10 +83,7 @@ MAXTR = 50            # Max trades per window
 MAX_CONCURRENT = 2    # Max concurrent positions across portfolio
 
 def log(msg):
-    try:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
-    except Exception:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg.encode('ascii', 'replace').decode('ascii')}", flush=True)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. 3-PHASE RISK-FREE BREAKEVEN & TIERED TRAILING STOP NUMBA ENGINE
@@ -256,6 +244,17 @@ def featurize_microstructure(df, br=None):
     df['bsr'] = df['Buy Qty'] / (df['Buy Qty'] + df['Sell Qty'] + 1e-10)
     df['vr5'] = df['Volume'] / (df['Volume'].rolling(20, min_periods=1).mean() + 1e-10)
     
+    if 'session_vah' in df.columns:
+        df['vah_pen'] = (df['Close'] - df['session_vah']) / atrs
+        df['val_pen'] = (df['Close'] - df['session_val']) / atrs
+    else:
+        df['vah_pen'] = 0.0; df['val_pen'] = 0.0
+        
+    if 'fp_poc' in df.columns:
+        df['dist_poc'] = (df['Close'] - df['fp_poc']) / atrs
+    else:
+        df['dist_poc'] = 0.0
+        
     for c in df.columns:
         if c != 'ts' and df[c].dtype == np.float64:
             df[c] = df[c].astype(np.float32)
