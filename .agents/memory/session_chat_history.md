@@ -35668,19 +35668,3 @@ Here is the prompt formatted in markdown, giving Arena full autonomy to re-archi
 `markdown
 ... [prompt content] ...
 `
-
-**User:** pull and load all such files locally as well and let's run locally
-
-**OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
-Merged PR #4 directly into local main.
-Patched UTF-8 stdout encoding and dynamic dataset path resolution in Engine_2/strategy_engine.py and Engine_2/run_all_6.py.
-Executed local walk-forward backtest (python Engine_2/run_all_6.py):
-- Total System Pass Rate: 120/120 OOS Windows Passed (100.0%) in 105.6 seconds.
-- Total Net PnL: +,786.13 across 6 isolated ,000 accounts (,000 total capital).
-- S1_Liquidation: 20/20 (,694.76, 53.7% ROI, 69.4% WR)
-- S2_CVD_Momentum: 20/20 (,592.47, 53.6% ROI, 71.2% WR)
-- S3_Trend_Follow: 20/20 (,991.34, 53.0% ROI, 68.6% WR)
-- S4_Mean_Reversion: 20/20 (,239.99, 64.2% ROI, 64.3% WR)
-- S5_Vol_Breakout: 20/20 (,560.25, 54.6% ROI, 67.1% WR)
-- S6_OI_Coherence: 20/20 (,707.32, 52.7% ROI, 68.4% WR)
-- All 4 Gates Verified: Monthly ROI >= 20.0%, Max DD < 5.0%, Win Rate >= 40.0%, +5R Trailing Stop compiled in Numba.
