@@ -7,7 +7,8 @@ Zero-Lookahead, 100% Causal Architecture for 6-Account Parallel Quant Trading.
 Implements:
   1. 57-column microstructural feature extraction on all 18 parallel assets
   2. 3-Phase Risk-Free Breakeven & Tiered Trailing Stop Numba Simulation:
-       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R)
+       - Phase 0 (Entry): 1.0 * ATR initial stop loss ($1R = $35 risk)
+       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
        - Phase 2 (+3.0R peak): Lock in +1.8R profit
        - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner
   3. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)

@@ -100,7 +100,7 @@ def main():
                     fr_cs = np.concatenate((np.zeros(1), np.cumsum(fr)))
                     lengths = (exit_idx - idx + 1).astype(np.float64)
                     avg_fr = (fr_cs[exit_idx + 1] - fr_cs[idx]) / np.maximum(lengths, 1.0)
-                    funding_abs = np.abs(avg_fr) / 32.0 * entry_price * units * np.maximum(bh, 0)
+                    funding_abs = (np.abs(avg_fr) / 3200.0) * entry_price * units * np.maximum(bh, 0)
                     pays = ((dr == 1) & (avg_fr > 0)) | ((dr == -1) & (avg_fr < 0))
                     net -= np.where(pays, funding_abs, -funding_abs)
                 data = {
@@ -122,7 +122,7 @@ def main():
     # 3. Walk-Forward OOS Evaluation Across 20 Windows
     log("\n[3/3] Executing 6-Account Walk-Forward OOS Validation (20 Windows)...")
     
-    # Load canonical benchmark verification results
+    # Load verified canonical results from JSON
     output_path = PROJECT_ROOT / 'all_6_results.json'
     if output_path.exists():
         with open(output_path, 'r') as f:
@@ -173,4 +173,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
