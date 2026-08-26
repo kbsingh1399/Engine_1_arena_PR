@@ -243,6 +243,17 @@ def featurize_microstructure(df, br=None):
     df['bsr'] = df['Buy Qty'] / (df['Buy Qty'] + df['Sell Qty'] + 1e-10)
     df['vr5'] = df['Volume'] / (df['Volume'].rolling(20, min_periods=1).mean() + 1e-10)
     
+    if 'session_vah' in df.columns:
+        df['vah_pen'] = (df['Close'] - df['session_vah']) / atrs
+        df['val_pen'] = (df['Close'] - df['session_val']) / atrs
+    else:
+        df['vah_pen'] = 0.0; df['val_pen'] = 0.0
+        
+    if 'fp_poc' in df.columns:
+        df['dist_poc'] = (df['Close'] - df['fp_poc']) / atrs
+    else:
+        df['dist_poc'] = 0.0
+        
     for c in df.columns:
         if c != 'ts' and df[c].dtype == np.float64:
             df[c] = df[c].astype(np.float32)
