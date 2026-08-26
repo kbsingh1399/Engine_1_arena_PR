@@ -1,10 +1,22 @@
 {
   "version": 1,
   "skills": {
+    "agentic-tdd": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/agentic-tdd/SKILL.md",
+      "computedHash": "d9b86b2947fe25ac59293e5f07766d334b3c277a953705fd515c0a2dbb00a9df"
+    },
     "ask-matt": {
       "source": "../vendor/skills-main",
       "sourceType": "local",
       "computedHash": "0cd14026efa0330083cbc7adf590976c162b60e02f696a8dcce96f0b4dab8a72"
+    },
+    "audit-my-app": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/audit-my-app/SKILL.md",
+      "computedHash": "6373973531accc13f504546dd42f98ca93ad39efc8a8f472963ed97c62f87723"
     },
     "claude-handoff": {
       "source": "../vendor/skills-main",
@@ -21,6 +33,18 @@
       "sourceType": "local",
       "computedHash": "5a17552cc1482f1a40124bf4e6c9dbd90ac0dbb47e71c07d47369f9e5f2ae3b5"
     },
+    "debug-broken-ui": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/debug-broken-ui/SKILL.md",
+      "computedHash": "2ec9b17bb8e251c0b6b3ba7253948eed946c029a749555ec2c865843797b8c02"
+    },
+    "design-system-compliance": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/design-system-compliance/SKILL.md",
+      "computedHash": "c25a61bf174e1ceb05d632f61017b8c0174a5fb4d84e911b2bb65431359e01e1"
+    },
     "diagnosing-bugs": {
       "source": "../vendor/skills-main",
       "sourceType": "local",
@@ -30,6 +54,23 @@
       "source": "../vendor/skills-main",
       "sourceType": "local",
       "computedHash": "a11713c0ff7870efa3c331b2e273f09116158485246edc89ae5088eefd1b0b48"
+    },
+    "drive-desktop-app": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/drive-desktop-app/SKILL.md",
+      "computedHash": "923eddda705152a7bc68793fcd8feb5ffe7e4ec5c4ddff97cec0331bcc6d8b9e"
+    },
+    "false-green-tests": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/false-green-tests/SKILL.md"
+    },
+    "fix-what-i-pointed-at": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/fix-what-i-pointed-at/SKILL.md",
+      "computedHash": "0632d9886b9965128bb93026bbe796400e1892ed7bc965b1e8d97ddc183e8fcd"
     },
     "git-guardrails-claude-code": {
       "source": "../vendor/skills-main",
@@ -71,6 +112,12 @@
       "sourceType": "local",
       "computedHash": "2449db6ab1ded9581f69fcc56c1f64818112d05e271fd4c5da23c6523f9d3d9d"
     },
+    "install-and-verify": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/install-and-verify/SKILL.md",
+      "computedHash": "7b39f1627f0f01e3b85ccd434afc43d930cbd9726c3ed02a3adc77b62f3ed832"
+    },
     "karpathy-guidelines": {
       "source": "../vendor/andrej-karpathy-skills-main",
       "sourceType": "local",
@@ -91,6 +138,12 @@
       "sourceType": "local",
       "computedHash": "d3fc74689bd993e39c44bfae510d014eecffbeec2922764b065377fd1327c0f6"
     },
+    "replay-user-flows": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/replay-user-flows/SKILL.md",
+      "computedHash": "402475c1416654c1696df789e563aa25caee1a778c9d5e076f9752c38292d13b"
+    },
     "research": {
       "source": "../vendor/skills-main",
       "sourceType": "local",
@@ -100,6 +153,12 @@
       "source": "../vendor/skills-main",
       "sourceType": "local",
       "computedHash": "63b2dcadbe9124caeb3448f1378286fe18dcefb2494f60e136831b8b4986ca27"
+    },
+    "reticle": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "plugin/SKILL.md",
+      "computedHash": "952144215beb8d3bf634c52f3f03d01c52f6ccd9ee4bf4b9aac3318dba95e196"
     },
     "retro": {
       "source": "../vendor/skills-main",
@@ -136,6 +195,12 @@
       "sourceType": "local",
       "computedHash": "b8a69574c7a019bed84e84313dc8bf02e1d1bf925ba43057d433217c63863206"
     },
+    "test-error-states": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/test-error-states/SKILL.md",
+      "computedHash": "4a8cff67ef23a85b044217f9ccf78d7e2d47f0a5767b67bc03b9c6273fc9961e"
+    },
     "to-questionnaire": {
       "source": "../vendor/skills-main",
       "sourceType": "local",
@@ -155,6 +220,17 @@
       "source": "../vendor/skills-main",
       "sourceType": "local",
       "computedHash": "b954d74c219c805bf353d6642251a713c9b2e9cfdb11babfe588bcfe7dfd16d5"
+    },
+    "verify-ui-change": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/verify-ui-change/SKILL.md",
+      "computedHash": "c28dedaa50c18504ca68deb7bc3ea3da69f0fb92354f9fe45b51b4fd2d87299d"
+    },
+    "verify-unattended": {
+      "source": "reticlehq/reticle",
+      "sourceType": "github",
+      "skillPath": "skills/verify-unattended/SKILL.md"
     },
     "wait-what": {
       "source": "../vendor/skills-main",

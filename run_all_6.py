@@ -31,11 +31,12 @@ import pandas as pd
 
 # Add Engine_2 to sys.path
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent
+PROJECT_ROOT = SCRIPT_DIR
+ENGINE2_DIR = SCRIPT_DIR / "Engine_2" if (SCRIPT_DIR / "Engine_2").exists() else SCRIPT_DIR
+if str(ENGINE2_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE2_DIR))
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from strategy_engine import (
     ALL_18_SYMBOLS, MONTHS, CAP, RSK, FEE_RT, TP, TRA, MAX_NOTIONAL,
