@@ -1,7 +1,7 @@
 ---
 name: error-diagnostics-smart-debug
 description: "Use when working with error diagnostics smart debug"
-risk: critical
+risk: unknown
 source: community
 date_added: "2026-02-27"
 ---
