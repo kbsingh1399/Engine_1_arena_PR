@@ -18,6 +18,13 @@ warnings.filterwarnings('ignore')
 
 os.environ.update({k: "1" for k in ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"]})
 
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 from pathlib import Path
 from datetime import datetime
 import numpy as np
@@ -26,8 +33,11 @@ from numba import njit
 import lightgbm as lgb
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
 
-ROOT = Path('/home/user/Engine_1_arena_PR')
-DATA_DIR = ROOT / 'Engine_2' / 'binance_backtesting_data'
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+DATA_DIR = SCRIPT_DIR / 'binance_backtesting_data'
+if not DATA_DIR.exists():
+    DATA_DIR = PROJECT_ROOT / 'Engine_2' / 'binance_backtesting_data'
 if not DATA_DIR.exists():
     DATA_DIR = Path('./Engine_2/binance_backtesting_data')
 
@@ -62,7 +72,10 @@ MINTR = 6             # Min trades per window
 MAXTR = 45            # Max trades per window
 
 def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+    try:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+    except Exception:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg.encode('ascii', 'replace').decode('ascii')}", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. EXACT 5R TRAILING STOP NUMBA EXECUTION ENGINE

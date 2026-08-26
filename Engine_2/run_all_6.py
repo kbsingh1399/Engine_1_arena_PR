@@ -17,7 +17,14 @@ Execution Cost: 0.08% round-trip taker fee + slippage, < 0.5% risk per trade.
 """
 
 import os, sys, site, gc, json, time, warnings
-site.addsitedir('/home/user/.local/lib/python3.11/site-packages')
+
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 warnings.filterwarnings('ignore')
 
 os.environ.update({k: "1" for k in ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"]})
