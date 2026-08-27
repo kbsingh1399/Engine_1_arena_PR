@@ -10,10 +10,8 @@ if str(ENGINE_DIR) not in sys.path:
 
 from strategy_engine import (  # noqa: E402
     DRAWDOWN_RISK_LIMIT,
-    HOUSE_MONEY_RISK_MAX,
-    HOUSE_MONEY_RISK_MIN,
-    HOUSE_SHIELD_RISK,
-    RECON_RISK,
+    HOUSE_MONEY_RISK,
+    MILD_EXPANSION_RISK,
     add_causal_regime_features,
     simulate_dynamic_risk,
 )
@@ -40,16 +38,16 @@ def _trades(r_multiples, mae_dollars=None, overlapping=False):
     return pd.DataFrame(rows)
 
 
-def test_dual_shield_escalator_and_sticky_house_shield():
-    # The first win creates house money, the house loss changes only the next
-    # entry to the $45 shield, and no later outcome can resize an earlier entry.
+def test_asymmetric_risk_escalator_uses_realized_equity_only():
+    # At zero realized PnL the exact policy enters mild expansion, then moves
+    # to house-money risk only after the first result is settled.
     trades = _trades([5.0, -0.1, 1.0])
     _, _, _, max_dd, executed = simulate_dynamic_risk(trades)
 
-    assert executed.iloc[0]["trade_risk"] == RECON_RISK
-    assert HOUSE_MONEY_RISK_MIN <= executed.iloc[1]["trade_risk"] <= HOUSE_MONEY_RISK_MAX
-    assert executed.iloc[2]["trade_risk"] == HOUSE_SHIELD_RISK
-    assert executed["risk_mode"].tolist() == ["recon", "house", "house-shield"]
+    assert executed.iloc[0]["trade_risk"] == MILD_EXPANSION_RISK
+    assert executed.iloc[1]["trade_risk"] == HOUSE_MONEY_RISK
+    assert executed.iloc[2]["trade_risk"] <= HOUSE_MONEY_RISK
+    assert executed["risk_mode"].tolist() == ["mild-expansion", "house", "house"]
     assert max_dd < 4.0
 
 
@@ -59,15 +57,18 @@ def test_target_lock_waits_for_six_completed_trades_and_no_open_positions():
 
     assert roi > 20.0
     assert wr > 40.0
-    assert len(executed) == 7
+    assert len(executed) == 6
 
 
 def test_allocator_does_not_use_unsettled_profit_for_house_money():
     trades = _trades([5.0, 1.0], overlapping=True)
     _, _, _, _, executed = simulate_dynamic_risk(trades)
 
-    # The first trade has not exited when the second entry is sized.
-    assert executed["trade_risk"].tolist() == [RECON_RISK, RECON_RISK]
+    # The first trade has not exited when the second entry is sized. The
+    # drawdown reservation reduces the second target rather than using future
+    # PnL to size it.
+    assert executed.iloc[0]["trade_risk"] == MILD_EXPANSION_RISK
+    assert 0.0 < executed.iloc[1]["trade_risk"] < MILD_EXPANSION_RISK
 
 
 def test_allocator_reserves_mae_inside_drawdown_budget():
@@ -123,7 +124,7 @@ def test_optuna_search_space_and_causal_s1_filter():
     assert OPTUNA_DEFAULTS['pullback_threshold'] == 0.12
     assert 0.05 <= OPTUNA_DEFAULTS['cvd_momentum'] <= 0.25
     assert 1.0 <= OPTUNA_DEFAULTS['liquidation_multiplier'] <= 2.0
-    assert 0.50 <= OPTUNA_DEFAULTS['probability_threshold'] <= 0.85
+    assert 0.30 <= OPTUNA_DEFAULTS['probability_threshold'] <= 0.85
     assert 3 <= OPTUNA_DEFAULTS['tree_depth'] <= 6
     assert 0.01 <= OPTUNA_DEFAULTS['learning_rate'] <= 0.08
 
@@ -170,7 +171,7 @@ def test_sparse_history_uses_cold_start_calibration_marker():
 
     assert model is None
     assert features is None
-    assert threshold == 0.55
+    assert threshold == 0.30
     assert params['cold_start'] is True
 
 

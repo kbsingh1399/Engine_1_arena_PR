@@ -47,11 +47,11 @@ if str(SCRIPT_DIR) not in sys.path:
 from strategy_engine import (
     ALL_18_SYMBOLS, MONTHS, CAP, RSK, FEE_RT, TP, TRA, MAX_NOTIONAL,
     TROI, TDD, TWR, MINTR, MAXTR, MAX_CONCURRENT,
-    RECON_RISK, HOUSE_MONEY_RISK_MIN, HOUSE_MONEY_RISK_MAX,
+    RECON_RISK, MILD_EXPANSION_RISK, HOUSE_MONEY_RISK,
     DRAWDOWN_DEFENSE_RISK,
     load_symbol_data, featurize_microstructure, gen_trades_tiered, STRATEGIES,
-    bmodel, pred, calibrate_in_sample_threshold, apply_signal_hyperparameters,
-    apply_cold_start_rule, apply_regime_routing, simulate_portfolio_concurrency,
+    bmodel, pred, calibrate_in_sample_threshold, apply_cold_start_rule,
+    apply_regime_routing, simulate_portfolio_concurrency,
     simulate_dynamic_risk, COLD_START_MAX_TRADES,
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
@@ -71,7 +71,7 @@ def main(strategy_name=None):
     log("🚀 ENGINE 2: 6-ACCOUNT PARALLEL QUANT ENGINE & REAL-TIME CAUSAL EXECUTION")
     log(f"   Capital per Account : ${CAP:,.0f} (Total Portfolio: ${CAP * 6:,.0f})")
     log(f"   Round-trip Fee+Slip : {FEE_RT * 100:.2f}% | Base R: ${RSK:.2f}")
-    log(f"   Risk Escalator      : Recon ${RECON_RISK:.0f} | House ${HOUSE_MONEY_RISK_MIN:.0f}-${HOUSE_MONEY_RISK_MAX:.0f} | Defense ${DRAWDOWN_DEFENSE_RISK:.0f}")
+    log(f"   Risk Escalator      : Recon ${RECON_RISK:.0f} | Mild ${MILD_EXPANSION_RISK:.0f} | House ${HOUSE_MONEY_RISK:.0f} | Defense ${DRAWDOWN_DEFENSE_RISK:.0f}")
     log(f"   Target Gates        : ROI > {TROI}%, MaxDD < {TDD}%, WR > {TWR}%, +5R Trail")
     log(f"   Portfolio Limit     : Max {MAX_CONCURRENT} Concurrent Open Positions")
     log(f"   Parallel Assets     : {len(ALL_18_SYMBOLS)} crypto pairs")
@@ -170,10 +170,7 @@ def main(strategy_name=None):
                 candidates = apply_cold_start_rule(tdf, sname)
                 bp = 0.50
             elif m is not None and len(tdf) > 0:
-                tuned_tdf = apply_signal_hyperparameters(
-                    tdf, sname, optuna_params
-                )
-                tp = pred(m, fcs, tuned_tdf)
+                tp = pred(m, fcs, tdf)
                 candidates = apply_regime_routing(tp, sname, bp)
             else:
                 candidates = tdf

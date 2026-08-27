@@ -6,8 +6,8 @@ AUTONOMOUS 120/120 OOS MASTER QUANT ENGINE (V19 - CALIBRATED DUAL-SHIELD ESCALAT
 Architecture: Calibrated Dual-Shield Escalator
 Key Upgrades:
   1. Base Reconnaissance Risk = $95.00 (1.9%)
-  2. House Money Expansion Risk = $185-$240 after +$100 realized profit
-  3. Single-Loss House Shield: If a loss occurs on house money, immediately revert to $45.00
+  2. Mild / House Expansion Risk = $160 / $220 after realized profit
+  3. Drawdown Defense Risk = $25.00 when realized PnL <= -$40.00
   4. Immediate Window Target Lock: Halts on reaching $1,025 (+20.5%)
 ================================================================================
 """

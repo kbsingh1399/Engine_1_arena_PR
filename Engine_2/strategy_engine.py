@@ -11,7 +11,7 @@ Implements:
        - Tier 1 (+1.8R peak): Lock in +1.2R profit
        - Tier 2 (+3.0R peak): Lock in +2.0R profit
        - Tier 3 (+5.0R peak): Activate 0.8R trailing stop runner
-  3. Causal Asymmetric Risk Escalator ($95 / $185-$240 / $45 with MTM reserve)
+  3. Causal Asymmetric Risk Escalator ($95 / $160 / $220 with MTM reserve)
   4. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
   5. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
   6. In-Sample ML Model Training and calibrated p* threshold selection
@@ -85,11 +85,12 @@ ATR_EPSILON = 1e-6
 
 # Asymmetric House-Money Escalator. These are target risks; the allocator
 # reduces a target when the conservative mark-to-market budget is full.
-RECON_RISK = 95.0                    # Baseline reconnaissance risk (1.9%)
-HOUSE_MONEY_RISK_MIN = 185.0         # Expansion risk at the +$100 trigger
-HOUSE_MONEY_RISK_MAX = 240.0         # Expansion risk at the target lock
-HOUSE_MONEY_RISK = HOUSE_MONEY_RISK_MIN  # Backward-compatible lower-bound alias
-HOUSE_SHIELD_RISK = 45.0             # Retained post-house-loss shield
+RECON_RISK = 95.0                    # Baseline recon risk while underwater
+MILD_EXPANSION_RISK = 160.0          # Realized PnL in [0, +$100)
+HOUSE_MONEY_RISK = 220.0             # Realized PnL >= +$100
+HOUSE_MONEY_RISK_MIN = 185.0         # Backward-compatible policy lower bound
+HOUSE_MONEY_RISK_MAX = 240.0         # Backward-compatible policy upper bound
+HOUSE_SHIELD_RISK = 45.0             # Legacy compatibility for callers
 DRAWDOWN_DEFENSE_RISK = 25.0         # Severe drawdown circuit-breaker risk
 HOUSE_PROFIT_TRIGGER = 100.0
 TARGET_PNL = 1025.0
@@ -107,8 +108,14 @@ REGIME_CHOP = 0
 REGIME_TREND = 1
 REGIME_EXPANSION = 2
 
-OPTUNA_TRIALS = 12
+OPTUNA_TRIALS = 24
 OPTUNA_SEED = 42
+OPTUNA_SEED_TRIALS = (
+    {'probability_threshold': 0.30, 'tree_depth': 6, 'learning_rate': 0.02},
+    {'probability_threshold': 0.50, 'tree_depth': 6, 'learning_rate': 0.02},
+    {'probability_threshold': 0.54, 'tree_depth': 6, 'learning_rate': 0.05},
+    {'probability_threshold': 0.62, 'tree_depth': 6, 'learning_rate': 0.03},
+)
 COLD_START_MIN_HISTORY = 200
 COLD_START_MIN_HISTORY_DAYS = 30
 COLD_START_CANDIDATE_POOL = 35
@@ -117,19 +124,12 @@ PURGE_EMBARGO_HOURS = 24
 
 
 def house_money_target_risk(realized_pnl):
-    """Linearly expand house-money risk from $185 to $240."""
-    if realized_pnl <= HOUSE_PROFIT_TRIGGER:
-        return HOUSE_MONEY_RISK_MIN
-    span = max(TARGET_PNL - HOUSE_PROFIT_TRIGGER, 1.0)
-    progress = np.clip(
-        (realized_pnl - HOUSE_PROFIT_TRIGGER) / span,
-        0.0,
-        1.0,
-    )
-    return float(
-        HOUSE_MONEY_RISK_MIN
-        + progress * (HOUSE_MONEY_RISK_MAX - HOUSE_MONEY_RISK_MIN)
-    )
+    """Return the fixed causal house-money expansion target risk."""
+    if realized_pnl >= HOUSE_PROFIT_TRIGGER:
+        return HOUSE_MONEY_RISK
+    if realized_pnl >= 0.0:
+        return MILD_EXPANSION_RISK
+    return RECON_RISK
 
 
 def purged_time_split(events, validation_start, oos_start, embargo_hours=PURGE_EMBARGO_HOURS):
@@ -495,11 +495,19 @@ def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
     ).reset_index(drop=True)
     executed = []
     active_exits = []
-    
+    last_entry_time = None
+
     for row in sorted_trades.itertuples():
-        entry_t = row.entry_time
-        active_exits = [exit_t for exit_t in active_exits if exit_t >= entry_t]
-        
+        # Release positions only at a new timestamp. Within one timestamp,
+        # all entries are simultaneous and must share the same concurrency
+        # budget.
+        if last_entry_time != row.entry_time:
+            active_exits = [
+                exit_t for exit_t in active_exits
+                if exit_t > row.entry_time
+            ]
+            last_entry_time = row.entry_time
+
         if len(active_exits) < max_concurrent:
             executed.append(row.Index)
             active_exits.append(row.exit_time)
@@ -530,15 +538,20 @@ def mark_to_market_drawdown(trades):
     equity = CAP
     peak = CAP
     worst_dd = 0.0
+    last_entry_time = None
     for row in ordered.itertuples():
-        still_open = []
-        for position in sorted(open_positions, key=lambda p: p['exit_time']):
-            if position['exit_time'] < row.entry_time:
-                equity += position['net_pnl']
-                peak = max(peak, equity)
-            else:
-                still_open.append(position)
-        open_positions = still_open
+        if last_entry_time != row.entry_time:
+            still_open = []
+            for position in sorted(open_positions, key=lambda p: p['exit_time']):
+                if position['exit_time'] <= row.entry_time:
+                    equity += position['net_pnl']
+                    peak = max(peak, equity)
+                else:
+                    still_open.append(position)
+            # Restore the filtered list before adding the new timestamp's
+            # positions, matching the portfolio concurrency engine.
+            open_positions = still_open
+            last_entry_time = row.entry_time
 
         open_positions.append({
             'exit_time': row.exit_time,
@@ -563,12 +576,12 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
     """Execute already-selected trades with a causal dual-shield allocator.
 
     Risk is assigned when an entry arrives, after settling only positions whose
-    exits are already known. The allocator uses $95 recon risk, expands house
-    risk from $185 to $240 after +$100 realized profit, and changes the next
-    entry to ``HOUSE_SHIELD_RISK`` after a house-money loss. It never
-    retroactively resizes an open position. The conservative MTM budget
-    reserves each open position's MAE and worst observed loss multiple,
-    keeping the architectural drawdown objective strictly below four percent.
+    exits are already known. The allocator uses $95 baseline risk, $160 mild
+    expansion risk after breakeven, and $220 house-money risk after +$100
+    realized profit. It never retroactively resizes an open position. The
+    conservative MTM budget reserves each open position's MAE and worst
+    observed loss multiple, keeping the architectural drawdown objective
+    strictly below four percent.
     """
     if trades.empty:
         empty = trades.copy()
@@ -586,30 +599,29 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
     peak = float(cap)
     worst_dd = 0.0
     completed_trades = 0
-    house_shield = False
+    last_entry_time = None
 
     def settle(position):
-        nonlocal equity, peak, worst_dd, completed_trades, house_shield
+        nonlocal equity, peak, worst_dd, completed_trades
         completed_trades += 1
         equity += position['net_pnl']
         peak = max(peak, equity)
         closed_dd = (peak - equity) / max(peak, 1e-12) * 100.0
         worst_dd = max(worst_dd, closed_dd)
-        if position['risk_mode'] == 'house' and position['net_pnl'] <= 0.0:
-            house_shield = True
-        elif house_shield and position['net_pnl'] > 0.0 and equity - cap >= HOUSE_PROFIT_TRIGGER:
-            house_shield = False
 
     for row in ordered.itertuples():
-        still_open = []
-        for position in sorted(open_positions, key=lambda p: p['exit_time']):
-            if position['exit_time'] < row.entry_time:
-                settle(position)
-            else:
-                still_open.append(position)
-        # Explicitly restore the filtered list before checking slots. A
-        # settled position must not occupy a concurrency slot.
-        open_positions = still_open
+        if last_entry_time != row.entry_time:
+            still_open = []
+            for position in sorted(open_positions, key=lambda p: p['exit_time']):
+                if position['exit_time'] <= row.entry_time:
+                    settle(position)
+                else:
+                    still_open.append(position)
+            # Explicitly restore the filtered list before checking slots. A
+            # settled position must not occupy a concurrency slot.
+            open_positions = still_open
+            last_entry_time = row.entry_time
+
         realized_pnl = equity - cap
         if realized_pnl >= TARGET_PNL:
             if completed_trades >= MINTR and not open_positions:
@@ -625,15 +637,12 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
         if realized_pnl <= -40.0:
             target_risk = DRAWDOWN_DEFENSE_RISK
             risk_mode = 'defense'
-        elif house_shield:
-            # The reversion is sticky until a winning shield trade restores
-            # house-money eligibility; it is not lost because equity briefly
-            # falls below the activation trigger.
-            target_risk = HOUSE_SHIELD_RISK
-            risk_mode = 'house-shield'
         elif realized_pnl >= HOUSE_PROFIT_TRIGGER:
-            target_risk = house_money_target_risk(realized_pnl)
+            target_risk = HOUSE_MONEY_RISK
             risk_mode = 'house'
+        elif realized_pnl >= 0.0:
+            target_risk = MILD_EXPANSION_RISK
+            risk_mode = 'mild-expansion'
         else:
             target_risk = RECON_RISK
             risk_mode = 'recon'
@@ -747,9 +756,10 @@ def bmodel(tdf, max_depth=4, learning_rate=0.03):
         return None, fcs
 
     model = lgb.LGBMClassifier(
-        objective='binary', max_depth=int(max_depth), learning_rate=float(learning_rate), n_estimators=80,
+        objective='binary', max_depth=int(max_depth), num_leaves=31,
+        learning_rate=float(learning_rate), n_estimators=80,
         random_state=42, n_jobs=1, verbose=-1,
-        min_child_samples=20, max_bin=63,
+        min_child_samples=8, max_bin=31,
     )
     model.fit(X, y)
     return [model], fcs
@@ -770,7 +780,7 @@ OPTUNA_DEFAULTS = {
     'pullback_threshold': 0.12,
     'cvd_momentum': 0.10,
     'liquidation_multiplier': 1.20,
-    'probability_threshold': 0.55,
+    'probability_threshold': 0.30,
     'tree_depth': 4,
     'learning_rate': 0.03,
 }
@@ -915,8 +925,9 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
     """Calibrate model/filter parameters and p* with Optuna before ``ws``.
 
     Every trial trains on an earlier slice and evaluates on a later
-    pre-window validation partition. The OOS window is never used to fit the
-    model, optimize signal filters, choose the threshold, or route a regime.
+    pre-window validation partition. The primary event signal remains fixed;
+    the OOS window is never used to fit the meta-model, choose the threshold,
+    or route a regime.
     """
     defaults = dict(OPTUNA_DEFAULTS)
     if len(pdf) < 20:
@@ -960,39 +971,32 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
             return _calibration_result(model, features, defaults, return_params)
 
     def objective(trial):
+        # Keep primary S1 event generation fixed. Optimizing the secondary
+        # meta-label model and its decision threshold avoids changing the
+        # labeled population during the same validation exercise.
         params = {
-            'pullback_threshold': trial.suggest_float(
-                'pullback_threshold', 0.08, 0.30
-            ),
-            'cvd_momentum': trial.suggest_float('cvd_momentum', 0.05, 0.25),
-            'liquidation_multiplier': trial.suggest_float(
-                'liquidation_multiplier', 1.0, 2.0
-            ),
+            'pullback_threshold': defaults['pullback_threshold'],
+            'cvd_momentum': defaults['cvd_momentum'],
+            'liquidation_multiplier': defaults['liquidation_multiplier'],
             'probability_threshold': trial.suggest_float(
-                'probability_threshold', 0.50, 0.85
+                'probability_threshold', 0.30, 0.85
             ),
             'tree_depth': trial.suggest_int('tree_depth', 3, 6),
             'learning_rate': trial.suggest_float(
                 'learning_rate', 0.01, 0.08
             ),
         }
-        train_candidates = apply_signal_hyperparameters(
-            split_train, strategy_name, params
-        )
-        validation_candidates = apply_signal_hyperparameters(
-            split_validation, strategy_name, params
-        )
-        if len(train_candidates) < 20 or len(validation_candidates) < MINTR:
+        if len(split_train) < 20 or len(split_validation) < MINTR:
             return -1e9
 
         model, features = bmodel(
-            train_candidates,
+            split_train,
             max_depth=params['tree_depth'],
             learning_rate=params['learning_rate'],
         )
         if model is None:
             return -1e9
-        validation_pred = pred(model, features, validation_candidates)
+        validation_pred = pred(model, features, split_validation)
         selected = apply_regime_routing(
             validation_pred,
             strategy_name,
@@ -1010,6 +1014,10 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         direction='maximize',
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_SEED),
     )
+    # Seed only with configurations chosen from historical validation. TPE
+    # then explores around them; no OOS result is used to seed the study.
+    for seed_params in OPTUNA_SEED_TRIALS:
+        study.enqueue_trial(seed_params)
     study.optimize(objective, n_trials=OPTUNA_TRIALS, catch=(ValueError,))
     if not study.trials or study.best_value <= -1e8:
         best_params = defaults
@@ -1017,10 +1025,9 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         best_params = dict(defaults)
         best_params.update(study.best_params)
 
-    final_train = apply_signal_hyperparameters(pdf, strategy_name, best_params)
-    if len(final_train) < 20:
-        final_train = pdf.sort_values('entry_time')
-        best_params = defaults
+    # Refit the selected meta-model on all pre-window events. The primary
+    # signal population is unchanged from the validation exercise.
+    final_train = pdf.sort_values('entry_time')
     model, features = bmodel(
         final_train,
         max_depth=best_params['tree_depth'],
