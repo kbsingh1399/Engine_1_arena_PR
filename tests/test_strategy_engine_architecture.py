@@ -148,6 +148,55 @@ def test_optuna_search_space_and_causal_s1_filter():
     assert len(selected) == 1
 
 
+def test_sparse_history_uses_cold_start_calibration_marker():
+    from strategy_engine import calibrate_in_sample_threshold
+
+    timestamps = pd.date_range("2020-01-01", periods=10, freq="15min")
+    sparse = pd.DataFrame(
+        {'entry_time': timestamps, 'exit_time': timestamps + pd.Timedelta(minutes=15)}
+    )
+    model, features, threshold, params = calibrate_in_sample_threshold(
+        sparse, pd.Timestamp("2020-01-02"), "S1_Liquidation", return_params=True
+    )
+
+    assert model is None
+    assert features is None
+    assert threshold == 0.55
+    assert params['cold_start'] is True
+
+
+def test_cold_start_rule_uses_current_bar_confirmation_only():
+    from strategy_engine import apply_cold_start_rule
+
+    timestamp = pd.Timestamp("2020-01-01")
+    candidates = pd.DataFrame(
+        [
+            {
+                'entry_time': timestamp,
+                'direction': 1,
+                'bsr': 0.60,
+                'zc20': 0.10,
+                'vr5': 1.0,
+                'liq_long_ratio': 1.1,
+                'liq_short_ratio': 1.0,
+            },
+            {
+                'entry_time': timestamp + pd.Timedelta(minutes=15),
+                'direction': 1,
+                'bsr': 0.49,
+                'zc20': 0.01,
+                'vr5': 1.0,
+                'liq_long_ratio': 1.0,
+                'liq_short_ratio': 1.0,
+            },
+        ]
+    )
+
+    selected = apply_cold_start_rule(candidates, 'S1_Liquidation')
+    assert len(selected) == 1
+    assert selected.iloc[0]['direction'] == 1
+
+
 def test_same_timestamp_entries_use_conviction_and_keep_slots_occupied():
     from strategy_engine import simulate_portfolio_concurrency
 

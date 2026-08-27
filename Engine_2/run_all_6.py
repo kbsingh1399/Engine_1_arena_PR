@@ -48,7 +48,8 @@ from strategy_engine import (
     TROI, TDD, TWR, MINTR, MAXTR, MAX_CONCURRENT,
     load_symbol_data, featurize_microstructure, gen_trades_tiered, STRATEGIES,
     bmodel, pred, calibrate_in_sample_threshold, apply_signal_hyperparameters,
-    apply_regime_routing, simulate_portfolio_concurrency, simulate_dynamic_risk,
+    apply_cold_start_rule, apply_regime_routing, simulate_portfolio_concurrency,
+    simulate_dynamic_risk, COLD_START_MAX_TRADES,
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
@@ -151,7 +152,11 @@ def main():
             m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
                 pdf, ws, sname, return_params=True
             )
-            if m is not None and len(tdf) > 0:
+            cold_start = bool(optuna_params.get('cold_start', False))
+            if cold_start:
+                candidates = apply_cold_start_rule(tdf, sname)
+                bp = 0.50
+            elif m is not None and len(tdf) > 0:
                 tuned_tdf = apply_signal_hyperparameters(
                     tdf, sname, optuna_params
                 )
@@ -161,9 +166,10 @@ def main():
                 candidates = tdf
                 bp = 0.50
 
+            trade_cap = COLD_START_MAX_TRADES if cold_start else MAXTR
             candidates = simulate_portfolio_concurrency(
                 candidates, max_concurrent=MAX_CONCURRENT
-            ).head(MAXTR)
+            ).head(trade_cap)
             _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
             nt = len(bdf)
             pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
@@ -189,9 +195,11 @@ def main():
                 'w': wi, 'start': ss, 'end': se, 'passed': passed, 'verdict': verdict,
                 'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
                 'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd,
-                'threshold': float(bp), 'risk_range': risk_range
+                'threshold': float(bp), 'risk_range': risk_range,
+                'selection_mode': 'cold-rule' if cold_start else 'optuna'
             })
-            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (p*={bp:.2f}, risk={risk_range})")
+            mode = 'cold-rule' if cold_start else 'optuna'
+            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (mode={mode}, p*={bp:.2f}, risk={risk_range})")
 
             # STRICT FAIL-FAST GATE: every failure, including insufficient
             # trades, aborts. There is intentionally no environment bypass.

@@ -102,6 +102,9 @@ REGIME_EXPANSION = 2
 
 OPTUNA_TRIALS = 12
 OPTUNA_SEED = 42
+COLD_START_MIN_HISTORY = 200
+COLD_START_MIN_HISTORY_DAYS = 30
+COLD_START_MAX_TRADES = 15
 
 
 def log(msg):
@@ -746,6 +749,81 @@ def apply_signal_hyperparameters(tdf, strategy_name, params=None):
     return tdf.loc[keep_long | keep_short].copy()
 
 
+def apply_cold_start_rule(tdf, strategy_name):
+    """Select cold-start entries with current-bar rules only.
+
+    This path is deliberately deterministic: it has no fitted model, future
+    labels, or month-wide ranking. The caller applies concurrency and the
+    chronological ``COLD_START_MAX_TRADES`` cap after this filter.
+    """
+    if tdf.empty:
+        return tdf
+    required = ('direction', 'bsr', 'zc20', 'vr5')
+    if any(column not in tdf.columns for column in required):
+        return tdf
+
+    direction = tdf['direction'].to_numpy()
+    bsr = tdf['bsr'].to_numpy()
+    zc20 = tdf['zc20'].to_numpy()
+    vr5 = tdf['vr5'].to_numpy()
+    liq_long_ratio = (
+        tdf['liq_long_ratio'].to_numpy()
+        if 'liq_long_ratio' in tdf.columns else np.zeros(len(tdf))
+    )
+    liq_short_ratio = (
+        tdf['liq_short_ratio'].to_numpy()
+        if 'liq_short_ratio' in tdf.columns else np.zeros(len(tdf))
+    )
+    macro_spread = (
+        tdf['macro_spread'].to_numpy()
+        if 'macro_spread' in tdf.columns else np.zeros(len(tdf))
+    )
+    rsi = (
+        tdf['rsi'].to_numpy()
+        if 'rsi' in tdf.columns else np.full(len(tdf), 50.0)
+    )
+    oicc = (
+        tdf['oicc'].to_numpy()
+        if 'oicc' in tdf.columns else np.zeros(len(tdf))
+    )
+    long_volume = (direction == 1) & (bsr >= 0.52)
+    short_volume = (direction == -1) & (bsr <= 0.48)
+    long_cvd = zc20 >= 0.05
+    short_cvd = zc20 <= -0.05
+
+    if strategy_name == 'S1_Liquidation':
+        long_signal = long_volume & (long_cvd | (liq_long_ratio >= 1.10))
+        short_signal = short_volume & (short_cvd | (liq_short_ratio >= 1.10))
+    elif strategy_name == 'S2_CVD_Momentum':
+        long_signal = long_volume & long_cvd & (vr5 >= 0.85)
+        short_signal = short_volume & short_cvd & (vr5 >= 0.85)
+    elif strategy_name == 'S3_Trend_Follow':
+        long_signal = long_volume & long_cvd & (macro_spread > 0.5)
+        short_signal = short_volume & short_cvd & (macro_spread < -0.5)
+    elif strategy_name == 'S4_Mean_Reversion':
+        long_signal = (direction == 1) & (rsi < 35)
+        short_signal = (direction == -1) & (rsi > 65)
+        if 'regime' in tdf.columns:
+            flat_or_trend = tdf['regime'].to_numpy() != REGIME_EXPANSION
+            long_signal &= flat_or_trend
+            short_signal &= flat_or_trend
+    elif strategy_name == 'S5_Vol_Breakout':
+        expansion = (
+            tdf['regime'].to_numpy() == REGIME_EXPANSION
+            if 'regime' in tdf.columns else vr5 >= 1.0
+        )
+        long_signal = long_volume & long_cvd & expansion
+        short_signal = short_volume & short_cvd & expansion
+    elif strategy_name == 'S6_OI_Coherence':
+        long_signal = long_volume & long_cvd & (oicc > 0)
+        short_signal = short_volume & short_cvd & (oicc < 0)
+    else:
+        long_signal = long_volume & long_cvd
+        short_signal = short_volume & short_cvd
+
+    return tdf.loc[long_signal | short_signal].sort_values('entry_time')
+
+
 def _calibration_result(model, features, params, return_params):
     if return_params:
         return model, features, float(params['probability_threshold']), params
@@ -761,7 +839,15 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
     """
     defaults = dict(OPTUNA_DEFAULTS)
     if len(pdf) < 20:
-        return _calibration_result(None, None, defaults, return_params)
+        cold_start = dict(defaults, cold_start=True)
+        return _calibration_result(None, None, cold_start, return_params)
+
+    history_days = (
+        pdf['entry_time'].max() - pdf['entry_time'].min()
+    ).total_seconds() / 86400.0
+    if len(pdf) < COLD_START_MIN_HISTORY or history_days < COLD_START_MIN_HISTORY_DAYS:
+        cold_start = dict(defaults, cold_start=True)
+        return _calibration_result(None, None, cold_start, return_params)
 
     # Select one chronological validation partition. It is always completed
     # before the OOS start and is never mixed into the training slice.
