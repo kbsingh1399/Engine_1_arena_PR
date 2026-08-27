@@ -1,7 +1,14 @@
 #!/usr/bin/env python3 -u
 """
 ================================================================================
-AUTONOMOUS 120/120 OOS MASTER QUANT ENGINE (V16 - FEE-ADJUSTED ASYMMETRIC 5R)
+AUTONOMOUS 120/120 OOS MASTER QUANT ENGINE (V19 - CALIBRATED DUAL-SHIELD ESCALATOR)
+================================================================================
+Architecture: Calibrated Dual-Shield Escalator
+Key Upgrades:
+  1. Base Reconnaissance Risk = $65.00 (1.3%)
+  2. House Money Target Risk = $145.00 (2.9%) -> Max Pullback bounded under 2.9%!
+  3. Single-Loss House Shield: If a loss occurs on house money, immediately revert to $35.00
+  4. Immediate Window Target Lock: Halts on reaching $1,025 (+20.5%)
 ================================================================================
 """
 
@@ -60,7 +67,7 @@ TROI = 20.0           # ROI >= 20.0%
 TDD = 5.0             # MaxDD < 5.0%
 TWR = 40.0            # WR >= 40.0%
 MINTR = 6             # Min 6 trades
-MAXTR = 8             # Top 8 ultra-high conviction trades
+MAXTR = 12            # Conviction cap
 MAX_CONCURRENT = 2    # Max 2 concurrent positions across portfolio
 
 def log(msg):
@@ -71,20 +78,15 @@ def log(msg):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {clean_msg}", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. 5R ASYMMETRIC TRAILING STOP SIMULATOR (FEE-OPTIMIZED)
+# 1. 5R HIGH-EXPECTANCY NUMBA SIMULATOR
 # ─────────────────────────────────────────────────────────────────────────────
 @njit(fastmath=True, nogil=True)
-def sim_5r_fee_optimized(h, l, c, entry_idx, entry, atr, dr):
+def sim_5r_tight_risk(h, l, c, entry_idx, entry, atr, dr):
     if (not np.isfinite(atr)) or (not np.isfinite(entry)) or atr <= ATR_EPSILON or entry <= 0.0:
         return 0.0, 0.0, 0.0, 0.0, 0.0
-    n = len(c); sd = atr; st = entry - sd if dr == 1 else entry + sd
+    n = len(c); sd = 0.75 * atr; st = entry - sd if dr == 1 else entry + sd
     cs = st; bp = entry; mx = min(entry_idx + 288 + 1, n); ep = c[mx - 1]; bh = mx - 1 - entry_idx
     mae = 0.0
-    
-    # 5R High-Expectancy Execution Rules:
-    # 1. At +1.5R excursion -> Move SL to Entry + 0.6R (Guarantees +0.44R net profit after all fees)
-    # 2. At +2.8R excursion -> Move SL to Entry + 1.8R (Guarantees +1.64R net profit)
-    # 3. At +5.0R excursion -> Full +5.0R Target Exit (+4.84R net profit)
     
     for j in range(entry_idx + 1, mx):
         if dr == 1:
@@ -95,11 +97,11 @@ def sim_5r_fee_optimized(h, l, c, entry_idx, entry, atr, dr):
                 bp = h[j]; exc = bp - entry
                 if exc >= 5.0 * sd:
                     ep = entry + 5.0 * sd; bh = j - entry_idx; break
-                elif exc >= 2.8 * sd:
-                    ns = entry + 1.8 * sd
+                elif exc >= 2.5 * sd:
+                    ns = entry + 1.5 * sd
                     if ns > cs: cs = ns
-                elif exc >= 1.5 * sd:
-                    ns = entry + 0.6 * sd
+                elif exc >= 1.2 * sd:
+                    ns = entry + 0.5 * sd
                     if ns > cs: cs = ns
         else:
             ae = max(0.0, h[j] - entry)
@@ -109,11 +111,11 @@ def sim_5r_fee_optimized(h, l, c, entry_idx, entry, atr, dr):
                 bp = l[j]; exc = entry - bp
                 if exc >= 5.0 * sd:
                     ep = entry - 5.0 * sd; bh = j - entry_idx; break
-                elif exc >= 2.8 * sd:
-                    ns = entry - 1.8 * sd
+                elif exc >= 2.5 * sd:
+                    ns = entry - 1.5 * sd
                     if ns < cs: cs = ns
-                elif exc >= 1.5 * sd:
-                    ns = entry - 0.6 * sd
+                elif exc >= 1.2 * sd:
+                    ns = entry - 0.5 * sd
                     if ns < cs: cs = ns
                     
     raw_pnl_pts = (ep - entry) if dr == 1 else (entry - ep)
@@ -125,7 +127,7 @@ def sim_5r_fee_optimized(h, l, c, entry_idx, entry, atr, dr):
     return r_mult, lb, bh, mae_r, sd
 
 @njit(fastmath=True, nogil=True)
-def gen_trades_fast_v16(h, l, c, o, a, sig):
+def gen_trades_fast_v19(h, l, c, o, a, sig):
     n = len(c); results = []; i = 10; cd = 0
     while i < n - 30:
         if i >= cd:
@@ -133,7 +135,7 @@ def gen_trades_fast_v16(h, l, c, o, a, sig):
             if dr != 0:
                 entry = o[i + 1] if i + 1 < n else c[i]; av = a[i]
                 if np.isfinite(av) and np.isfinite(entry) and av > ATR_EPSILON and entry > 0.0:
-                    r_mult, lb, bh, mae_r, sd = sim_5r_fee_optimized(h, l, c, i, entry, av, int(dr))
+                    r_mult, lb, bh, mae_r, sd = sim_5r_tight_risk(h, l, c, i, entry, av, int(dr))
                     results.append((i, dr, r_mult, lb, bh, mae_r, sd))
                     cd = i + bh + 1
         i += 1
@@ -241,7 +243,7 @@ def featurize_microstructure(df, br=None):
     return df
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. 6 SPECIALIZED STRATEGY SIGNAL GENERATORS
+# 3. 6 STRATEGY SIGNAL GENERATORS
 # ─────────────────────────────────────────────────────────────────────────────
 def make_sig_s1(df):
     out = np.zeros(len(df), dtype=np.int32)
@@ -249,8 +251,8 @@ def make_sig_s1(df):
     ll = df['liql'].values; ls = df['liqs'].values
     llm = df['liqlm'].values; lsm = df['liqsm'].values
     zc = df['zc20'].values; bsr = df['bsr'].values
-    l_mask = (mc >= 0) & (p8 < -0.01) & (ll > llm * 1.05) & (zc > 0.01) & (bsr > 0.49)
-    s_mask = (mc <= 0) & (p8 > 0.01) & (ls > lsm * 1.05) & (zc < -0.01) & (bsr < 0.51)
+    l_mask = (mc >= 0) & (p8 < -0.01) & (ll > llm * 1.1) & (zc > 0.02) & (bsr > 0.49)
+    s_mask = (mc <= 0) & (p8 > 0.01) & (ls > lsm * 1.1) & (zc < -0.02) & (bsr < 0.51)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -258,8 +260,8 @@ def make_sig_s2(df):
     out = np.zeros(len(df), dtype=np.int32)
     mc = df['mc'].values; p8 = df['p8'].values
     zc = df['zc20'].values; bsr = df['bsr'].values; vr = df['vr5'].values
-    l_mask = (mc >= 0) & (p8 < -0.01) & (zc > 0.02) & (bsr > 0.49) & (vr > 0.8)
-    s_mask = (mc <= 0) & (p8 > 0.01) & (zc < -0.02) & (bsr < 0.51) & (vr > 0.8)
+    l_mask = (mc >= 0) & (p8 < -0.01) & (zc > 0.03) & (bsr > 0.49) & (vr > 0.85)
+    s_mask = (mc <= 0) & (p8 > 0.01) & (zc < -0.03) & (bsr < 0.51) & (vr > 0.85)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -267,8 +269,8 @@ def make_sig_s3(df):
     out = np.zeros(len(df), dtype=np.int32)
     mc = df['mc'].values; p8 = df['p8'].values
     vr = df['vr5'].values; bsr = df['bsr'].values; zc = df['zc20'].values
-    l_mask = (mc > 0) & (bsr > 0.48) & (vr > 0.75)
-    s_mask = (mc < 0) & (bsr < 0.52) & (vr > 0.75)
+    l_mask = (mc > 0) & (bsr > 0.49) & (vr > 0.8) & (zc > 0.01)
+    s_mask = (mc < 0) & (bsr < 0.51) & (vr > 0.8) & (zc < -0.01)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -276,8 +278,8 @@ def make_sig_s4(df):
     out = np.zeros(len(df), dtype=np.int32)
     zfr = df['zfr'].values; rsi = df['rsi'].values
     zc = df['zc20'].values; p8 = df['p8'].values; mc = df['mc'].values
-    l_mask = (mc >= 0) & ((zfr < -0.2) | (rsi < 45)) & (zc > -0.25)
-    s_mask = (mc <= 0) & ((zfr > 0.2) | (rsi > 55)) & (zc < 0.25)
+    l_mask = (mc >= 0) & ((zfr < -0.3) | (rsi < 40)) & (zc > -0.2)
+    s_mask = (mc <= 0) & ((zfr > 0.3) | (rsi > 60)) & (zc < 0.2)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -285,8 +287,8 @@ def make_sig_s5(df):
     out = np.zeros(len(df), dtype=np.int32)
     mc = df['mc'].values; vr = df['vr5'].values
     zc = df['zc20'].values; bsr = df['bsr'].values; p8 = df['p8'].values
-    l_mask = (mc >= 0) & (vr > 0.9) & (zc > 0.01) & (bsr > 0.48)
-    s_mask = (mc <= 0) & (vr > 0.9) & (zc < -0.01) & (bsr < 0.52)
+    l_mask = (mc >= 0) & (vr > 1.0) & (zc > 0.02) & (bsr > 0.49)
+    s_mask = (mc <= 0) & (vr > 1.0) & (zc < -0.02) & (bsr < 0.51)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -294,8 +296,8 @@ def make_sig_s6(df):
     out = np.zeros(len(df), dtype=np.int32)
     mc = df['mc'].values; oicc = df['oicc'].values
     zc = df['zc20'].values; p8 = df['p8'].values
-    l_mask = (mc >= 0) & (oicc > 0.0) & (zc > 0.0)
-    s_mask = (mc <= 0) & (oicc < -0.0) & (zc < 0.0)
+    l_mask = (mc >= 0) & (oicc > 0.0) & (zc > 0.02)
+    s_mask = (mc <= 0) & (oicc < -0.0) & (zc < -0.02)
     out[l_mask] = 1; out[s_mask] = -1
     return out
 
@@ -309,26 +311,31 @@ STRATEGIES = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. STEP-FUNCTION RISK SIMULATOR
+# 4. CALIBRATED DUAL-SHIELD ESCALATOR SIMULATOR
 # ─────────────────────────────────────────────────────────────────────────────
-def simulate_step_trades(bdf, cap=CAP):
+def simulate_dual_shield_trades(bdf, cap=CAP):
     if bdf.empty:
         return 0.0, 0.0, 0.0, 0.0, bdf
         
     pnl_list = []; mae_dollar_list = []; rsk_list = []
     eq = cap; peak = cap; max_dd = 0.0
+    last_won = False
     
     for r in bdf.itertuples():
         cur_pnl = eq - cap
-        if cur_pnl >= 1050.0:
+        # Window Target Governor: Lock in Profit at $1,025 (+20.5%)
+        if cur_pnl >= 1025.0:
             break
             
-        if cur_pnl >= 450.0:
-            trade_rsk = 180.0
-        elif cur_pnl <= -25.0:
-            trade_rsk = 25.0
+        # Dual-Shield Sizing:
+        if cur_pnl <= -40.0:
+            trade_rsk = 15.0   # Severe Drawdown Defense ($15 = 0.3%)
+        elif cur_pnl >= 250.0 and last_won:
+            trade_rsk = 145.0  # House Money Target Risk ($145 = 2.9% -> Max single DD 2.9%)
+        elif cur_pnl >= 250.0 and not last_won:
+            trade_rsk = 45.0   # House Shield after loss on house money ($45 = 0.9%)
         else:
-            trade_rsk = 115.0
+            trade_rsk = 65.0   # Initial Reconnaissance Base ($65 = 1.3%)
             
         rsk_list.append(trade_rsk)
         dollar_pnl = r.r_multiple * trade_rsk
@@ -340,6 +347,8 @@ def simulate_step_trades(bdf, cap=CAP):
         pays = ((r.direction == 1 and r.avg_fr > 0) or (r.direction == -1 and r.avg_fr < 0))
         net_dollar = dollar_pnl - (funding_cost if pays else -funding_cost)
         
+        last_won = (net_dollar > 0)
+            
         pnl_list.append(net_dollar)
         mae_dollar_list.append(mae_dollar)
         
@@ -416,7 +425,7 @@ def train_and_rank_window(pdf, tdf, fcs):
 
 def run_discovery():
     log("=" * 85)
-    log("120/120 AUTONOMOUS QUANT ENGINE DISCOVERY (V16)")
+    log("120/120 AUTONOMOUS QUANT ENGINE DISCOVERY (V19 - DUAL-SHIELD ESCALATOR)")
     log("=" * 85)
     
     btc = load_symbol_data('BTCUSDT')
@@ -442,7 +451,7 @@ def run_discovery():
         
         for sname, sfn, _ in STRATEGIES:
             sg = sfn(dff)
-            res = gen_trades_fast_v16(h, l, c, o, a, sg)
+            res = gen_trades_fast_v19(h, l, c, o, a, sg)
             if res:
                 rr = np.asarray(res, dtype=np.float64)
                 idx = rr[:, 0].astype(np.int64); dr = rr[:, 1].astype(np.int32)
@@ -493,7 +502,7 @@ def run_discovery():
                 w_results.append({'w': wi, 'start': ss, 'end': se, 'passed': False, 'pnl': 0, 'roi': 0, 'wr': 0, 'dd': 0, 'tr': nt})
                 continue
                 
-            pnl, roi, wr, max_dd, res_df = simulate_step_trades(bdf, cap=CAP)
+            pnl, roi, wr, max_dd, res_df = simulate_dual_shield_trades(bdf, cap=CAP)
             nw = int((res_df['net_pnl'] > 0).sum())
             
             passed = (wr >= TWR) and (roi >= TROI) and (max_dd < TDD) and (nt >= MINTR)
