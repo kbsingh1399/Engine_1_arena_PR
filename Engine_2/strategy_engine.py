@@ -32,7 +32,10 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import lightgbm as lgb
+import optuna
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / 'Engine_2' / 'binance_backtesting_data'
@@ -96,6 +99,10 @@ MAX_CONCURRENT = 2    # Max concurrent positions across portfolio
 REGIME_CHOP = 0
 REGIME_TREND = 1
 REGIME_EXPANSION = 2
+
+OPTUNA_TRIALS = 12
+OPTUNA_SEED = 42
+
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
@@ -318,8 +325,10 @@ def make_signal_s1(df):
     llm = df['liqlm'].values; lsm = df['liqsm'].values
     mc = df['mc'].values; p8 = df['p8'].values
     zc20 = df['zc20'].values
-    mask_l = (mc > 0) & (p8 < -0.12) & ((ll > llm * 1.2) | (zc20 > 0.1))
-    mask_s = (mc < 0) & (p8 > 0.12) & ((ls > lsm * 1.2) | (zc20 < -0.1))
+    # Keep a superset of the tunable S1 search space. The in-sample
+    # optimizer narrows this universe at each walk-forward boundary.
+    mask_l = (mc > 0) & (p8 < -0.08) & ((ll > llm * 1.0) | (zc20 > 0.05))
+    mask_s = (mc < 0) & (p8 > 0.08) & ((ls > lsm * 1.0) | (zc20 < -0.05))
     out[mask_l] = 1; out[mask_s] = -1
     return out
 
@@ -665,7 +674,7 @@ def _model_frame(tdf, fcs):
     return tdf[fcs].replace([np.inf, -np.inf], 0.0).fillna(0.0).astype(np.float32)
 
 
-def bmodel(tdf):
+def bmodel(tdf, max_depth=4, learning_rate=0.03):
     fcs = causal_feature_columns(tdf)
     if len(tdf) < 20 or len(fcs) < 3:
         return None, fcs
@@ -678,7 +687,7 @@ def bmodel(tdf):
         return None, fcs
 
     model = lgb.LGBMClassifier(
-        objective='binary', max_depth=4, learning_rate=0.03, n_estimators=80,
+        objective='binary', max_depth=int(max_depth), learning_rate=float(learning_rate), n_estimators=80,
         random_state=42, n_jobs=1, verbose=-1,
         min_child_samples=20, max_bin=63,
     )
@@ -697,65 +706,154 @@ def pred(models, fcs, tdf):
     tdf['prob'] = np.mean(probs, axis=0)
     return tdf
 
-def calibrate_in_sample_threshold(pdf, ws, strategy_name=None):
-    """Calibrate an operating threshold using history strictly before ``ws``.
+OPTUNA_DEFAULTS = {
+    'pullback_threshold': 0.12,
+    'cvd_momentum': 0.10,
+    'liquidation_multiplier': 1.20,
+    'probability_threshold': 0.55,
+    'tree_depth': 4,
+    'learning_rate': 0.03,
+}
 
-    Each candidate ``p*`` is evaluated on a pre-window validation slice. The
-    OOS window is never used to fit the model, calibrate probabilities, choose
-    the threshold, or decide which regime route is preferred.
+
+def apply_signal_hyperparameters(tdf, strategy_name, params=None):
+    """Filter candidate entries using parameters chosen before the OOS start.
+
+    The existing S1 signal generator creates the broad liquidation/CVD
+    candidate universe. Optuna narrows that universe here with current-bar
+    values; it never adds an entry after seeing its future outcome.
     """
-    if len(pdf) < 20:
-        return None, None, 0.55
+    if tdf.empty or strategy_name != 'S1_Liquidation' or not params:
+        return tdf
+    required = ('direction', 'p8', 'zc20', 'liq_long_ratio', 'liq_short_ratio')
+    if any(column not in tdf.columns for column in required):
+        return tdf
 
-    last_model = None
-    last_features = None
+    pullback = float(params.get('pullback_threshold', OPTUNA_DEFAULTS['pullback_threshold']))
+    cvd = float(params.get('cvd_momentum', OPTUNA_DEFAULTS['cvd_momentum']))
+    liquidation = float(params.get('liquidation_multiplier', OPTUNA_DEFAULTS['liquidation_multiplier']))
+    direction = tdf['direction'].to_numpy()
+    p8 = tdf['p8'].to_numpy()
+    zc20 = tdf['zc20'].to_numpy()
+    long_liq = tdf['liq_long_ratio'].to_numpy()
+    short_liq = tdf['liq_short_ratio'].to_numpy()
+    keep_long = (direction == 1) & (p8 <= -pullback) & (
+        (zc20 >= cvd) | (long_liq >= liquidation)
+    )
+    keep_short = (direction == -1) & (p8 >= pullback) & (
+        (zc20 <= -cvd) | (short_liq >= liquidation)
+    )
+    return tdf.loc[keep_long | keep_short].copy()
+
+
+def _calibration_result(model, features, params, return_params):
+    if return_params:
+        return model, features, float(params['probability_threshold']), params
+    return model, features, float(params['probability_threshold'])
+
+
+def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=False):
+    """Calibrate model/filter parameters and p* with Optuna before ``ws``.
+
+    Every trial trains on an earlier slice and evaluates on a later
+    pre-window validation partition. The OOS window is never used to fit the
+    model, optimize signal filters, choose the threshold, or route a regime.
+    """
+    defaults = dict(OPTUNA_DEFAULTS)
+    if len(pdf) < 20:
+        return _calibration_result(None, None, defaults, return_params)
+
+    # Select one chronological validation partition. It is always completed
+    # before the OOS start and is never mixed into the training slice.
+    split_train = None
+    split_validation = None
     for val_days in (30, 60, 90):
         validation_start = ws - pd.Timedelta(days=val_days)
         train = pdf[pdf['exit_time'] < validation_start].sort_values('entry_time')
         validation = pdf[
             (pdf['entry_time'] >= validation_start) & (pdf['exit_time'] < ws)
         ].sort_values('entry_time')
-        if len(train) < 20:
-            # Early windows may contain less than 30 days of history. Use a
-            # chronological in-sample split instead of silently disabling
-            # calibration; both partitions remain strictly before ``ws``.
-            if len(pdf) >= 40:
-                split = max(20, int(len(pdf) * 0.70))
-                train = pdf.iloc[:split].sort_values('entry_time')
-                validation = pdf.iloc[split:].sort_values('entry_time')
-            else:
-                train = pdf.sort_values('entry_time')
-                validation = pd.DataFrame()
+        if len(train) >= 20 and len(validation) >= MINTR:
+            split_train, split_validation = train, validation
+            break
 
-        model, features = bmodel(train)
+    if split_train is None:
+        # Early windows may contain less than 30 days of history. A
+        # chronological in-sample split is still valid and avoids silently
+        # disabling calibration.
+        if len(pdf) >= 40:
+            split = max(20, int(len(pdf) * 0.70))
+            split_train = pdf.iloc[:split].sort_values('entry_time')
+            split_validation = pdf.iloc[split:].sort_values('entry_time')
+        else:
+            model, features = bmodel(pdf.sort_values('entry_time'))
+            return _calibration_result(model, features, defaults, return_params)
+
+    def objective(trial):
+        params = {
+            'pullback_threshold': trial.suggest_float(
+                'pullback_threshold', 0.08, 0.30
+            ),
+            'cvd_momentum': trial.suggest_float('cvd_momentum', 0.05, 0.25),
+            'liquidation_multiplier': trial.suggest_float(
+                'liquidation_multiplier', 1.0, 2.0
+            ),
+            'probability_threshold': trial.suggest_float(
+                'probability_threshold', 0.50, 0.85
+            ),
+            'tree_depth': trial.suggest_int('tree_depth', 3, 6),
+            'learning_rate': trial.suggest_float(
+                'learning_rate', 0.01, 0.08
+            ),
+        }
+        train_candidates = apply_signal_hyperparameters(
+            split_train, strategy_name, params
+        )
+        validation_candidates = apply_signal_hyperparameters(
+            split_validation, strategy_name, params
+        )
+        if len(train_candidates) < 20 or len(validation_candidates) < MINTR:
+            return -1e9
+
+        model, features = bmodel(
+            train_candidates,
+            max_depth=params['tree_depth'],
+            learning_rate=params['learning_rate'],
+        )
         if model is None:
-            continue
-        last_model, last_features = model, features
+            return -1e9
+        validation_pred = pred(model, features, validation_candidates)
+        selected = apply_regime_routing(
+            validation_pred,
+            strategy_name,
+            params['probability_threshold'],
+        )
+        selected = simulate_portfolio_concurrency(
+            selected, max_concurrent=MAX_CONCURRENT
+        ).head(MAXTR)
+        if len(selected) < MINTR:
+            return -1e9
+        _, roi, wr, dd, _ = simulate_dynamic_risk(selected, cap=CAP)
+        return float(roi * wr - 2.0 * max(0.0, dd - 3.9))
 
-        if len(validation) < MINTR:
-            continue
-        validation_pred = pred(model, features, validation)
-        best_p = None
-        best_score = -np.inf
-        for threshold in np.arange(0.50, 0.92, 0.02):
-            candidates = apply_regime_routing(
-                validation_pred, strategy_name, threshold
-            )
-            candidates = simulate_portfolio_concurrency(
-                candidates, max_concurrent=MAX_CONCURRENT
-            ).head(MAXTR)
-            if len(candidates) < MINTR:
-                continue
-            _, roi, wr, dd, _ = simulate_dynamic_risk(candidates, cap=CAP)
-            # Select a risk-adjusted operating point; target gates remain a
-            # separate, fail-closed OOS decision in the runner.
-            score = roi + 0.05 * wr - 2.0 * max(0.0, dd - 3.9)
-            if score > best_score:
-                best_score = score
-                best_p = float(threshold)
-        if best_p is not None:
-            return model, features, best_p
+    study = optuna.create_study(
+        direction='maximize',
+        sampler=optuna.samplers.TPESampler(seed=OPTUNA_SEED),
+    )
+    study.optimize(objective, n_trials=OPTUNA_TRIALS, catch=(ValueError,))
+    if not study.trials or study.best_value <= -1e8:
+        best_params = defaults
+    else:
+        best_params = dict(defaults)
+        best_params.update(study.best_params)
 
-    if last_model is not None:
-        return last_model, last_features, 0.55
-    return None, None, 0.55
+    final_train = apply_signal_hyperparameters(pdf, strategy_name, best_params)
+    if len(final_train) < 20:
+        final_train = pdf.sort_values('entry_time')
+        best_params = defaults
+    model, features = bmodel(
+        final_train,
+        max_depth=best_params['tree_depth'],
+        learning_rate=best_params['learning_rate'],
+    )
+    return _calibration_result(model, features, best_params, return_params)
