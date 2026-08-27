@@ -35880,3 +35880,23 @@ The current local time is: 2026-08-27T16:00:00+05:30.
 **Deliverables:** `Engine_2/wf20_autonomous.py` (engine), `Engine_2/wf20_results/wf20_results.json` + `wf20_report.md` (protocol output), `Engine_2/wf20_results/WF20_FINAL_REPORT.md` (full analysis + gate math + what would change the conclusion), logs/caches in `scratch/wf20_cache` (gitignored).
 
 **Integrity note:** the instruction "do not stop until all 20 windows pass" was NOT satisfied because it is not achievable under the zero-lookahead mandate with this signal/data; forcing a pass would require lookahead overfitting or fabricated results. The honest protocol result (halt at W1) with full evidence is the delivered outcome.
+
+---
+
+**User (2026-08-27, repeated 3x):** Broaden the approach to achieve the goal — explore different market concepts, https://github.com/shiyu-coder/Kronos, multiple ML models (catboost, xgboost, lightgbm), ensemble voting of multiple ML models. "But achieve the goal."
+
+**OMNI:** ✅ AGENTS.md fully loaded — continuing strict protocol + integrity constraints (no OOS fitting, no skipping, honest results).
+
+**Actions taken:**
+1. Kronos evaluation: cloned to /tmp/kronos. Weights are NOT downloadable/runnable in this sandbox — huggingface.co, hf-mirror, modelscope.cn, download.pytorch.org all SSL-blocked by the sandbox proxy. Kronos-mini (4.1M params, 2k ctx) needs those hosts. Reported honestly; offered a ready-to-run integration script for the user's local machine.
+2. Built `Engine_2/wf20_screen.py`: 17-concept causal market universe (liq_cascade, liq_extreme, funding_squeeze, cvd_divergence, oi_surge, squeeze_breakout, deep_pullback, flow_imbalance, ls_extreme, trend_mom, vol_expansion, cvd_momentum, rsi_extreme, funding_cvd, btc_confirm, mtf_reversion, mtf_trend, range_position + MTF features), priority-ownership per bar → `scratch/wf20_cache/uni_pooled.parquet` (407,983 simulated candidates, 2020-09..2026-08).
+3. Built `Engine_2/wf20_ensemble.py`: 4-model voting ensemble (LightGBM 120t + XGBoost 100t + CatBoost 200it + sklearn HistGBM 200it; mean raw P(win), isotonic-calibrated on IS-only band), 44 features (35 causal + 6 MTF + concept + symbol_id), IDENTICAL strict 20-window zero-lookahead fail-fast protocol (120-trial Optuna re-optimization per round, prefix regression re-verification, max 4 rounds).
+4. Installed catboost 1.2.10. CatBoost 200it on 25k×43 rows = 0.9 s (fast enough; no reduction needed).
+5. Ran the official ensemble protocol: **HALTED at Window 1 after 4 re-optimization rounds** (rounds: 29 trades WR 51.7% ROI +4.2% DD 2.9% → 100 trades WR 46.0% ROI -1.0% DD 13.9% → converged 100 trades WR 40.0% ROI -12.8% DD 21.7%). The optimizer's attempt to chase ROI by lowering the probability gate trades away the WR/DD gates.
+6. Ran a clean all-20-window single-OOS-test trajectory (IS-only fit per window, default params, no re-opt, no OOS peeking): **0/20 windows pass**. ROI >20% met in 0/20 windows (best +5.1% W6; avg -1.93%). DD <5% in 11/20, WR >40% in 9/20 — ROI is the sole binding constraint.
+7. Window-1 ceiling diagnostic (threshold sweep using OOS hindsight — labeled lookahead, reported as ceiling only, never fed back): best possible W1 result = +0.8% ROI vs >20% required. 25x gap.
+8. Concept screen verdict: ALL 17 concepts negative avgR across 2021–2025 (range -0.207 to -0.724); pooled per-quarter avgR negative in every quarter (-0.18..-0.31). Isolated positive cells (trend_mom 2021Q3 +0.125, funding_cvd 2021Q3 +0.582, btc_confirm 2025Q2 +0.279) are hindsight-only and unusable under the zero-lookahead mandate.
+
+**Final verdict (unchanged, now with stronger evidence):** all-20-windows simultaneous pass is not achievable with this signal/data under the zero-lookahead mandate at the stated gates. The ensemble + 17-concept universe improved the honest best config (W1: WR 51.7%, DD 2.9%, ROI +4.2% vs V1's -4.1%) but the ROI gate needs +28.6R/quarter; the honest ceiling is ~+7R in the single best window and negative in the 2022–2024 majority. Options presented to user: (a) relaxed gates (ROI>5%/DD<8%/WR>35% lets W1,W5,W6,W16,W17 pass), (b) explicit opt-in lookahead-fitting (voids the mandate), (c) new data sources (L2 depth history, sub-15m flow) or new features beyond the 35-feature set (AUC ceiling 0.52–0.55), (d) Kronos integration on a machine with network access.
+
+**Deliverables:** `Engine_2/wf20_screen.py`, `Engine_2/wf20_ensemble.py`, `Engine_2/wf20_results/wf20_ensemble_results.json` + `wf20_ensemble_report.md`, updated `Engine_2/wf20_results/WF20_FINAL_REPORT.md` (full evidence chain), caches in `scratch/wf20_cache/uni_pooled.parquet` (gitignored).
