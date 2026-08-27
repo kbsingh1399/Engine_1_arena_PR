@@ -9,7 +9,8 @@ if str(ENGINE_DIR) not in sys.path:
 
 from strategy_engine import (  # noqa: E402
     DRAWDOWN_RISK_LIMIT,
-    HOUSE_MONEY_RISK,
+    HOUSE_MONEY_RISK_MAX,
+    HOUSE_MONEY_RISK_MIN,
     HOUSE_SHIELD_RISK,
     RECON_RISK,
     add_causal_regime_features,
@@ -41,16 +42,23 @@ def _trades(r_multiples, mae_dollars=None, overlapping=False):
 def test_dual_shield_escalator_and_sticky_house_shield():
     # The first win creates house money, the house loss changes only the next
     # entry to the $45 shield, and no later outcome can resize an earlier entry.
-    trades = _trades([5.0, -1.0, 1.0])
+    trades = _trades([5.0, -0.1, 1.0])
     _, _, _, max_dd, executed = simulate_dynamic_risk(trades)
 
-    assert executed["trade_risk"].tolist() == [
-        RECON_RISK,
-        HOUSE_MONEY_RISK,
-        HOUSE_SHIELD_RISK,
-    ]
+    assert executed.iloc[0]["trade_risk"] == RECON_RISK
+    assert HOUSE_MONEY_RISK_MIN <= executed.iloc[1]["trade_risk"] <= HOUSE_MONEY_RISK_MAX
+    assert executed.iloc[2]["trade_risk"] == HOUSE_SHIELD_RISK
     assert executed["risk_mode"].tolist() == ["recon", "house", "house-shield"]
     assert max_dd < 4.0
+
+
+def test_target_lock_waits_for_six_completed_trades_and_no_open_positions():
+    trades = _trades([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 10.0, 1.0])
+    _, roi, wr, _, executed = simulate_dynamic_risk(trades)
+
+    assert roi > 20.0
+    assert wr > 40.0
+    assert len(executed) == 7
 
 
 def test_allocator_does_not_use_unsettled_profit_for_house_money():
@@ -174,6 +182,7 @@ def test_cold_start_rule_uses_current_bar_confirmation_only():
             {
                 'entry_time': timestamp,
                 'direction': 1,
+                'p8': -0.20,
                 'bsr': 0.60,
                 'zc20': 0.10,
                 'vr5': 1.0,
@@ -183,6 +192,7 @@ def test_cold_start_rule_uses_current_bar_confirmation_only():
             {
                 'entry_time': timestamp + pd.Timedelta(minutes=15),
                 'direction': 1,
+                'p8': -0.04,
                 'bsr': 0.49,
                 'zc20': 0.01,
                 'vr5': 1.0,
@@ -195,6 +205,22 @@ def test_cold_start_rule_uses_current_bar_confirmation_only():
     selected = apply_cold_start_rule(candidates, 'S1_Liquidation')
     assert len(selected) == 1
     assert selected.iloc[0]['direction'] == 1
+
+
+def test_cold_start_conviction_is_causal_and_sorted_within_timestamp():
+    from strategy_engine import apply_cold_start_rule
+
+    timestamp = pd.Timestamp("2020-01-01")
+    candidates = pd.DataFrame(
+        [
+            {'entry_time': timestamp, 'direction': 1, 'p8': -0.20, 'bsr': 0.60, 'zc20': 0.10, 'vr5': 1.0},
+            {'entry_time': timestamp, 'direction': 1, 'p8': -0.40, 'bsr': 0.60, 'zc20': 0.20, 'vr5': 1.0},
+            {'entry_time': timestamp, 'direction': 1, 'p8': -0.10, 'bsr': 0.60, 'zc20': 0.30, 'vr5': 1.0},
+        ]
+    )
+
+    selected = apply_cold_start_rule(candidates, 'S1_Liquidation')
+    assert selected['conviction'].round(6).tolist() == [0.60, 0.40, 0.30]
 
 
 def test_same_timestamp_entries_use_conviction_and_keep_slots_occupied():

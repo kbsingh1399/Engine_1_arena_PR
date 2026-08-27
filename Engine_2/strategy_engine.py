@@ -6,12 +6,12 @@ ENGINE 2: CORE QUANT STRATEGY & NUMBA EXECUTION ENGINE
 Zero-Lookahead, 100% Causal Architecture for 6-Account Parallel Quant Trading.
 Implements:
   1. 57-column microstructural feature extraction on all 18 parallel assets
-  2. 3-Phase Risk-Free Breakeven & Tiered Trailing Stop Numba Simulation:
+  2. 3-Phase Fee-Protective Profit Tiers & 5R Trailing Stop Numba Simulation:
        - Phase 0 (Entry): 1.0 * ATR initial stop loss (base risk is $35)
-       - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
-       - Phase 2 (+3.0R peak): Lock in +1.8R profit
-       - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner
-  3. Causal Dual-Shield Risk Escalator ($65 / $145 / $45 with MTM reserve)
+       - Tier 1 (+1.8R peak): Lock in +1.2R profit
+       - Tier 2 (+3.0R peak): Lock in +2.0R profit
+       - Tier 3 (+5.0R peak): Activate 0.8R trailing stop runner
+  3. Causal Asymmetric Risk Escalator ($95 / $185-$240 / $45 with MTM reserve)
   4. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
   5. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
   6. In-Sample ML Model Training and calibrated p* threshold selection
@@ -76,17 +76,24 @@ RSK = 35.0             # Base risk used to normalize simulator R-multiples
 FEE_RT = 0.0008        # 0.08% round-trip taker fee + slippage
 TP = 5.0               # 5R minimum target before activating trailing stop
 TRA = 0.8              # 0.8R trailing distance
+TIER1_TRIGGER_R = 1.8
+TIER1_LOCK_R = 1.2
+TIER2_TRIGGER_R = 3.0
+TIER2_LOCK_R = 2.0
 MAX_NOTIONAL = 50000.0
 ATR_EPSILON = 1e-6
 
-# Calibrated Dual-Shield Escalator. These are target risks; the allocator may
-# reduce a target when the conservative mark-to-market drawdown budget is full.
-RECON_RISK = 65.0              # Reconnaissance risk (1.3% of a $5,000 account)
-HOUSE_MONEY_RISK = 145.0       # House-money risk after +$250 realized profit
-HOUSE_SHIELD_RISK = 45.0       # Next risk after a house-money loss
-DRAWDOWN_DEFENSE_RISK = 15.0   # Severe drawdown circuit-breaker risk
-HOUSE_PROFIT_TRIGGER = 250.0
-DRAWDOWN_RISK_LIMIT = 0.039    # Strictly below the 4% architectural objective
+# Asymmetric House-Money Escalator. These are target risks; the allocator
+# reduces a target when the conservative mark-to-market budget is full.
+RECON_RISK = 95.0                    # Baseline reconnaissance risk (1.9%)
+HOUSE_MONEY_RISK_MIN = 185.0         # Expansion risk at the +$100 trigger
+HOUSE_MONEY_RISK_MAX = 240.0         # Expansion risk at the target lock
+HOUSE_MONEY_RISK = HOUSE_MONEY_RISK_MIN  # Backward-compatible lower-bound alias
+HOUSE_SHIELD_RISK = 45.0             # Retained post-house-loss shield
+DRAWDOWN_DEFENSE_RISK = 25.0         # Severe drawdown circuit-breaker risk
+HOUSE_PROFIT_TRIGGER = 100.0
+TARGET_PNL = 1025.0
+DRAWDOWN_RISK_LIMIT = 0.039          # Strictly below the 4% architectural objective
 MIN_EXECUTION_RISK = 1.0       # Do not count dust-sized residual positions
 
 TROI = 20.0           # Target ROI > 20% per window (> $1,000 net profit)
@@ -104,7 +111,24 @@ OPTUNA_TRIALS = 12
 OPTUNA_SEED = 42
 COLD_START_MIN_HISTORY = 200
 COLD_START_MIN_HISTORY_DAYS = 30
+COLD_START_CANDIDATE_POOL = 35
 COLD_START_MAX_TRADES = 15
+
+
+def house_money_target_risk(realized_pnl):
+    """Linearly expand house-money risk from $185 to $240."""
+    if realized_pnl <= HOUSE_PROFIT_TRIGGER:
+        return HOUSE_MONEY_RISK_MIN
+    span = max(TARGET_PNL - HOUSE_PROFIT_TRIGGER, 1.0)
+    progress = np.clip(
+        (realized_pnl - HOUSE_PROFIT_TRIGGER) / span,
+        0.0,
+        1.0,
+    )
+    return float(
+        HOUSE_MONEY_RISK_MIN
+        + progress * (HOUSE_MONEY_RISK_MAX - HOUSE_MONEY_RISK_MIN)
+    )
 
 
 def log(msg):
@@ -116,11 +140,11 @@ def log(msg):
 @njit(fastmath=True, nogil=True)
 def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
     """
-    3-Phase Risk-Free Breakeven & Tiered Trailing Stop Simulation:
+    3-Phase Fee-Protective Profit Tier Simulation:
       - Phase 0: Initial SL at 1.0 * atr (1R risk)
-      - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
-      - Phase 2 (+3.0R peak): Lock in +1.8R profit
-      - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner to let profit run
+      - Tier 1 (+1.8R peak): Lock in +1.2R profit
+      - Tier 2 (+3.0R peak): Lock in +2.0R profit
+      - Tier 3 (+5.0R peak): Activate 0.8R trailing stop runner
     """
     if (not np.isfinite(atr)) or (not np.isfinite(entry)) or atr <= ATR_EPSILON or entry <= 0.0:
         return 0.0, 0.0, 0.0, 0.0, 0.0
@@ -137,11 +161,11 @@ def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
                 if exc >= TP * sd:
                     ns = bp - TRA * sd
                     if ns > cs: cs = ns
-                elif exc >= 3.0 * sd:
-                    ns = entry + 1.8 * sd
+                elif exc >= TIER2_TRIGGER_R * sd:
+                    ns = entry + TIER2_LOCK_R * sd
                     if ns > cs: cs = ns
-                elif exc >= 1.5 * sd:
-                    ns = entry + 0.2 * sd
+                elif exc >= TIER1_TRIGGER_R * sd:
+                    ns = entry + TIER1_LOCK_R * sd
                     if ns > cs: cs = ns
         else:
             ae = max(0.0, h[j] - entry)
@@ -152,11 +176,11 @@ def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
                 if exc >= TP * sd:
                     ns = bp + TRA * sd
                     if ns < cs: cs = ns
-                elif exc >= 3.0 * sd:
-                    ns = entry - 1.8 * sd
+                elif exc >= TIER2_TRIGGER_R * sd:
+                    ns = entry - TIER2_LOCK_R * sd
                     if ns < cs: cs = ns
-                elif exc >= 1.5 * sd:
-                    ns = entry - 0.2 * sd
+                elif exc >= TIER1_TRIGGER_R * sd:
+                    ns = entry - TIER1_LOCK_R * sd
                     if ns < cs: cs = ns
     u = min(RSK / sd, MAX_NOTIONAL / entry)
     g = u * (ep - entry) if dr == 1 else u * (entry - ep)
@@ -440,12 +464,10 @@ def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
     # boundary. Use their already-computed causal conviction score only as a
     # same-timestamp tie-breaker; never let a later timestamp outrank an
     # earlier entry.
-    if 'route_score' in trades_df.columns:
-        sort_columns.append('route_score')
-        ascending.append(False)
-    elif 'prob' in trades_df.columns:
-        sort_columns.append('prob')
-        ascending.append(False)
+    for score_column in ('route_score', 'prob', 'conviction'):
+        if score_column in trades_df.columns:
+            sort_columns.append(score_column)
+            ascending.append(False)
     sorted_trades = trades_df.sort_values(
         sort_columns, ascending=ascending, kind='stable'
     ).reset_index(drop=True)
@@ -519,11 +541,12 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
     """Execute already-selected trades with a causal dual-shield allocator.
 
     Risk is assigned when an entry arrives, after settling only positions whose
-    exits are already known. A house-money loss changes the *next* entry to
-    ``HOUSE_SHIELD_RISK``; it never retroactively resizes an open position.
-    The conservative MTM budget reserves each open position's MAE and worst
-    observed loss multiple, keeping the architectural drawdown objective
-    strictly below four percent.
+    exits are already known. The allocator uses $95 recon risk, expands house
+    risk from $185 to $240 after +$100 realized profit, and changes the next
+    entry to ``HOUSE_SHIELD_RISK`` after a house-money loss. It never
+    retroactively resizes an open position. The conservative MTM budget
+    reserves each open position's MAE and worst observed loss multiple,
+    keeping the architectural drawdown objective strictly below four percent.
     """
     if trades.empty:
         empty = trades.copy()
@@ -540,10 +563,12 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
     equity = float(cap)
     peak = float(cap)
     worst_dd = 0.0
+    completed_trades = 0
     house_shield = False
 
     def settle(position):
-        nonlocal equity, peak, worst_dd, house_shield
+        nonlocal equity, peak, worst_dd, completed_trades, house_shield
+        completed_trades += 1
         equity += position['net_pnl']
         peak = max(peak, equity)
         closed_dd = (peak - equity) / max(peak, 1e-12) * 100.0
@@ -560,12 +585,21 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
                 settle(position)
             else:
                 still_open.append(position)
+        # Explicitly restore the filtered list before checking slots. A
+        # settled position must not occupy a concurrency slot.
         open_positions = still_open
+        realized_pnl = equity - cap
+        if realized_pnl >= TARGET_PNL:
+            if completed_trades >= MINTR and not open_positions:
+                break
+            if open_positions:
+                # Wait for existing positions to settle; do not add exposure
+                # after the target has already been reached.
+                continue
 
         if len(open_positions) >= max_concurrent:
             continue
 
-        realized_pnl = equity - cap
         if realized_pnl <= -40.0:
             target_risk = DRAWDOWN_DEFENSE_RISK
             risk_mode = 'defense'
@@ -576,7 +610,7 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
             target_risk = HOUSE_SHIELD_RISK
             risk_mode = 'house-shield'
         elif realized_pnl >= HOUSE_PROFIT_TRIGGER:
-            target_risk = HOUSE_MONEY_RISK
+            target_risk = house_money_target_risk(realized_pnl)
             risk_mode = 'house'
         else:
             target_risk = RECON_RISK
@@ -758,7 +792,7 @@ def apply_cold_start_rule(tdf, strategy_name):
     """
     if tdf.empty:
         return tdf
-    required = ('direction', 'bsr', 'zc20', 'vr5')
+    required = ('direction', 'p8', 'bsr', 'zc20', 'vr5')
     if any(column not in tdf.columns for column in required):
         return tdf
 
@@ -821,7 +855,31 @@ def apply_cold_start_rule(tdf, strategy_name):
         long_signal = long_volume & long_cvd
         short_signal = short_volume & short_cvd
 
-    return tdf.loc[long_signal | short_signal].sort_values('entry_time')
+    selected = tdf.loc[long_signal | short_signal].copy()
+    if selected.empty:
+        return selected
+
+    # Both terms use only the candidate's decision-bar state. For a long,
+    # positive CVD and negative p8 pullback both increase conviction; the signs
+    # reverse symmetrically for a short.
+    selected['conviction'] = (
+        (selected['direction'] * selected['zc20']).clip(lower=-2.0, upper=2.0)
+        + (selected['p8'] * -selected['direction']).clip(lower=-1.0, upper=1.0)
+    )
+
+    # A global top-k over a full OOS month would use later scores to suppress
+    # earlier entries. Keep the requested 35-candidate ranking causal by
+    # applying it independently at each timestamp, then let the chronological
+    # concurrency engine choose the best two at that same decision boundary.
+    return (
+        selected.sort_values(
+            ['entry_time', 'conviction'],
+            ascending=[True, False],
+            kind='stable',
+        )
+        .groupby('entry_time', sort=False, group_keys=False)
+        .head(COLD_START_CANDIDATE_POOL)
+    )
 
 
 def _calibration_result(model, features, params, return_params):

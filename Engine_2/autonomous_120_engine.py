@@ -5,8 +5,8 @@ AUTONOMOUS 120/120 OOS MASTER QUANT ENGINE (V19 - CALIBRATED DUAL-SHIELD ESCALAT
 ================================================================================
 Architecture: Calibrated Dual-Shield Escalator
 Key Upgrades:
-  1. Base Reconnaissance Risk = $65.00 (1.3%)
-  2. House Money Target Risk = $145.00 (2.9%) -> Max Pullback bounded under 2.9%!
+  1. Base Reconnaissance Risk = $95.00 (1.9%)
+  2. House Money Expansion Risk = $185-$240 after +$100 realized profit
   3. Single-Loss House Shield: If a loss occurs on house money, immediately revert to $45.00
   4. Immediate Window Target Lock: Halts on reaching $1,025 (+20.5%)
 ================================================================================
@@ -32,6 +32,7 @@ from strategy_engine import (
     HOUSE_SHIELD_RISK,
     DRAWDOWN_DEFENSE_RISK,
     HOUSE_PROFIT_TRIGGER,
+    house_money_target_risk,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -370,7 +371,7 @@ def simulate_dual_shield_trades(bdf, cap=CAP):
             trade_rsk = HOUSE_SHIELD_RISK
             risk_mode = 'house-shield'
         elif cur_pnl >= HOUSE_PROFIT_TRIGGER:
-            trade_rsk = HOUSE_MONEY_RISK
+            trade_rsk = house_money_target_risk(cur_pnl)
             risk_mode = 'house'
         else:
             trade_rsk = RECON_RISK
