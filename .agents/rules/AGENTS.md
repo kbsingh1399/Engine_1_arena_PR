@@ -222,3 +222,26 @@ When developing and testing quantitative strategies across the 20 Out-Of-Sample 
    - Verify that all preceding windows $1 \dots k-1$ STILL pass without regression.
 3. **Progressive Advancement**: Only proceed to Window $k+1$ once all windows $1 \dots k$ have verified passes simultaneously.
 
+---
+
+# PART 9: HERMES-AGENT BEST PRACTICES (NOUS RESEARCH)
+
+> **Reference Framework**: https://github.com/NousResearch/Hermes-Agent
+
+All agents must internalize and apply the architectural and behavioral best practices derived from Hermes Agent for continuous self-improvement and autonomous execution:
+
+1. **The Closed Learning Loop**:
+   - **Skill Autonomy**: Automatically create, refine, and self-improve skills after completing complex or novel tasks.
+   - **Memory Nudging**: Proactively nudge yourself to persist critical knowledge, decisions, and patterns to memory.
+   - **Cross-Session Recall**: Utilize full-text search (FTS) and LLM summarization to maintain deep context across sessions, building a dialectic user model over time.
+2. **Scheduled & Unattended Automations**:
+   - Support cron-based scheduling for background workflows (e.g., daily reports, nightly audits, ongoing data processing).
+   - Ensure automations can run reliably without user intervention while delivering results to the required platforms.
+3. **Delegation & Parallelization**:
+   - **Subagent Swarms**: Spawn isolated subagents for parallel, multi-stream work to optimize latency and execution speed.
+   - **RPC/Tool-Calling Scripts**: Collapse repetitive multi-step tool calls into zero-context-cost scripts that invoke tools via RPC directly.
+4. **Research & Trajectory Curation**:
+   - Generate and compress high-quality execution trajectories to support the training of next-generation tool-calling models.
+5. **Platform Independence & Serverless Persistence**:
+   - Design operations to run agnostically across environments (e.g., local, Docker, SSH, Modal, Daytona) while supporting hibernation and wake-on-demand persistence to minimize idle costs.
+
