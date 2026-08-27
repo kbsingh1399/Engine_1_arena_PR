@@ -422,13 +422,27 @@ def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
     Chronologically execute trades enforcing max N concurrent positions across all 18 assets.
     """
     if trades_df.empty: return trades_df
-    sorted_trades = trades_df.sort_values('entry_time').reset_index(drop=True)
+    sort_columns = ['entry_time']
+    ascending = [True]
+    # All candidates at one timestamp are observable at the same decision
+    # boundary. Use their already-computed causal conviction score only as a
+    # same-timestamp tie-breaker; never let a later timestamp outrank an
+    # earlier entry.
+    if 'route_score' in trades_df.columns:
+        sort_columns.append('route_score')
+        ascending.append(False)
+    elif 'prob' in trades_df.columns:
+        sort_columns.append('prob')
+        ascending.append(False)
+    sorted_trades = trades_df.sort_values(
+        sort_columns, ascending=ascending, kind='stable'
+    ).reset_index(drop=True)
     executed = []
     active_exits = []
     
     for row in sorted_trades.itertuples():
         entry_t = row.entry_time
-        active_exits = [exit_t for exit_t in active_exits if exit_t > entry_t]
+        active_exits = [exit_t for exit_t in active_exits if exit_t >= entry_t]
         
         if len(active_exits) < max_concurrent:
             executed.append(row.Index)
@@ -463,7 +477,7 @@ def mark_to_market_drawdown(trades):
     for row in ordered.itertuples():
         still_open = []
         for position in sorted(open_positions, key=lambda p: p['exit_time']):
-            if position['exit_time'] <= row.entry_time:
+            if position['exit_time'] < row.entry_time:
                 equity += position['net_pnl']
                 peak = max(peak, equity)
             else:
