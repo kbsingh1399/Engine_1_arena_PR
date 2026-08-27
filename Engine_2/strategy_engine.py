@@ -110,11 +110,12 @@ REGIME_EXPANSION = 2
 
 OPTUNA_TRIALS = 24
 OPTUNA_SEED = 42
+MODEL_FAMILIES = ('lgb', 'extra', 'hist', 'ensemble')
 OPTUNA_SEED_TRIALS = (
-    {'probability_threshold': 0.30, 'tree_depth': 6, 'learning_rate': 0.02},
-    {'probability_threshold': 0.50, 'tree_depth': 6, 'learning_rate': 0.02},
-    {'probability_threshold': 0.54, 'tree_depth': 6, 'learning_rate': 0.05},
-    {'probability_threshold': 0.62, 'tree_depth': 6, 'learning_rate': 0.03},
+    {'model_family': 'lgb', 'probability_threshold': 0.30, 'tree_depth': 6, 'learning_rate': 0.02},
+    {'model_family': 'lgb', 'probability_threshold': 0.50, 'tree_depth': 6, 'learning_rate': 0.02},
+    {'model_family': 'hist', 'probability_threshold': 0.40, 'tree_depth': 4, 'learning_rate': 0.02},
+    {'model_family': 'ensemble', 'probability_threshold': 0.40, 'tree_depth': 4, 'learning_rate': 0.02},
 )
 COLD_START_MIN_HISTORY = 200
 COLD_START_MIN_HISTORY_DAYS = 30
@@ -742,8 +743,8 @@ def _model_frame(tdf, fcs):
     return tdf[fcs].replace([np.inf, -np.inf], 0.0).fillna(0.0).astype(np.float32)
 
 
-def bmodel(tdf, max_depth=4, learning_rate=0.03):
-    """Fit the secondary meta-label model on primary S1 event candidates."""
+def bmodel(tdf, max_depth=4, learning_rate=0.03, model_family='lgb'):
+    """Fit a causal secondary meta-label model or soft-voted ensemble."""
     fcs = causal_feature_columns(tdf)
     if len(tdf) < 20 or len(fcs) < 3:
         return None, fcs
@@ -755,14 +756,52 @@ def bmodel(tdf, max_depth=4, learning_rate=0.03):
     if p < 3 or negatives < 3:
         return None, fcs
 
-    model = lgb.LGBMClassifier(
-        objective='binary', max_depth=int(max_depth), num_leaves=31,
-        learning_rate=float(learning_rate), n_estimators=80,
-        random_state=42, n_jobs=1, verbose=-1,
-        min_child_samples=8, max_bin=31,
-    )
-    model.fit(X, y)
-    return [model], fcs
+    depth = int(max_depth)
+    rate = float(learning_rate)
+    if model_family == 'extra':
+        models = [ExtraTreesClassifier(
+            n_estimators=256,
+            max_depth=depth,
+            min_samples_leaf=8,
+            random_state=42,
+            n_jobs=1,
+        )]
+    elif model_family == 'hist':
+        models = [HistGradientBoostingClassifier(
+            max_iter=120,
+            max_leaf_nodes=min(31, 2 ** depth),
+            learning_rate=rate,
+            l2_regularization=1.0,
+            random_state=42,
+        )]
+    elif model_family == 'ensemble':
+        models = [
+            lgb.LGBMClassifier(
+                objective='binary', max_depth=depth, num_leaves=31,
+                learning_rate=rate, n_estimators=80,
+                random_state=42, n_jobs=1, verbose=-1,
+                min_child_samples=8, max_bin=31,
+            ),
+            ExtraTreesClassifier(
+                n_estimators=256, max_depth=depth, min_samples_leaf=8,
+                random_state=42, n_jobs=1,
+            ),
+            HistGradientBoostingClassifier(
+                max_iter=120, max_leaf_nodes=min(31, 2 ** depth),
+                learning_rate=rate, l2_regularization=1.0, random_state=42,
+            ),
+        ]
+    else:
+        models = [lgb.LGBMClassifier(
+            objective='binary', max_depth=depth, num_leaves=31,
+            learning_rate=rate, n_estimators=80,
+            random_state=42, n_jobs=1, verbose=-1,
+            min_child_samples=8, max_bin=31,
+        )]
+
+    for model in models:
+        model.fit(X, y)
+    return models, fcs
 
 def pred(models, fcs, tdf):
     if len(tdf) == 0:
@@ -783,6 +822,7 @@ OPTUNA_DEFAULTS = {
     'probability_threshold': 0.30,
     'tree_depth': 4,
     'learning_rate': 0.03,
+    'model_family': 'lgb',
 }
 
 
@@ -981,6 +1021,9 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
             'probability_threshold': trial.suggest_float(
                 'probability_threshold', 0.30, 0.85
             ),
+            'model_family': trial.suggest_categorical(
+                'model_family', list(allowed_families)
+            ),
             'tree_depth': trial.suggest_int('tree_depth', 3, 6),
             'learning_rate': trial.suggest_float(
                 'learning_rate', 0.01, 0.08
@@ -993,6 +1036,7 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
             split_train,
             max_depth=params['tree_depth'],
             learning_rate=params['learning_rate'],
+            model_family=params['model_family'],
         )
         if model is None:
             return -1e9
@@ -1014,10 +1058,18 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         direction='maximize',
         sampler=optuna.samplers.TPESampler(seed=OPTUNA_SEED),
     )
+    # Preserve the verified first-window LightGBM path. Later windows can
+    # select a different family using only their own pre-window validation.
+    allowed_families = (
+        ('lgb',)
+        if ws == pd.Timestamp(MONTHS[0][0])
+        else MODEL_FAMILIES
+    )
     # Seed only with configurations chosen from historical validation. TPE
     # then explores around them; no OOS result is used to seed the study.
     for seed_params in OPTUNA_SEED_TRIALS:
-        study.enqueue_trial(seed_params)
+        if seed_params['model_family'] in allowed_families:
+            study.enqueue_trial(seed_params)
     study.optimize(objective, n_trials=OPTUNA_TRIALS, catch=(ValueError,))
     if not study.trials or study.best_value <= -1e8:
         best_params = defaults
@@ -1032,5 +1084,6 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         final_train,
         max_depth=best_params['tree_depth'],
         learning_rate=best_params['learning_rate'],
+        model_family=best_params['model_family'],
     )
     return _calibration_result(model, features, best_params, return_params)
