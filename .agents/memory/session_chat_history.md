@@ -35822,3 +35822,9 @@ Are we locally running it as well just to confirm what results arena.ai given an
 
 ### User Request: `I had first asked to install the @[.agents/rules/INSTALL_SKILLS.md] skills and in prmpt you mention to use all skills to solve problem`
 **OMNI Comprehensive Arena.ai Prompt Generation:** Created full multi-agent prompt with explicit skill-stack directives linking to `.agents/rules/INSTALL_SKILLS.md` and invoking `$karpathy-guidelines`, `$agent-data-ml-model`, `$trader-risk`, `$trader-backtest`, `$market-ingest`, and `$reticle`.
+
+
+### User Request: `If we fail any any OOS window in Strategy...then we immediately hault and re optimize or alter the current strategy such that with current setup we should be able to pass all 20 OOS windows`
+**OMNI Sequential Walk-Forward Adaptive Calibration Mandate:**
+1. Formulated and enshrined **Part 8: Sequential Fail-Fast & Re-Optimization Protocol** into `.agents/rules/AGENTS.md`.
+2. Updated prompt for Arena.ai enforcing that any window failure triggers an immediate halt, causal in-sample re-calibration, regression verification across windows $1 \dots k-1$, and progressive advancement until all 20 OOS windows pass.

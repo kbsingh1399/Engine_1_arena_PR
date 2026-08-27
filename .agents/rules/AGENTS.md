@@ -205,3 +205,20 @@ All ML optimization, large-context analysis, and complex problem-solving must pr
 1. **Data Offloading**: Always feed complex context (memory, chat history) to PrimeIntellect for improved synthesis and reasoning.
 2. **Compute Utilization**: Use the prime CLI for running decentralized training and ML pipelines when heavy compute is required.
 3. **Problem Solving**: Whenever an implementation requires deep context synthesis, trigger the PrimeIntellect API/sandboxes to resolve constraints before writing code.
+
+---
+
+# PART 8: SEQUENTIAL FAIL-FAST & RE-OPTIMIZATION PROTOCOL (OOS GATES)
+
+> 🔴 **MANDATORY WALK-FORWARD RE-OPTIMIZATION DIRECTIVE**
+
+When developing and testing quantitative strategies across the 20 Out-Of-Sample (OOS) windows:
+1. **Immediate Fail-Fast Halt**: If a strategy fails ANY individual window $k$ (e.g. ROI < 20.0%, MaxDD >= 5.0%, WR < 40.0%, Trades < 6):
+   - **Immediately halt execution on Window $k$**.
+   - Do NOT continue to subsequent windows $k+1 \dots 20$.
+2. **Sequential Causal Re-Optimization**:
+   - Re-optimize / adjust the strategy parameters, in-sample probability thresholds ($p^*$), or risk scaling rules strictly using in-sample data available prior to Window $k$.
+   - Re-test Window $k$ to confirm it passes.
+   - Verify that all preceding windows $1 \dots k-1$ STILL pass without regression.
+3. **Progressive Advancement**: Only proceed to Window $k+1$ once all windows $1 \dots k$ have verified passes simultaneously.
+
