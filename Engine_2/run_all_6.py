@@ -47,7 +47,8 @@ from strategy_engine import (
     ALL_18_SYMBOLS, MONTHS, CAP, RSK, FEE_RT, TP, TRA, MAX_NOTIONAL,
     TROI, TDD, TWR, MINTR, MAXTR, MAX_CONCURRENT,
     load_symbol_data, featurize_microstructure, gen_trades_tiered, STRATEGIES,
-    bmodel, pred, calibrate_in_sample_threshold, simulate_portfolio_concurrency,
+    bmodel, pred, calibrate_in_sample_threshold, apply_regime_routing,
+    simulate_portfolio_concurrency, simulate_dynamic_risk,
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
@@ -57,7 +58,7 @@ def main():
     log("🚀 ENGINE 2: 6-ACCOUNT PARALLEL QUANT ENGINE & REAL-TIME CAUSAL EXECUTION")
     log(f"   Capital per Account : ${CAP:,.0f} (Total Portfolio: ${CAP * 6:,.0f})")
     log(f"   Round-trip Fee+Slip : {FEE_RT * 100:.2f}% | Risk per Trade (1R): ${RSK:.2f}")
-    log(f"   Target Gates        : ROI >= {TROI}%, MaxDD < {TDD}%, WR >= {TWR}%, +5R Trail")
+    log(f"   Target Gates        : ROI > {TROI}%, MaxDD < {TDD}%, WR > {TWR}%, +5R Trail")
     log(f"   Portfolio Limit     : Max {MAX_CONCURRENT} Concurrent Open Positions")
     log(f"   Parallel Assets     : {len(ALL_18_SYMBOLS)} crypto pairs")
     log(f"   Walk-Forward Windows: {len(MONTHS)} monthly OOS windows")
@@ -143,57 +144,57 @@ def main():
             pdf = tdf_all[tdf_all['exit_time'] < ws].sort_values('entry_time')
             tdf = tdf_all[(tdf_all['entry_time'] >= ws) & (tdf_all['entry_time'] <= we)].sort_values('entry_time')
             
-            # In-Sample Model Training & Causal Calibration
-            m, fcs, bp = calibrate_in_sample_threshold(pdf, ws)
+            # In-Sample Model Training & Causal p* Calibration. The regime
+            # route is evaluated per decision bar; no whole-window ranking is
+            # used because that would let a later OOS score affect an earlier
+            # concurrency decision.
+            m, fcs, bp = calibrate_in_sample_threshold(pdf, ws, sname)
             if m is not None and len(tdf) > 0:
                 tp = pred(m, fcs, tdf)
-                candidates = tp[tp['prob'] >= bp].sort_values('entry_time')
-                if len(candidates) < MINTR:
-                    candidates = tp[tp['prob'] >= 0.50].sort_values('entry_time')
-                    bp = 0.50
-                # Apply Portfolio Concurrency Limit (Max 2 Positions)
-                bdf = simulate_portfolio_concurrency(candidates, max_concurrent=MAX_CONCURRENT)
-                if len(bdf) > MAXTR:
-                    bdf = bdf.head(MAXTR)
+                candidates = apply_regime_routing(tp, sname, bp)
             else:
-                bdf = simulate_portfolio_concurrency(tdf, max_concurrent=MAX_CONCURRENT).head(MAXTR)
+                candidates = tdf
                 bp = 0.50
 
+            candidates = simulate_portfolio_concurrency(
+                candidates, max_concurrent=MAX_CONCURRENT
+            ).head(MAXTR)
+            _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
             nt = len(bdf)
-            if nt < MINTR:
-                log(f"  W{wi:2d} ({ss} -> {se}): FAIL (insufficient trades: {nt} < {MINTR})")
-                w_results.append({'w': wi, 'start': ss, 'end': se, 'passed': False, 'pnl': 0, 'roi': 0, 'wr': 0, 'dd': 0, 'tr': nt})
-                continue
-
-            nw = int((bdf['net_pnl'] > 0).sum())
-            wr = (nw / nt) * 100.0
-            pnl = float(bdf['net_pnl'].sum())
+            pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
             roi = (pnl / CAP) * 100.0
+            nw = int((bdf['net_pnl'] > 0).sum()) if nt else 0
+            wr = (nw / nt) * 100.0 if nt else 0.0
             dd = closed_equity_drawdown(bdf)
             mtm_dd = mark_to_market_drawdown(bdf)
-            max_dd = max(dd, mtm_dd)
-            
-            passed = (wr >= TWR) and (roi >= TROI) and (max_dd < TDD) and (nt >= MINTR)
+            max_dd = max(float(max_dd), dd, mtm_dd)
+
+            passed = (wr > TWR) and (roi > TROI) and (max_dd < TDD) and (nt >= MINTR)
             if passed:
                 strat_passes += 1
                 total_passes += 1
                 verdict = "PASS"
             else:
                 verdict = "FAIL"
-                
+
+            risk_range = "n/a"
+            if nt and 'trade_risk' in bdf:
+                risk_range = f"${bdf['trade_risk'].min():.0f}-${bdf['trade_risk'].max():.0f}"
             w_results.append({
                 'w': wi, 'start': ss, 'end': se, 'passed': passed, 'verdict': verdict,
                 'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
-                'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd, 'threshold': float(bp)
+                'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd,
+                'threshold': float(bp), 'risk_range': risk_range
             })
-            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (bp={bp:.2f})")
+            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (p*={bp:.2f}, risk={risk_range})")
 
-            # STRICT FAIL-FAST GATE: Do not proceed if window fails target criteria
-            if not passed and os.environ.get("NO_FAIL_FAST", "0") != "1":
+            # STRICT FAIL-FAST GATE: every failure, including insufficient
+            # trades, aborts. There is intentionally no environment bypass.
+            if not passed:
                 fail_reasons = []
-                if roi < TROI: fail_reasons.append(f"ROI={roi:.1f}% < {TROI}%")
+                if roi <= TROI: fail_reasons.append(f"ROI={roi:.1f}% <= {TROI}%")
                 if max_dd >= TDD: fail_reasons.append(f"MaxDD={max_dd:.1f}% >= {TDD}%")
-                if wr < TWR: fail_reasons.append(f"WR={wr:.1f}% < {TWR}%")
+                if wr <= TWR: fail_reasons.append(f"WR={wr:.1f}% <= {TWR}%")
                 if nt < MINTR: fail_reasons.append(f"Trades={nt} < {MINTR}")
                 log(f"\n❌ [FAIL-FAST ABORT] {sname} Window {wi} failed criteria: {', '.join(fail_reasons)}. Execution halted immediately.")
                 sys.exit(1)

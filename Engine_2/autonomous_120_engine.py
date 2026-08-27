@@ -7,7 +7,7 @@ Architecture: Calibrated Dual-Shield Escalator
 Key Upgrades:
   1. Base Reconnaissance Risk = $65.00 (1.3%)
   2. House Money Target Risk = $145.00 (2.9%) -> Max Pullback bounded under 2.9%!
-  3. Single-Loss House Shield: If a loss occurs on house money, immediately revert to $35.00
+  3. Single-Loss House Shield: If a loss occurs on house money, immediately revert to $45.00
   4. Immediate Window Target Lock: Halts on reaching $1,025 (+20.5%)
 ================================================================================
 """
@@ -22,6 +22,17 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import lightgbm as lgb
+
+# Keep the V19 discovery simulator on the same risk-policy constants as the
+# master runner. Its feature/simulation path remains separate because it uses
+# a 0.75 ATR stop and an R-multiple-native trade schema.
+from strategy_engine import (
+    RECON_RISK,
+    HOUSE_MONEY_RISK,
+    HOUSE_SHIELD_RISK,
+    DRAWDOWN_DEFENSE_RISK,
+    HOUSE_PROFIT_TRIGGER,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -314,76 +325,103 @@ STRATEGIES = [
 # 4. CALIBRATED DUAL-SHIELD ESCALATOR SIMULATOR
 # ─────────────────────────────────────────────────────────────────────────────
 def simulate_dual_shield_trades(bdf, cap=CAP):
+    """Apply the V19 risk policy without using outcomes before their exits."""
     if bdf.empty:
         return 0.0, 0.0, 0.0, 0.0, bdf
-        
-    pnl_list = []; mae_dollar_list = []; rsk_list = []
-    eq = cap; peak = cap; max_dd = 0.0
-    last_won = False
-    
-    for r in bdf.itertuples():
-        cur_pnl = eq - cap
-        # Window Target Governor: Lock in Profit at $1,025 (+20.5%)
-        if cur_pnl >= 1025.0:
+
+    ordered = bdf.sort_values(['entry_time', 'exit_time']).reset_index(drop=True)
+    open_positions = []
+    executed = []
+    equity = float(cap)
+    peak = float(cap)
+    max_dd = 0.0
+    house_shield = False
+
+    def settle(position):
+        nonlocal equity, peak, max_dd, house_shield
+        equity += position['net_pnl']
+        peak = max(peak, equity)
+        max_dd = max(max_dd, (peak - equity) / max(peak, 1e-12) * 100.0)
+        if position['risk_mode'] == 'house' and position['net_pnl'] <= 0.0:
+            house_shield = True
+        elif house_shield and position['net_pnl'] > 0.0 and equity - cap >= HOUSE_PROFIT_TRIGGER:
+            house_shield = False
+
+    for row in ordered.itertuples():
+        still_open = []
+        for position in sorted(open_positions, key=lambda p: p['exit_time']):
+            if position['exit_time'] < row.entry_time:
+                settle(position)
+            else:
+                still_open.append(position)
+        open_positions = still_open
+
+        # Window Target Governor: lock in profit at $1,025 (+20.5%).
+        if equity - cap >= 1025.0:
             break
-            
-        # Dual-Shield Sizing:
+        if len(open_positions) >= MAX_CONCURRENT:
+            continue
+
+        cur_pnl = equity - cap
         if cur_pnl <= -40.0:
-            trade_rsk = 15.0   # Severe Drawdown Defense ($15 = 0.3%)
-        elif cur_pnl >= 250.0 and last_won:
-            trade_rsk = 145.0  # House Money Target Risk ($145 = 2.9% -> Max single DD 2.9%)
-        elif cur_pnl >= 250.0 and not last_won:
-            trade_rsk = 45.0   # House Shield after loss on house money ($45 = 0.9%)
+            trade_rsk = DRAWDOWN_DEFENSE_RISK
+            risk_mode = 'defense'
+        elif house_shield:
+            trade_rsk = HOUSE_SHIELD_RISK
+            risk_mode = 'house-shield'
+        elif cur_pnl >= HOUSE_PROFIT_TRIGGER:
+            trade_rsk = HOUSE_MONEY_RISK
+            risk_mode = 'house'
         else:
-            trade_rsk = 65.0   # Initial Reconnaissance Base ($65 = 1.3%)
-            
-        rsk_list.append(trade_rsk)
-        dollar_pnl = r.r_multiple * trade_rsk
-        mae_dollar = r.mae_r * trade_rsk
-        
-        # Funding rate deduction
-        units = min(trade_rsk / r.sd, MAX_NOTIONAL / r.entry_price)
-        funding_cost = (abs(r.avg_fr) / 3200.0) * r.entry_price * units * max(r.bh, 0)
-        pays = ((r.direction == 1 and r.avg_fr > 0) or (r.direction == -1 and r.avg_fr < 0))
+            trade_rsk = RECON_RISK
+            risk_mode = 'recon'
+
+        # Funding rate deduction is linear in position size, so it is kept in
+        # this V19-native schema before the realized result is settled.
+        dollar_pnl = row.r_multiple * trade_rsk
+        mae_dollar = max(0.0, row.mae_r * trade_rsk)
+        units = min(trade_rsk / max(row.sd, ATR_EPSILON), MAX_NOTIONAL / row.entry_price)
+        funding_cost = (abs(row.avg_fr) / 3200.0) * row.entry_price * units * max(row.bh, 0)
+        pays = ((row.direction == 1 and row.avg_fr > 0) or
+                (row.direction == -1 and row.avg_fr < 0))
         net_dollar = dollar_pnl - (funding_cost if pays else -funding_cost)
-        
-        last_won = (net_dollar > 0)
-            
-        pnl_list.append(net_dollar)
-        mae_dollar_list.append(mae_dollar)
-        
-        # MTM Drawdown
-        trough = eq - mae_dollar
-        dd = (peak - trough) / peak * 100.0
-        if dd > max_dd: max_dd = dd
-        eq += net_dollar
-        if eq > peak: peak = eq
-        
-    res_df = bdf.iloc[:len(pnl_list)].copy()
-    res_df['net_pnl'] = pnl_list
-    res_df['mae_dollar'] = mae_dollar_list
-    res_df['trade_risk'] = rsk_list
-    
-    total_pnl = float(sum(pnl_list))
-    roi = (total_pnl / cap) * 100.0
-    
-    # Closed equity drawdown
-    eq_curve = cap + np.cumsum(pnl_list)
-    pk_curve = np.maximum.accumulate(np.insert(eq_curve, 0, cap))
-    cr_curve = np.insert(eq_curve, 0, cap)
-    closed_dd = float(np.max((pk_curve - cr_curve) / pk_curve * 100.0))
-    final_max_dd = max(closed_dd, max_dd)
-    
-    nw = int(sum(1 for p in pnl_list if p > 0))
-    wr = (nw / len(pnl_list)) * 100.0 if len(pnl_list) > 0 else 0.0
-    return total_pnl, roi, wr, final_max_dd, res_df
+        position = {
+            'exit_time': row.exit_time,
+            'net_pnl': float(net_dollar),
+            'mae_dollar': float(mae_dollar),
+            'risk_mode': risk_mode,
+        }
+        record = ordered.iloc[row.Index].to_dict()
+        record.update({
+            'net_pnl': float(net_dollar),
+            'mae_dollar': float(mae_dollar),
+            'trade_risk': float(trade_rsk),
+            'risk_mode': risk_mode,
+        })
+        position['record'] = record
+        open_positions.append(position)
+        executed.append(record)
+        trough = equity - sum(p['mae_dollar'] for p in open_positions)
+        max_dd = max(max_dd, (peak - trough) / max(peak, 1e-12) * 100.0)
+
+    for position in sorted(open_positions, key=lambda p: p['exit_time']):
+        settle(position)
+
+    res_df = pd.DataFrame(executed)
+    if res_df.empty:
+        return 0.0, 0.0, 0.0, max_dd, res_df
+    total_pnl = float(res_df['net_pnl'].sum())
+    roi = total_pnl / cap * 100.0
+    wr = float((res_df['net_pnl'] > 0.0).mean() * 100.0)
+    return total_pnl, roi, wr, max_dd, res_df
 
 def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
     if trades_df.empty: return trades_df
     sorted_trades = trades_df.sort_values('entry_time').reset_index(drop=True)
     executed = []; active_exits = []
     for r in sorted_trades.itertuples():
-        active_exits = [ex for ex in active_exits if ex > r.entry_time]
+        # An equal-timestamp stop is not known at the new bar's open.
+        active_exits = [ex for ex in active_exits if ex >= r.entry_time]
         if len(active_exits) < max_concurrent:
             active_exits.append(r.exit_time)
             executed.append(r.Index)
@@ -393,35 +431,37 @@ def simulate_portfolio_concurrency(trades_df, max_concurrent=MAX_CONCURRENT):
 # 5. IN-SAMPLE MODEL TRAINING & TOP-K CONVICTION PACING
 # ─────────────────────────────────────────────────────────────────────────────
 def train_and_rank_window(pdf, tdf, fcs):
+    """Score each entry causally; never select a month-wide top-k set."""
     if len(tdf) == 0:
         return tdf
     if len(pdf) < 15:
-        if 'bsr' in tdf.columns and 'zc20' in tdf.columns:
-            tdf_c = tdf.copy()
-            tdf_c['score'] = np.abs(tdf_c['zc20']) + np.abs(tdf_c['bsr'] - 0.5) * 5.0
-            top_k = tdf_c.sort_values('score', ascending=False).head(MAXTR).sort_values('entry_time')
-            return simulate_portfolio_concurrency(top_k, max_concurrent=MAX_CONCURRENT)
-        return simulate_portfolio_concurrency(tdf.head(MAXTR), max_concurrent=MAX_CONCURRENT)
-        
-    X_tr = pdf[fcs].astype(np.float32); y_tr = pdf['label'].astype(np.int32)
-    pos_ct = (y_tr == 1).sum(); neg_ct = (y_tr == 0).sum()
-    sw = float(neg_ct / max(pos_ct, 1)) if pos_ct > 0 else 1.0
-    
-    m = lgb.LGBMClassifier(max_depth=3, learning_rate=0.03, n_estimators=50, scale_pos_weight=sw, random_state=42, n_jobs=1, verbose=-1)
+        # Signals are already computed from the current bar. Process them in
+        # time order rather than sorting by outcomes or future OOS scores.
+        return simulate_portfolio_concurrency(
+            tdf.sort_values('entry_time'), max_concurrent=MAX_CONCURRENT
+        ).head(MAXTR)
+
+    X_tr = pdf[fcs].astype(np.float32)
+    y_tr = pdf['label'].astype(np.int32)
+    if y_tr.nunique() < 2:
+        return simulate_portfolio_concurrency(
+            tdf.sort_values('entry_time'), max_concurrent=MAX_CONCURRENT
+        ).head(MAXTR)
+
+    # Unweighted probabilities retain their usual interpretation; the
+    # threshold is a fixed operating floor, not a future-dependent quota.
+    m = lgb.LGBMClassifier(
+        objective='binary', max_depth=3, learning_rate=0.03, n_estimators=50,
+        random_state=42, n_jobs=1, verbose=-1,
+    )
     m.fit(X_tr, y_tr)
-    
+
     tdf_c = tdf.copy()
     tdf_c['prob'] = m.predict_proba(tdf[fcs].astype(np.float32))[:, 1]
-    
-    # Top-K Conviction Sorter
-    top_k = tdf_c.sort_values('prob', ascending=False).head(MAXTR).sort_values('entry_time')
-    bdf = simulate_portfolio_concurrency(top_k, max_concurrent=MAX_CONCURRENT)
-    
-    if len(bdf) < MINTR:
-        fallback = tdf_c.sort_values('prob', ascending=False).head(MAXTR).sort_values('entry_time')
-        bdf = simulate_portfolio_concurrency(fallback, max_concurrent=MAX_CONCURRENT)
-        
-    return bdf
+    eligible = tdf_c[tdf_c['prob'] >= 0.50].sort_values('entry_time')
+    return simulate_portfolio_concurrency(
+        eligible, max_concurrent=MAX_CONCURRENT
+    ).head(MAXTR)
 
 def run_discovery():
     log("=" * 85)

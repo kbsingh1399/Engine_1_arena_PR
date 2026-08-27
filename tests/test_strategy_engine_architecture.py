@@ -1,0 +1,108 @@
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+ENGINE_DIR = Path(__file__).resolve().parents[1] / "Engine_2"
+if str(ENGINE_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_DIR))
+
+from strategy_engine import (  # noqa: E402
+    DRAWDOWN_RISK_LIMIT,
+    HOUSE_MONEY_RISK,
+    HOUSE_SHIELD_RISK,
+    RECON_RISK,
+    add_causal_regime_features,
+    simulate_dynamic_risk,
+)
+
+
+def _trades(r_multiples, mae_dollars=None, overlapping=False):
+    mae_dollars = mae_dollars or [35.0] * len(r_multiples)
+    rows = []
+    for index, (r_multiple, mae_dollar) in enumerate(
+        zip(r_multiples, mae_dollars)
+    ):
+        spacing = 1 if overlapping else 2
+        entry = pd.Timestamp("2020-01-01") + pd.Timedelta(days=index * spacing)
+        exit_time = entry + pd.Timedelta(days=2 if overlapping else 1)
+        rows.append(
+            {
+                "entry_time": entry,
+                "exit_time": exit_time,
+                "r_multiple": r_multiple,
+                "net_pnl": r_multiple * 35.0,
+                "mae_dollar": mae_dollar,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_dual_shield_escalator_and_sticky_house_shield():
+    # The first win creates house money, the house loss changes only the next
+    # entry to the $45 shield, and no later outcome can resize an earlier entry.
+    trades = _trades([5.0, -1.0, 1.0])
+    _, _, _, max_dd, executed = simulate_dynamic_risk(trades)
+
+    assert executed["trade_risk"].tolist() == [
+        RECON_RISK,
+        HOUSE_MONEY_RISK,
+        HOUSE_SHIELD_RISK,
+    ]
+    assert executed["risk_mode"].tolist() == ["recon", "house", "house-shield"]
+    assert max_dd < 4.0
+
+
+def test_allocator_does_not_use_unsettled_profit_for_house_money():
+    trades = _trades([5.0, 1.0], overlapping=True)
+    _, _, _, _, executed = simulate_dynamic_risk(trades)
+
+    # The first trade has not exited when the second entry is sized.
+    assert executed["trade_risk"].tolist() == [RECON_RISK, RECON_RISK]
+
+
+def test_allocator_reserves_mae_inside_drawdown_budget():
+    trades = _trades([-1.0], mae_dollars=[350.0])
+    _, _, _, max_dd, executed = simulate_dynamic_risk(trades)
+
+    assert max_dd <= DRAWDOWN_RISK_LIMIT * 100.0 + 1e-9
+    assert executed.iloc[0]["mae_dollar"] <= 5000.0 * DRAWDOWN_RISK_LIMIT + 1e-9
+
+
+def test_regime_features_are_causal_at_each_decision_bar():
+    close = pd.Series(100.0 + pd.RangeIndex(900).to_numpy(dtype=float))
+    frame = pd.DataFrame(
+        {
+            "Close": close,
+            "atr": 1.0,
+            "ef": close,
+            "es": close - 1.0,
+        }
+    )
+    changed = frame.copy()
+    changed.loc[700:, "Close"] = 10_000.0
+
+    original_features = add_causal_regime_features(frame.copy())
+    changed_features = add_causal_regime_features(changed)
+    for column in (
+        "realized_vol_short",
+        "realized_vol_long",
+        "vol_ratio",
+        "trend_strength",
+        "regime",
+    ):
+        pd.testing.assert_series_equal(
+            original_features.loc[:699, column],
+            changed_features.loc[:699, column],
+            check_names=False,
+        )
+
+
+def test_runner_has_no_fail_fast_environment_escape_hatch():
+    for runner in (
+        Path(__file__).resolve().parents[1] / "run_all_6.py",
+        Path(__file__).resolve().parents[1] / "Engine_2" / "run_all_6.py",
+    ):
+        source = runner.read_text(encoding="utf-8")
+        assert "NO_FAIL_FAST" not in source
+        assert "if not passed:" in source

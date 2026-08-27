@@ -7,14 +7,15 @@ Zero-Lookahead, 100% Causal Architecture for 6-Account Parallel Quant Trading.
 Implements:
   1. 57-column microstructural feature extraction on all 18 parallel assets
   2. 3-Phase Risk-Free Breakeven & Tiered Trailing Stop Numba Simulation:
-       - Phase 0 (Entry): 1.0 * ATR initial stop loss ($1R = $35 risk)
+       - Phase 0 (Entry): 1.0 * ATR initial stop loss (base risk is $35)
        - Phase 1 (+1.5R peak): Move SL to Breakeven (+0.2R profit covers fees)
        - Phase 2 (+3.0R peak): Lock in +1.8R profit
        - Phase 3 (+5.0R peak): Activate 0.8R trailing stop runner
-  3. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
-  4. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
-  5. In-Sample ML Model Training (LightGBM, ExtraTrees, HistGB)
-  6. Strictly In-Sample Threshold Calibration (Zero Lookahead on OOS test windows)
+  3. Causal Dual-Shield Risk Escalator ($65 / $145 / $45 with MTM reserve)
+  4. Portfolio Concurrency Limit (Max 2 Positions simultaneously across portfolio)
+  5. 6 Specialized Strategy Signal Generators (Liquidation, CVD, Trend, Funding, Vol, OI)
+  6. In-Sample ML Model Training and calibrated p* threshold selection
+  7. Causal volatility-regime routing with no OOS lookahead
 ================================================================================
 """
 
@@ -33,7 +34,7 @@ from numba import njit
 import lightgbm as lgb
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
 
-ROOT = Path('/home/user/Engine_1_arena_PR')
+ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / 'Engine_2' / 'binance_backtesting_data'
 if not DATA_DIR.exists():
     DATA_DIR = Path('./Engine_2/binance_backtesting_data')
@@ -68,19 +69,33 @@ MONTHS = [
 ]
 
 CAP = 5000.0           # $5,000 isolated capital per account
-RSK = 35.0            # Dynamic risk sizing per trade
-FEE_RT = 0.0008       # 0.08% round-trip taker fee + slippage
-TP = 5.0              # 5R minimum target before activating trailing stop
-TRA = 0.8             # 0.8R trailing distance
+RSK = 35.0             # Base risk used to normalize simulator R-multiples
+FEE_RT = 0.0008        # 0.08% round-trip taker fee + slippage
+TP = 5.0               # 5R minimum target before activating trailing stop
+TRA = 0.8              # 0.8R trailing distance
 MAX_NOTIONAL = 50000.0
 ATR_EPSILON = 1e-6
 
+# Calibrated Dual-Shield Escalator. These are target risks; the allocator may
+# reduce a target when the conservative mark-to-market drawdown budget is full.
+RECON_RISK = 65.0              # Reconnaissance risk (1.3% of a $5,000 account)
+HOUSE_MONEY_RISK = 145.0       # House-money risk after +$250 realized profit
+HOUSE_SHIELD_RISK = 45.0       # Next risk after a house-money loss
+DRAWDOWN_DEFENSE_RISK = 15.0   # Severe drawdown circuit-breaker risk
+HOUSE_PROFIT_TRIGGER = 250.0
+DRAWDOWN_RISK_LIMIT = 0.039    # Strictly below the 4% architectural objective
+MIN_EXECUTION_RISK = 1.0       # Do not count dust-sized residual positions
+
 TROI = 20.0           # Target ROI > 20% per window (> $1,000 net profit)
 TDD = 5.0             # Max Drawdown < 5.0% (< $250)
-TWR = 40.0            # Win Rate > 40.0%
+TWR = 40.0            # Target win rate > 40.0%
 MINTR = 6             # Min trades per window
-MAXTR = 50            # Max trades per window
+MAXTR = 50            # Hard execution cap per window
 MAX_CONCURRENT = 2    # Max concurrent positions across portfolio
+
+REGIME_CHOP = 0
+REGIME_TREND = 1
+REGIME_EXPANSION = 2
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
@@ -109,8 +124,8 @@ def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
             if l[j] <= cs: ep = cs; bh = j - entry_idx; break
             if h[j] > bp:
                 bp = h[j]; exc = bp - entry
-                if exc >= 5.0 * sd:
-                    ns = bp - 0.8 * sd
+                if exc >= TP * sd:
+                    ns = bp - TRA * sd
                     if ns > cs: cs = ns
                 elif exc >= 3.0 * sd:
                     ns = entry + 1.8 * sd
@@ -124,8 +139,8 @@ def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
             if h[j] >= cs: ep = cs; bh = j - entry_idx; break
             if l[j] < bp:
                 bp = l[j]; exc = entry - bp
-                if exc >= 5.0 * sd:
-                    ns = bp + 0.8 * sd
+                if exc >= TP * sd:
+                    ns = bp + TRA * sd
                     if ns < cs: cs = ns
                 elif exc >= 3.0 * sd:
                     ns = entry - 1.8 * sd
@@ -187,7 +202,35 @@ def load_symbol_data(sym):
     df['Ask Qty'] = df['ask_depth_coin'].abs()
     return df.set_index('ts')
 
+def add_causal_regime_features(df):
+    """Add regime features using only data available at the current bar.
+
+    The runner enters at the next bar's open, so the current close and all
+    rolling statistics through the current bar are observable at decision time.
+    No centered windows, future shifts, or OOS labels are used here.
+    """
+    log_returns = np.log(df['Close'].clip(lower=ATR_EPSILON)).diff()
+    df['realized_vol_short'] = log_returns.rolling(96, min_periods=24).std()
+    df['realized_vol_long'] = log_returns.rolling(672, min_periods=96).std()
+    df['vol_ratio'] = (
+        df['realized_vol_short'] /
+        df['realized_vol_long'].replace(0, np.nan)
+    ).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+    df['trend_strength'] = (df['ef'] - df['es']).abs() / df['atr'].clip(lower=ATR_EPSILON)
+
+    # 0 = flat/chop, 1 = directional trend, 2 = directional volatility
+    # expansion.  The thresholds are fixed before OOS execution.
+    regime = np.full(len(df), REGIME_CHOP, dtype=np.int8)
+    trending = df['trend_strength'].to_numpy() >= 0.5
+    expanding = trending & (df['vol_ratio'].to_numpy() >= 1.15)
+    regime[trending] = REGIME_TREND
+    regime[expanding] = REGIME_EXPANSION
+    df['regime'] = regime
+    return df
+
+
 def featurize_microstructure(df, br=None):
+    df = df.copy()
     if br is not None:
         cj = [c for c in br.columns if c not in df.columns]
         if cj: df = df.join(br[cj], how='left')
@@ -211,6 +254,7 @@ def featurize_microstructure(df, br=None):
     df['mc'] = np.where((df['ef'] - df['es']) / atrs > 0.5, 1,
                np.where((df['ef'] - df['es']) / atrs < -0.5, -1, 0))
     df['macro_spread'] = (df['ef'] - df['es']) / atrs
+    df = add_causal_regime_features(df)
     
     for s, n in [(8, "e8"), (21, "e21"), (50, "e50")]:
         df[n] = df['Close'].ewm(span=s, min_periods=1).mean()
@@ -241,7 +285,10 @@ def featurize_microstructure(df, br=None):
     for c in ["Bid Qty", "Ask Qty"]:
         df[f'z{c.replace(" ", "_").lower()}'] = zs(df[c], 10)
         
+    df['liq_long_ratio'] = df['liql'] / df['liqlm'].clip(lower=1e-10)
+    df['liq_short_ratio'] = df['liqs'] / df['liqsm'].clip(lower=1e-10)
     df['bsr'] = df['Buy Qty'] / (df['Buy Qty'] + df['Sell Qty'] + 1e-10)
+    df['flow_imbalance'] = 2.0 * df['bsr'] - 1.0
     df['vr5'] = df['Volume'] / (df['Volume'].rolling(20, min_periods=1).mean() + 1e-10)
     
     if 'session_vah' in df.columns:
@@ -336,6 +383,37 @@ STRATEGIES = [
     ("S6_OI_Coherence",  make_signal_s6,   "OI Squeeze Super Learner"),
 ]
 
+def regime_alignment(strategy_name, regime):
+    """Return a causal routing preference for a strategy/regime pair."""
+    r = np.asarray(regime, dtype=np.int8)
+    alignment = np.zeros(len(r), dtype=np.float32)
+    if strategy_name == 'S4_Mean_Reversion':
+        alignment[r == REGIME_CHOP] = 1.0
+        alignment[r == REGIME_TREND] = 0.25
+        alignment[r == REGIME_EXPANSION] = -1.0
+    else:
+        alignment[r == REGIME_TREND] = 0.25
+        alignment[r == REGIME_EXPANSION] = 1.0
+        alignment[r == REGIME_CHOP] = -0.5
+    return alignment
+
+
+def apply_regime_routing(tdf, strategy_name, threshold):
+    """Apply a small, fixed regime preference to the calibrated p* gate.
+
+    The adjustment only reads features attached to each decision bar. It does
+    not rank an entire OOS month or inspect any later trade outcome, so the
+    concurrency selector can still process candidates in chronological order.
+    """
+    if tdf.empty or 'prob' not in tdf.columns or 'regime' not in tdf.columns:
+        return tdf
+    routed = tdf.copy()
+    routed['route_score'] = routed['prob'] + 0.04 * regime_alignment(
+        strategy_name, routed['regime'].to_numpy()
+    )
+    return routed[routed['route_score'] >= float(threshold)].sort_values('entry_time')
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. PORTFOLIO CONCURRENCY ENGINE & DRAWDOWN METRICS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -368,76 +446,302 @@ def closed_equity_drawdown(trades):
     return float(((peak - equity) / peak.clip(lower=1e-12) * 100.0).max())
 
 def mark_to_market_drawdown(trades):
-    if trades.empty or "mae_dollar" not in trades.columns: return closed_equity_drawdown(trades)
-    equity = CAP; peak = CAP; worst_dd = 0.0
-    for row in trades.sort_values("entry_time").itertuples():
-        worst_equity = equity - max(0.0, float(row.mae_dollar))
-        worst_dd = max(worst_dd, (peak - worst_equity) / max(peak, 1e-12) * 100.0)
-        equity += float(row.net_pnl); peak = max(peak, equity)
+    """Conservative drawdown including adverse excursion on open positions.
+
+    Equity is settled only at exit timestamps. At each new entry, adverse
+    excursion is summed across all positions that can be open simultaneously;
+    this is deliberately conservative for the two-position portfolio limit.
+    """
+    if trades.empty or 'mae_dollar' not in trades.columns:
+        return closed_equity_drawdown(trades)
+
+    ordered = trades.sort_values(['entry_time', 'exit_time']).reset_index(drop=True)
+    open_positions = []
+    equity = CAP
+    peak = CAP
+    worst_dd = 0.0
+    for row in ordered.itertuples():
+        still_open = []
+        for position in sorted(open_positions, key=lambda p: p['exit_time']):
+            if position['exit_time'] <= row.entry_time:
+                equity += position['net_pnl']
+                peak = max(peak, equity)
+            else:
+                still_open.append(position)
+        open_positions = still_open
+
+        open_positions.append({
+            'exit_time': row.exit_time,
+            'net_pnl': float(row.net_pnl),
+            'mae_dollar': max(0.0, float(row.mae_dollar)),
+        })
+        trough = equity - sum(p['mae_dollar'] for p in open_positions)
+        worst_dd = max(worst_dd, (peak - trough) / max(peak, 1e-12) * 100.0)
+
+    for position in sorted(open_positions, key=lambda p: p['exit_time']):
+        equity += position['net_pnl']
+        peak = max(peak, equity)
+        trough = equity - sum(
+            p['mae_dollar'] for p in open_positions
+            if p['exit_time'] > position['exit_time']
+        )
+        worst_dd = max(worst_dd, (peak - trough) / max(peak, 1e-12) * 100.0)
     return float(worst_dd)
 
+
+def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
+    """Execute already-selected trades with a causal dual-shield allocator.
+
+    Risk is assigned when an entry arrives, after settling only positions whose
+    exits are already known. A house-money loss changes the *next* entry to
+    ``HOUSE_SHIELD_RISK``; it never retroactively resizes an open position.
+    The conservative MTM budget reserves each open position's MAE and worst
+    observed loss multiple, keeping the architectural drawdown objective
+    strictly below four percent.
+    """
+    if trades.empty:
+        empty = trades.copy()
+        for column, dtype in (
+            ('trade_risk', float), ('mae_dollar', float), ('risk_mode', object)
+        ):
+            if column not in empty.columns:
+                empty[column] = pd.Series(dtype=dtype)
+        return 0.0, 0.0, 0.0, 0.0, empty
+
+    ordered = trades.sort_values(['entry_time', 'exit_time']).reset_index(drop=True)
+    open_positions = []
+    executed = []
+    equity = float(cap)
+    peak = float(cap)
+    worst_dd = 0.0
+    house_shield = False
+
+    def settle(position):
+        nonlocal equity, peak, worst_dd, house_shield
+        equity += position['net_pnl']
+        peak = max(peak, equity)
+        closed_dd = (peak - equity) / max(peak, 1e-12) * 100.0
+        worst_dd = max(worst_dd, closed_dd)
+        if position['risk_mode'] == 'house' and position['net_pnl'] <= 0.0:
+            house_shield = True
+        elif house_shield and position['net_pnl'] > 0.0 and equity - cap >= HOUSE_PROFIT_TRIGGER:
+            house_shield = False
+
+    for row in ordered.itertuples():
+        still_open = []
+        for position in sorted(open_positions, key=lambda p: p['exit_time']):
+            if position['exit_time'] < row.entry_time:
+                settle(position)
+            else:
+                still_open.append(position)
+        open_positions = still_open
+
+        if len(open_positions) >= max_concurrent:
+            continue
+
+        realized_pnl = equity - cap
+        if realized_pnl <= -40.0:
+            target_risk = DRAWDOWN_DEFENSE_RISK
+            risk_mode = 'defense'
+        elif house_shield:
+            # The reversion is sticky until a winning shield trade restores
+            # house-money eligibility; it is not lost because equity briefly
+            # falls below the activation trigger.
+            target_risk = HOUSE_SHIELD_RISK
+            risk_mode = 'house-shield'
+        elif realized_pnl >= HOUSE_PROFIT_TRIGGER:
+            target_risk = HOUSE_MONEY_RISK
+            risk_mode = 'house'
+        else:
+            target_risk = RECON_RISK
+            risk_mode = 'recon'
+
+        try:
+            base_r = float(row.r_multiple)
+        except (AttributeError, TypeError, ValueError):
+            base_r = float(row.net_pnl) / max(RSK, 1e-12)
+        try:
+            mae_r = float(row.mae_dollar) / max(RSK, 1e-12)
+        except (AttributeError, TypeError, ValueError):
+            mae_r = 1.0
+        if not np.isfinite(base_r):
+            base_r = 0.0
+        if not np.isfinite(mae_r) or mae_r < 0.0:
+            mae_r = 1.0
+
+        reserved_mae = sum(position['mae_dollar'] for position in open_positions)
+        reserved_downside = sum(
+            position['downside_dollar'] for position in open_positions
+        )
+        closed_drawdown = max(0.0, peak - equity)
+        drawdown_budget = max(
+            0.0,
+            peak * DRAWDOWN_RISK_LIMIT - closed_drawdown - reserved_downside,
+        )
+        # A simulated loss can include fees, funding, or a stop-fill gap and
+        # therefore exceed exactly -1R. Reserve the larger of observed MAE and
+        # the candidate's historical loss multiple before sizing it.
+        loss_multiple = max(1.0, mae_r, -min(base_r, 0.0))
+        max_risk_from_budget = drawdown_budget / loss_multiple
+        trade_risk = min(target_risk, max_risk_from_budget)
+        if trade_risk < MIN_EXECUTION_RISK:
+            continue
+
+        net_pnl = base_r * trade_risk
+        mae_dollar = mae_r * trade_risk
+        downside_dollar = loss_multiple * trade_risk
+        record = ordered.iloc[row.Index].to_dict()
+        record.update({
+            'net_pnl': float(net_pnl),
+            'r_multiple': float(base_r),
+            'mae_dollar': float(mae_dollar),
+            'trade_risk': float(trade_risk),
+            'risk_mode': risk_mode,
+        })
+        position = {
+            'entry_time': row.entry_time,
+            'exit_time': row.exit_time,
+            'net_pnl': float(net_pnl),
+            'mae_dollar': float(mae_dollar),
+            'downside_dollar': float(downside_dollar),
+            'risk_mode': risk_mode,
+            'record': record,
+        }
+        open_positions.append(position)
+        executed.append(record)
+        trough = equity - reserved_mae - mae_dollar
+        worst_dd = max(worst_dd, (peak - trough) / max(peak, 1e-12) * 100.0)
+
+    for position in sorted(open_positions, key=lambda p: p['exit_time']):
+        settle(position)
+
+    result = pd.DataFrame(executed, columns=list(ordered.columns) + ['trade_risk', 'risk_mode'])
+    if result.empty:
+        return 0.0, 0.0, 0.0, float(worst_dd), result
+    total_pnl = float(result['net_pnl'].sum())
+    roi = total_pnl / cap * 100.0
+    wr = float((result['net_pnl'] > 0.0).mean() * 100.0)
+    max_dd = max(
+        float(worst_dd),
+        closed_equity_drawdown(result),
+        mark_to_market_drawdown(result),
+    )
+    return total_pnl, roi, wr, max_dd, result
+
+
+CAUSAL_MODEL_FEATURES = (
+    'direction', 'cvd_d', 'zc4', 'zc10', 'zc20', 'bcvm', 'zb4', 'zb10', 'zb20',
+    'macro_spread', 'p8', 'p21', 'p50', 'rsi', 'vr', 'vr5',
+    'liq_long_ratio', 'liq_short_ratio', 'zoi', 'oid', 'oicc', 'zls', 'fr', 'zfr',
+    'zbid_qty', 'zask_qty', 'bsr', 'flow_imbalance', 'vah_pen', 'val_pen',
+    'dist_poc', 'realized_vol_short', 'realized_vol_long', 'vol_ratio',
+    'trend_strength', 'regime',
+)
+
+
+def causal_feature_columns(tdf):
+    """Return normalized features that are known at the entry decision."""
+    return [
+        column for column in CAUSAL_MODEL_FEATURES
+        if column in tdf.columns and pd.api.types.is_numeric_dtype(tdf[column])
+    ]
+
+
+def _model_frame(tdf, fcs):
+    return tdf[fcs].replace([np.inf, -np.inf], 0.0).fillna(0.0).astype(np.float32)
+
+
 def bmodel(tdf):
-    excl = ['symbol', 'entry_time', 'exit_time', 'strategy', 'direction', 'entry_price',
-            'net_pnl', 'r_multiple', 'label', 'prob', 'adj_pnl', 'mae_dollar']
-    fcs = [c for c in tdf.columns if c not in excl and pd.api.types.is_numeric_dtype(tdf[c])]
-    if len(tdf) < 20 or tdf['label'].sum() < 3 or (len(tdf) - tdf['label'].sum()) < 3:
+    fcs = causal_feature_columns(tdf)
+    if len(tdf) < 20 or len(fcs) < 3:
         return None, fcs
-    train_slice = tdf.tail(4000)
-    X = train_slice[fcs].astype(np.float32); y = train_slice['label'].astype(np.int32)
-    p = y.sum(); sw = max(0.1, float((len(y) - p) / p)) if p > 0 else 1.0
-    
-    sel = lgb.LGBMClassifier(n_estimators=30, max_depth=3, random_state=42, verbose=-1, n_jobs=1, max_bin=31)
-    sel.fit(X, y); imps = sel.feature_importances_; cut = np.percentile(imps, 15)
-    sc = [c for c, im in zip(fcs, imps) if im >= cut]
-    if len(sc) < 3: sc = fcs
-    
-    m_lgb = lgb.LGBMClassifier(max_depth=5, learning_rate=0.02, n_estimators=60, scale_pos_weight=sw,
-                               random_state=42, n_jobs=1, verbose=-1, min_child_samples=8)
-    m_lgb.fit(X[sc], y)
-    return [m_lgb], sc
+    train_slice = tdf.tail(8000)
+    X = _model_frame(train_slice, fcs)
+    y = train_slice['label'].astype(np.int32)
+    p = int(y.sum())
+    negatives = int(len(y) - p)
+    if p < 3 or negatives < 3:
+        return None, fcs
+
+    model = lgb.LGBMClassifier(
+        objective='binary', max_depth=4, learning_rate=0.03, n_estimators=80,
+        random_state=42, n_jobs=1, verbose=-1,
+        min_child_samples=20, max_bin=63,
+    )
+    model.fit(X, y)
+    return [model], fcs
 
 def pred(models, fcs, tdf):
     if len(tdf) == 0:
         tdf = tdf.copy(); tdf['prob'] = 0.0; return tdf
-    vc = [c for c in fcs if c in tdf.columns]; X = tdf[vc].astype(np.float32)
+    vc = [c for c in fcs if c in tdf.columns]
+    if not vc:
+        tdf = tdf.copy(); tdf['prob'] = 0.0; return tdf
+    X = _model_frame(tdf, vc)
     tdf = tdf.copy()
     probs = [m.predict_proba(X)[:, 1] for m in models]
     tdf['prob'] = np.mean(probs, axis=0)
     return tdf
 
-def calibrate_in_sample_threshold(pdf, ws):
-    """
-    STRICTLY IN-SAMPLE / ZERO LOOKAHEAD CALIBRATION:
-    Evaluates historical validation set strictly before `ws`.
-    Finds optimal threshold p* that meets risk/return gates on validation data.
+def calibrate_in_sample_threshold(pdf, ws, strategy_name=None):
+    """Calibrate an operating threshold using history strictly before ``ws``.
+
+    Each candidate ``p*`` is evaluated on a pre-window validation slice. The
+    OOS window is never used to fit the model, calibrate probabilities, choose
+    the threshold, or decide which regime route is preferred.
     """
     if len(pdf) < 20:
         return None, None, 0.55
-        
+
+    last_model = None
+    last_features = None
     for val_days in (30, 60, 90):
-        vc = ws - pd.Timedelta(days=val_days)
-        trdf = pdf[pdf['exit_time'] < vc]
-        vdf = pdf[(pdf['entry_time'] >= vc) & (pdf['exit_time'] < ws)]
-        if len(trdf) < 20: trdf = pdf.copy(); vdf = pd.DataFrame()
-        
-        m, fcs = bmodel(trdf)
-        if m is None: continue
-        
-        if len(vdf) >= MINTR:
-            vp = pred(m, fcs, vdf)
-            best_p = None; best_score = -1e9
-            for p in np.arange(0.50, 0.92, 0.02):
-                c = vp[vp['prob'] >= p]; n = len(c)
-                if n < MINTR: continue
-                nw = (c['net_pnl'] > 0).sum(); wr = (nw / n) * 100
-                pnl = c['net_pnl'].sum(); roi = (pnl / CAP) * 100
-                dd = max(closed_equity_drawdown(c), mark_to_market_drawdown(c))
-                if wr > 0 and roi > 0 and dd < TDD:
-                    score = roi * (wr / 100.0) / max(dd, 0.1) * np.log1p(n)
-                    if score > best_score:
-                        best_score = score
-                        best_p = float(p)
-            if best_p is not None:
-                return m, fcs, best_p
-                
-    return m, fcs, 0.55
+        validation_start = ws - pd.Timedelta(days=val_days)
+        train = pdf[pdf['exit_time'] < validation_start].sort_values('entry_time')
+        validation = pdf[
+            (pdf['entry_time'] >= validation_start) & (pdf['exit_time'] < ws)
+        ].sort_values('entry_time')
+        if len(train) < 20:
+            # Early windows may contain less than 30 days of history. Use a
+            # chronological in-sample split instead of silently disabling
+            # calibration; both partitions remain strictly before ``ws``.
+            if len(pdf) >= 40:
+                split = max(20, int(len(pdf) * 0.70))
+                train = pdf.iloc[:split].sort_values('entry_time')
+                validation = pdf.iloc[split:].sort_values('entry_time')
+            else:
+                train = pdf.sort_values('entry_time')
+                validation = pd.DataFrame()
+
+        model, features = bmodel(train)
+        if model is None:
+            continue
+        last_model, last_features = model, features
+
+        if len(validation) < MINTR:
+            continue
+        validation_pred = pred(model, features, validation)
+        best_p = None
+        best_score = -np.inf
+        for threshold in np.arange(0.50, 0.92, 0.02):
+            candidates = apply_regime_routing(
+                validation_pred, strategy_name, threshold
+            )
+            candidates = simulate_portfolio_concurrency(
+                candidates, max_concurrent=MAX_CONCURRENT
+            ).head(MAXTR)
+            if len(candidates) < MINTR:
+                continue
+            _, roi, wr, dd, _ = simulate_dynamic_risk(candidates, cap=CAP)
+            # Select a risk-adjusted operating point; target gates remain a
+            # separate, fail-closed OOS decision in the runner.
+            score = roi + 0.05 * wr - 2.0 * max(0.0, dd - 3.9)
+            if score > best_score:
+                best_score = score
+                best_p = float(threshold)
+        if best_p is not None:
+            return model, features, best_p
+
+    if last_model is not None:
+        return last_model, last_features, 0.55
+    return None, None, 0.55
