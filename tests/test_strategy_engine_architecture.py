@@ -106,3 +106,19 @@ def test_runner_has_no_fail_fast_environment_escape_hatch():
         source = runner.read_text(encoding="utf-8")
         assert "NO_FAIL_FAST" not in source
         assert "if not passed:" in source
+
+
+def test_same_timestamp_entries_use_conviction_and_keep_slots_occupied():
+    from strategy_engine import simulate_portfolio_concurrency
+
+    timestamp = pd.Timestamp("2020-01-01")
+    trades = pd.DataFrame(
+        [
+            {"entry_time": timestamp, "exit_time": timestamp, "route_score": 0.1},
+            {"entry_time": timestamp, "exit_time": timestamp, "route_score": 0.9},
+            {"entry_time": timestamp, "exit_time": timestamp, "route_score": 0.8},
+        ]
+    )
+
+    selected = simulate_portfolio_concurrency(trades, max_concurrent=2)
+    assert selected["route_score"].tolist() == [0.9, 0.8]
