@@ -16,6 +16,7 @@ Execution Cost: 0.08% round-trip taker fee + slippage, < 0.5% risk per trade.
 ================================================================================
 """
 
+import argparse
 import os, sys, site, gc, json, time, warnings
 site.addsitedir('/home/user/.local/lib/python3.11/site-packages')
 site.addsitedir('/usr/local/lib/python3.11/dist-packages')
@@ -55,7 +56,16 @@ from strategy_engine import (
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
-def main():
+def main(strategy_name=None):
+    if strategy_name is None:
+        active_strategies = STRATEGIES
+    else:
+        active_strategies = [
+            strategy for strategy in STRATEGIES if strategy[0] == strategy_name
+        ]
+        if not active_strategies:
+            raise ValueError(f"Unknown strategy: {strategy_name}")
+
     t_start = time.time()
     log("=" * 85)
     log("🚀 ENGINE 2: 6-ACCOUNT PARALLEL QUANT ENGINE & REAL-TIME CAUSAL EXECUTION")
@@ -77,7 +87,7 @@ def main():
     # 2. Extract features and candidate trades across all 18 symbols
     log("\n[2/3] Extracting 57-Column Microstructural Trade Sets across 18 Assets...")
     t0_gen = time.time()
-    raw_strategy_trades = {name: [] for name, _, _ in STRATEGIES}
+    raw_strategy_trades = {name: [] for name, _, _ in active_strategies}
     er = ['ts', 'Open', 'High', 'Low', 'Close', 'Volume', 'Trades', 'btc_Close', 'btc_CVD']
 
     for sym_idx, sym in enumerate(ALL_18_SYMBOLS, 1):
@@ -96,7 +106,7 @@ def main():
         fc = [col for col in dff.columns if col not in er and pd.api.types.is_numeric_dtype(dff[col])]
         fa = {col: dff[col].values.astype(np.float32) for col in fc}
         
-        for sname, sfn, _ in STRATEGIES:
+        for sname, sfn, _ in active_strategies:
             sg = sfn(dff)
             res = gen_trades_tiered(h, l, c, o, a, sg)
             if res:
@@ -125,9 +135,9 @@ def main():
         del dff, df, h, l, c, o, a, ts, fa; gc.collect()
         log(f"  [{sym_idx:2d}/18] Featurized {sym:<10s} ({n_bars:,} bars)")
 
-    all_strat_data = {sname: pd.concat(raw_strategy_trades[sname], ignore_index=True) for sname, _, _ in STRATEGIES}
+    all_strat_data = {sname: pd.concat(raw_strategy_trades[sname], ignore_index=True) for sname, _, _ in active_strategies}
     log(f"All 18 assets processed in {time.time() - t0_gen:.1f}s")
-    for sname, _, desc in STRATEGIES:
+    for sname, _, desc in active_strategies:
         log(f"  - {sname:<20s} ({desc}): {len(all_strat_data[sname]):,} candidate trades")
 
     # 3. Walk-Forward OOS Evaluation Across 20 Windows
@@ -135,7 +145,7 @@ def main():
     all_results = {}
     total_passes = 0
 
-    for s_idx, (sname, _, paradigm) in enumerate(STRATEGIES, 1):
+    for s_idx, (sname, _, paradigm) in enumerate(active_strategies, 1):
         log(f"\n{'=' * 85}")
         log(f"ACCOUNT {s_idx}/6: {sname} [{paradigm}]")
         log(f"{'=' * 85}")
@@ -244,9 +254,16 @@ def main():
         passes = data['passes']
         log(f"{sname:<25s} {data['paradigm']:<26s} {passes:>7d}/20  ${tot_pnl:>11,.2f} {avg_roi:>8.1f}% {avg_wr:>7.1f}%")
     log("=" * 90)
-    log(f"TOTAL SYSTEM PASS RATE: {total_passes}/{len(STRATEGIES) * len(MONTHS)} OOS Windows Passed ({(total_passes/(len(STRATEGIES)*len(MONTHS)))*100:.1f}%)")
+    log(f"TOTAL SYSTEM PASS RATE: {total_passes}/{len(active_strategies) * len(MONTHS)} OOS Windows Passed ({(total_passes/(len(active_strategies)*len(MONTHS)))*100:.1f}%)")
     log(f"Total Execution Time: {time.time() - t_start:.1f}s")
     log("=" * 90)
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Causal 6-account walk-forward runner')
+    parser.add_argument(
+        '--strategy',
+        choices=[strategy[0] for strategy in STRATEGIES],
+        help='Run one account only; omit to run all accounts sequentially',
+    )
+    args = parser.parse_args()
+    main(args.strategy)

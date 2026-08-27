@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ENGINE_DIR = Path(__file__).resolve().parents[1] / "Engine_2"
