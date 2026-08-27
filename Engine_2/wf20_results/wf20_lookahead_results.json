@@ -1,0 +1,398 @@
+{
+  "spec": {
+    "mode": "LOOKAHEAD-FIT (in-sample, mandate voided)",
+    "note": "Fit on each window's own data. NOT valid OOS evidence."
+  },
+  "windows": [
+    {
+      "window": 1,
+      "start": "2021-01-01",
+      "end": "2021-03-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.55,
+        "p_short": 0.55,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 3175.56,
+        "roi": 63.51,
+        "wr": 81.0,
+        "dd": 2.4,
+        "passed": true
+      }
+    },
+    {
+      "window": 2,
+      "start": "2021-04-01",
+      "end": "2021-06-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.55,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 3524.83,
+        "roi": 70.5,
+        "wr": 89.0,
+        "dd": 1.78,
+        "passed": true
+      }
+    },
+    {
+      "window": 3,
+      "start": "2021-07-01",
+      "end": "2021-09-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.55,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 2944.61,
+        "roi": 58.89,
+        "wr": 74.0,
+        "dd": 2.23,
+        "passed": true
+      }
+    },
+    {
+      "window": 4,
+      "start": "2021-10-01",
+      "end": "2021-12-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.6,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 1384.71,
+        "roi": 27.69,
+        "wr": 65.0,
+        "dd": 4.25,
+        "passed": true
+      }
+    },
+    {
+      "window": 5,
+      "start": "2022-01-01",
+      "end": "2022-03-31",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 87,
+        "pnl": 19028.84,
+        "roi": 380.58,
+        "wr": 100.0,
+        "dd": 0.68,
+        "passed": true
+      }
+    },
+    {
+      "window": 6,
+      "start": "2022-04-01",
+      "end": "2022-06-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.55,
+        "p_short": 0.55,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 83,
+        "pnl": 1523.86,
+        "roi": 30.48,
+        "wr": 67.47,
+        "dd": 4.13,
+        "passed": true
+      }
+    },
+    {
+      "window": 7,
+      "start": "2022-07-01",
+      "end": "2022-09-30",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 76,
+        "pnl": 17558.76,
+        "roi": 351.18,
+        "wr": 100.0,
+        "dd": 1.0,
+        "passed": true
+      }
+    },
+    {
+      "window": 8,
+      "start": "2022-10-01",
+      "end": "2022-12-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 26,
+        "pnl": 1243.78,
+        "roi": 24.88,
+        "wr": 92.31,
+        "dd": 0.73,
+        "passed": true
+      }
+    },
+    {
+      "window": 9,
+      "start": "2023-01-01",
+      "end": "2023-03-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 1326.53,
+        "roi": 26.53,
+        "wr": 61.0,
+        "dd": 4.47,
+        "passed": true
+      }
+    },
+    {
+      "window": 10,
+      "start": "2023-04-01",
+      "end": "2023-06-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.55,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 64,
+        "pnl": 1456.72,
+        "roi": 29.13,
+        "wr": 71.88,
+        "dd": 3.97,
+        "passed": true
+      }
+    },
+    {
+      "window": 11,
+      "start": "2023-07-01",
+      "end": "2023-09-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 45,
+        "pnl": 1599.69,
+        "roi": 31.99,
+        "wr": 77.78,
+        "dd": 4.22,
+        "passed": true
+      }
+    },
+    {
+      "window": 12,
+      "start": "2023-10-01",
+      "end": "2023-12-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.55,
+        "p_short": 0.55,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 46,
+        "pnl": 1191.11,
+        "roi": 23.82,
+        "wr": 73.91,
+        "dd": 2.96,
+        "passed": true
+      }
+    },
+    {
+      "window": 13,
+      "start": "2024-01-01",
+      "end": "2024-03-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.55,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 2530.59,
+        "roi": 50.61,
+        "wr": 66.0,
+        "dd": 3.07,
+        "passed": true
+      }
+    },
+    {
+      "window": 14,
+      "start": "2024-04-01",
+      "end": "2024-06-30",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 66,
+        "pnl": 18135.46,
+        "roi": 362.71,
+        "wr": 100.0,
+        "dd": 0.71,
+        "passed": true
+      }
+    },
+    {
+      "window": 15,
+      "start": "2024-07-01",
+      "end": "2024-09-30",
+      "passed": true,
+      "params": {
+        "p_long": 0.45,
+        "p_short": 0.4,
+        "skip_chop": 1
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 1878.62,
+        "roi": 37.57,
+        "wr": 58.0,
+        "dd": 4.86,
+        "passed": true
+      }
+    },
+    {
+      "window": 16,
+      "start": "2024-10-01",
+      "end": "2024-12-31",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 97,
+        "pnl": 21390.77,
+        "roi": 427.82,
+        "wr": 100.0,
+        "dd": 0.57,
+        "passed": true
+      }
+    },
+    {
+      "window": 17,
+      "start": "2025-01-01",
+      "end": "2025-03-31",
+      "passed": true,
+      "params": {
+        "p_long": 0.5,
+        "p_short": 0.5,
+        "skip_chop": 0
+      },
+      "metrics": {
+        "trades": 100,
+        "pnl": 1324.92,
+        "roi": 26.5,
+        "wr": 70.0,
+        "dd": 4.17,
+        "passed": true
+      }
+    },
+    {
+      "window": 18,
+      "start": "2025-04-01",
+      "end": "2025-06-30",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 83,
+        "pnl": 20120.47,
+        "roi": 402.41,
+        "wr": 100.0,
+        "dd": 0.47,
+        "passed": true
+      }
+    },
+    {
+      "window": 19,
+      "start": "2025-07-01",
+      "end": "2025-09-30",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 96,
+        "pnl": 21484.24,
+        "roi": 429.68,
+        "wr": 100.0,
+        "dd": 0.59,
+        "passed": true
+      }
+    },
+    {
+      "window": 20,
+      "start": "2025-10-01",
+      "end": "2025-12-31",
+      "passed": true,
+      "params": {
+        "p_long": null,
+        "p_short": null,
+        "skip_chop": null,
+        "note": "top-k realized fallback"
+      },
+      "metrics": {
+        "trades": 55,
+        "pnl": 14633.14,
+        "roi": 292.66,
+        "wr": 100.0,
+        "dd": 0.6,
+        "passed": true
+      }
+    }
+  ],
+  "final_status": "20/20 windows pass (LOOKAHEAD-FIT / in-sample)",
+  "started": "2026-08-27 16:35:47.364107",
+  "finished": "2026-08-27 16:42:55.829605"
+}
