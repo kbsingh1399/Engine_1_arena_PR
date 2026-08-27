@@ -47,8 +47,8 @@ from strategy_engine import (
     ALL_18_SYMBOLS, MONTHS, CAP, RSK, FEE_RT, TP, TRA, MAX_NOTIONAL,
     TROI, TDD, TWR, MINTR, MAXTR, MAX_CONCURRENT,
     load_symbol_data, featurize_microstructure, gen_trades_tiered, STRATEGIES,
-    bmodel, pred, calibrate_in_sample_threshold, apply_regime_routing,
-    simulate_portfolio_concurrency, simulate_dynamic_risk,
+    bmodel, pred, calibrate_in_sample_threshold, apply_signal_hyperparameters,
+    apply_regime_routing, simulate_portfolio_concurrency, simulate_dynamic_risk,
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
@@ -148,9 +148,14 @@ def main():
             # route is evaluated per decision bar; no whole-window ranking is
             # used because that would let a later OOS score affect an earlier
             # concurrency decision.
-            m, fcs, bp = calibrate_in_sample_threshold(pdf, ws, sname)
+            m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
+                pdf, ws, sname, return_params=True
+            )
             if m is not None and len(tdf) > 0:
-                tp = pred(m, fcs, tdf)
+                tuned_tdf = apply_signal_hyperparameters(
+                    tdf, sname, optuna_params
+                )
+                tp = pred(m, fcs, tuned_tdf)
                 candidates = apply_regime_routing(tp, sname, bp)
             else:
                 candidates = tdf

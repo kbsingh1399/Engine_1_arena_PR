@@ -108,6 +108,46 @@ def test_runner_has_no_fail_fast_environment_escape_hatch():
         assert "if not passed:" in source
 
 
+def test_optuna_search_space_and_causal_s1_filter():
+    from strategy_engine import OPTUNA_DEFAULTS, apply_signal_hyperparameters
+
+    assert OPTUNA_DEFAULTS['pullback_threshold'] == 0.12
+    assert 0.05 <= OPTUNA_DEFAULTS['cvd_momentum'] <= 0.25
+    assert 1.0 <= OPTUNA_DEFAULTS['liquidation_multiplier'] <= 2.0
+    assert 0.50 <= OPTUNA_DEFAULTS['probability_threshold'] <= 0.85
+    assert 3 <= OPTUNA_DEFAULTS['tree_depth'] <= 6
+    assert 0.01 <= OPTUNA_DEFAULTS['learning_rate'] <= 0.08
+
+    candidates = pd.DataFrame(
+        [
+            {
+                'direction': 1,
+                'p8': -0.20,
+                'zc20': 0.15,
+                'liq_long_ratio': 1.0,
+                'liq_short_ratio': 1.0,
+            },
+            {
+                'direction': 1,
+                'p8': -0.04,
+                'zc20': 0.01,
+                'liq_long_ratio': 1.0,
+                'liq_short_ratio': 1.0,
+            },
+        ]
+    )
+    selected = apply_signal_hyperparameters(
+        candidates,
+        'S1_Liquidation',
+        {
+            'pullback_threshold': 0.12,
+            'cvd_momentum': 0.10,
+            'liquidation_multiplier': 1.20,
+        },
+    )
+    assert len(selected) == 1
+
+
 def test_same_timestamp_entries_use_conviction_and_keep_slots_occupied():
     from strategy_engine import simulate_portfolio_concurrency
 
