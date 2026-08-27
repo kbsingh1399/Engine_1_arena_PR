@@ -22,5 +22,6 @@ Develop and run the backtest autonomously until it meets the following criteria 
 - Target Gates: ROI > 20.0%, MaxDD < 5.0%, Win Rate > 40.0%, +5R Trailing Stop
 - Portfolio Limit: Max 2 Concurrent Open Positions
 - Parallel Assets: 18 crypto pairs
+- Walk-Forward Windows: 20 monthly OOS windows (from 2021 to 2026)
 
-Create the necessary scripts to accomplish this, implementing causal re-optimization loops if the OOS windows fail. Do not stop until all criteria are met.
+Create the necessary scripts to accomplish this, implementing causal re-optimization loops if the OOS windows fail. Do not stop until all criteria are met across all 20 windows.
