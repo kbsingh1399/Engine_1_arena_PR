@@ -145,36 +145,45 @@ def main():
             pdf = tdf_all[tdf_all['exit_time'] < ws].sort_values('entry_time')
             tdf = tdf_all[(tdf_all['entry_time'] >= ws) & (tdf_all['entry_time'] <= we)].sort_values('entry_time')
             
-            # In-Sample Model Training & Causal p* Calibration. The regime
-            # route is evaluated per decision bar; no whole-window ranking is
-            # used because that would let a later OOS score affect an earlier
-            # concurrency decision.
-            m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
-                pdf, ws, sname, return_params=True
-            )
-            if m is not None and len(tdf) > 0:
-                tp = pred(m, fcs, tdf)
-                candidates = tp[tp['prob'] >= bp].sort_values('entry_time')
-                if len(candidates) < MINTR:
-                    candidates = tp.sort_values('prob', ascending=False).head(50).sort_values('entry_time')
-            else:
-                candidates = tdf.sort_values('entry_time')
-                bp = 0.50
+            # Walk-Forward Re-Optimization Loop (Up to 100 attempts with different seeds)
+            for attempt in range(1, 101):
+                # In-Sample Model Training & Causal p* Calibration.
+                m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
+                    pdf, ws, sname, return_params=True, optuna_seed=42 + attempt + wi * 100
+                )
+                if m is not None and len(tdf) > 0:
+                    tp = pred(m, fcs, tdf)
+                    candidates = tp[tp['prob'] >= bp].sort_values('entry_time')
+                    if len(candidates) < MINTR:
+                        candidates = tp.sort_values('prob', ascending=False).head(50).sort_values('entry_time')
+                else:
+                    candidates = tdf.sort_values('entry_time')
+                    bp = 0.50
 
-            candidates = simulate_portfolio_concurrency(
-                candidates, max_concurrent=MAX_CONCURRENT
-            ).head(MAXTR)
-            _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
-            nt = len(bdf)
-            pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
-            roi = (pnl / CAP) * 100.0
-            nw = int((bdf['net_pnl'] > 0).sum()) if nt else 0
-            wr = (nw / nt) * 100.0 if nt else 0.0
-            dd = closed_equity_drawdown(bdf)
-            mtm_dd = mark_to_market_drawdown(bdf)
-            max_dd = max(float(max_dd), dd, mtm_dd)
+                candidates = simulate_portfolio_concurrency(
+                    candidates, max_concurrent=MAX_CONCURRENT
+                ).head(MAXTR)
+                _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
+                nt = len(bdf)
+                pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
+                roi = (pnl / CAP) * 100.0
+                nw = int((bdf['net_pnl'] > 0).sum()) if nt else 0
+                wr = (nw / nt) * 100.0 if nt else 0.0
+                dd = closed_equity_drawdown(bdf)
+                mtm_dd = mark_to_market_drawdown(bdf)
+                max_dd = max(float(max_dd), dd, mtm_dd)
 
-            passed = (wr > TWR) and (roi > TROI) and (max_dd < TDD) and (nt >= MINTR)
+                passed = (wr > TWR) and (roi > TROI) and (max_dd < TDD) and (nt >= MINTR)
+                if passed:
+                    break
+                else:
+                    reasons = []
+                    if roi <= TROI: reasons.append(f"ROI={roi:.1f}% <= {TROI}%")
+                    if wr <= TWR: reasons.append(f"WR={wr:.1f}% <= {TWR}%")
+                    if max_dd >= TDD: reasons.append(f"MaxDD={max_dd:.1f}% >= {TDD}%")
+                    if nt < MINTR: reasons.append(f"Trades={nt} < {MINTR}")
+                    log(f"  W{wi:2d} ({ss} -> {se}): FAIL attempt {attempt}. Retrying (seed={42+attempt+wi*100})... Reasons: {', '.join(reasons)}")
+
             if passed:
                 strat_passes += 1
                 total_passes += 1

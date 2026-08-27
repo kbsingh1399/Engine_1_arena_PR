@@ -245,3 +245,14 @@ All agents must internalize and apply the architectural and behavioral best prac
 5. **Platform Independence & Serverless Persistence**:
    - Design operations to run agnostically across environments (e.g., local, Docker, SSH, Modal, Daytona) while supporting hibernation and wake-on-demand persistence to minimize idle costs.
 
+---
+
+# PART 10: DEEPSEEK HARNESS INTEGRATION
+
+> **Reference Repository**: https://github.com/deepseek-ai/deepseek-harness
+
+All agents must integrate and leverage the DeepSeek Harness ecosystem for unified multi-agent evaluations and complex system interactions:
+
+1. **Unified Evaluation**: Use the harness to standardize evaluations across all language models and multi-agent systems you build.
+2. **Local Workflows**: To run the harness locally for evaluation loops, ensure you are inside the `deepseek-harness` directory and run `pnpm dsh web` for the UI, or execute the CLI tests via `pnpm run`. 
+3. **Agent Coordination**: Integrate custom evaluation scripts via the harness SDK rather than ad-hoc python scripts, allowing for reproducible and version-controlled metrics.

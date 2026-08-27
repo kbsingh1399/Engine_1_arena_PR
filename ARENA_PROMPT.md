@@ -1,6 +1,6 @@
 # STRICTLY CONTINUE — DO NOT STOP UNTIL 20/20 WINDOWS PASS
 
-You passed Window 1. You halted correctly at Window 2. Now fix Window 2 and keep going. You are not done.
+You passed Window 1. You halted correctly at Window 2. Now fix Window 2 and keep going. You are not done. Donot hault...Rather if you fail, then reotpimze by yourself...Run in automouns loop till all 20 OOS pas
 
 **Current verified state:**
 ```

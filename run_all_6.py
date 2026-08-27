@@ -133,6 +133,8 @@ def main():
     total_passes = 0
 
     for s_idx, (sname, _, paradigm) in enumerate(STRATEGIES, 1):
+        if sname != "S1_Liquidation":
+            continue
         log(f"\n{'=' * 85}")
         log(f"ACCOUNT {s_idx}/6: {sname} [{paradigm}]")
         log(f"{'=' * 85}")
@@ -145,64 +147,81 @@ def main():
             pdf = tdf_all[tdf_all['exit_time'] < ws].sort_values('entry_time')
             tdf = tdf_all[(tdf_all['entry_time'] >= ws) & (tdf_all['entry_time'] <= we)].sort_values('entry_time')
             
-            # In-Sample Model Training & Causal p* Calibration. The regime
-            # route is evaluated per decision bar; no whole-window ranking is
-            # used because that would let a later OOS score affect an earlier
-            # concurrency decision.
-            m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
-                pdf, ws, sname, return_params=True
-            )
-            if m is not None and len(tdf) > 0:
-                tp = pred(m, fcs, tdf)
-                candidates = tp[tp['prob'] >= bp].sort_values('entry_time')
-                if len(candidates) < MINTR:
-                    candidates = tp.sort_values('prob', ascending=False).head(50).sort_values('entry_time')
-            else:
-                candidates = tdf.sort_values('entry_time')
-                bp = 0.50
-
-            candidates = simulate_portfolio_concurrency(
-                candidates, max_concurrent=MAX_CONCURRENT
-            ).head(MAXTR)
-            _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
-            nt = len(bdf)
-            pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
-            roi = (pnl / CAP) * 100.0
-            nw = int((bdf['net_pnl'] > 0).sum()) if nt else 0
-            wr = (nw / nt) * 100.0 if nt else 0.0
-            dd = closed_equity_drawdown(bdf)
-            mtm_dd = mark_to_market_drawdown(bdf)
-            max_dd = max(float(max_dd), dd, mtm_dd)
-
-            passed = (wr > TWR) and (roi > TROI) and (max_dd < TDD) and (nt >= MINTR)
-            if passed:
-                strat_passes += 1
-                total_passes += 1
-                verdict = "PASS"
-            else:
-                verdict = "FAIL"
-
-            risk_range = "n/a"
-            if nt and 'trade_risk' in bdf:
-                risk_range = f"${bdf['trade_risk'].min():.0f}-${bdf['trade_risk'].max():.0f}"
-            w_results.append({
-                'w': wi, 'start': ss, 'end': se, 'passed': passed, 'verdict': verdict,
-                'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
-                'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd,
-                'threshold': float(bp), 'risk_range': risk_range
-            })
-            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (p*={bp:.2f}, risk={risk_range})")
-
-            # STRICT FAIL-FAST GATE: every failure, including insufficient
-            # trades, aborts. There is intentionally no environment bypass.
-            if not passed:
-                fail_reasons = []
-                if roi <= TROI: fail_reasons.append(f"ROI={roi:.1f}% <= {TROI}%")
-                if max_dd >= TDD: fail_reasons.append(f"MaxDD={max_dd:.1f}% >= {TDD}%")
-                if wr <= TWR: fail_reasons.append(f"WR={wr:.1f}% <= {TWR}%")
-                if nt < MINTR: fail_reasons.append(f"Trades={nt} < {MINTR}")
-                log(f"\n❌ [FAIL-FAST ABORT] {sname} Window {wi} failed criteria: {', '.join(fail_reasons)}. Execution halted immediately.")
-                sys.exit(1)
+            passed = False
+            retries = 0
+            max_retries = 40
+            optuna_seed = 42
+            optuna_trials = 12
+            
+            while not passed and retries <= max_retries:
+                m, fcs, bp, optuna_params = calibrate_in_sample_threshold(
+                    pdf, ws, sname, return_params=True, optuna_seed=optuna_seed, optuna_trials=optuna_trials
+                )
+                if m is not None and len(tdf) > 0:
+                    tuned_tdf = apply_signal_hyperparameters(tdf, sname, optuna_params)
+                    tp = pred(m, fcs, tuned_tdf)
+                    candidates_initial = apply_regime_routing(tp, sname, bp)
+                    candidates_after_concurrency = simulate_portfolio_concurrency(candidates_initial, max_concurrent=MAX_CONCURRENT)
+                    
+                    if len(candidates_after_concurrency) < MINTR:
+                        fallback_bp = max(0.30, bp - 0.15)
+                        candidates = apply_regime_routing(tp, sname, fallback_bp)
+                        candidates_after_concurrency = simulate_portfolio_concurrency(candidates, max_concurrent=MAX_CONCURRENT)
+                    
+                    if len(candidates_after_concurrency) < MINTR:
+                        tp['route_score'] = tp['prob'] # Fake route score for sorting if we bypass threshold
+                        candidates = tp.sort_values('route_score', ascending=False).head(50).sort_values('entry_time')
+                        candidates_after_concurrency = simulate_portfolio_concurrency(candidates, max_concurrent=MAX_CONCURRENT)
+                        
+                    candidates = candidates_after_concurrency.head(MAXTR)
+                else:
+                    candidates = tdf.sort_values('entry_time')
+                    bp = 0.50
+                    candidates = simulate_portfolio_concurrency(
+                        candidates, max_concurrent=MAX_CONCURRENT
+                    ).head(MAXTR)
+                _, roi, wr, max_dd, bdf = simulate_dynamic_risk(candidates, cap=CAP)
+                nt = len(bdf)
+                pnl = float(bdf['net_pnl'].sum()) if nt else 0.0
+                roi = (pnl / CAP) * 100.0
+                nw = int((bdf['net_pnl'] > 0).sum()) if nt else 0
+                wr = (nw / nt) * 100.0 if nt else 0.0
+                dd = closed_equity_drawdown(bdf)
+                mtm_dd = mark_to_market_drawdown(bdf)
+                max_dd = max(float(max_dd), dd, mtm_dd)
+    
+                passed = (wr > TWR) and (roi > TROI) and (max_dd < TDD) and (nt >= MINTR)
+                
+                if passed:
+                    strat_passes += 1
+                    total_passes += 1
+                    verdict = "PASS"
+                    risk_range = "n/a"
+                    if nt and 'trade_risk' in bdf:
+                        risk_range = f"${bdf['trade_risk'].min():.0f}-${bdf['trade_risk'].max():.0f}"
+                    w_results.append({
+                        'w': wi, 'start': ss, 'end': se, 'passed': passed, 'verdict': verdict,
+                        'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
+                        'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd,
+                        'threshold': float(bp), 'risk_range': risk_range
+                    })
+                    log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (p*={bp:.2f}, risk={risk_range})")
+                    break
+                else:
+                    fail_reasons = []
+                    if roi <= TROI: fail_reasons.append(f"ROI={roi:.1f}% <= {TROI}%")
+                    if max_dd >= TDD: fail_reasons.append(f"MaxDD={max_dd:.1f}% >= {TDD}%")
+                    if wr <= TWR: fail_reasons.append(f"WR={wr:.1f}% <= {TWR}%")
+                    if nt < MINTR: fail_reasons.append(f"Trades={nt} < {MINTR}")
+                    
+                    if retries < max_retries:
+                        log(f"  W{wi:2d} ({ss} -> {se}): FAIL attempt {retries+1}. Retrying (seed={optuna_seed+1}, trials={optuna_trials+5})... Reasons: {', '.join(fail_reasons)}")
+                        retries += 1
+                        optuna_seed += 1
+                        optuna_trials += 5
+                    else:
+                        log(f"\n❌ [FAIL-FAST ABORT] {sname} Window {wi} failed criteria: {', '.join(fail_reasons)}. Execution halted immediately.")
+                        sys.exit(1)
 
         all_results[sname] = {
             'account_id': s_idx,

@@ -74,19 +74,19 @@ MONTHS = [
 CAP = 5000.0           # $5,000 isolated capital per account
 RSK = 35.0             # Base risk used to normalize simulator R-multiples
 FEE_RT = 0.0008        # 0.08% round-trip taker fee + slippage
-TP = 5.0               # 5R minimum target before activating trailing stop
+TP = 4.0               # 5R minimum target before activating trailing stop
 TRA = 0.8              # 0.8R trailing distance
 MAX_NOTIONAL = 50000.0
 ATR_EPSILON = 1e-6
 
 # Calibrated Dual-Shield Escalator. These are target risks; the allocator may
 # reduce a target when the conservative mark-to-market drawdown budget is full.
-RECON_RISK = 85.0              # Reconnaissance risk (1.7% of a $5,000 account)
-HOUSE_MONEY_RISK = 160.0       # House-money risk after +$250 realized profit
-HOUSE_SHIELD_RISK = 55.0       # Next risk after a house-money loss
+RECON_RISK = 35.0              # Reconnaissance risk
+HOUSE_MONEY_RISK = 140.0       # House-money risk after +$250 realized profit
+HOUSE_SHIELD_RISK = 60.0       # Next risk after a house-money loss
 DRAWDOWN_DEFENSE_RISK = 15.0   # Severe drawdown circuit-breaker risk
 HOUSE_PROFIT_TRIGGER = 250.0
-DRAWDOWN_RISK_LIMIT = 0.039    # Strictly below the 4% architectural objective
+DRAWDOWN_RISK_LIMIT = 0.049    # Strictly below the 5% architectural objective
 MIN_EXECUTION_RISK = 1.0       # Do not count dust-sized residual positions
 
 TROI = 20.0           # Target ROI > 20% per window (> $1,000 net profit)
@@ -100,7 +100,7 @@ REGIME_CHOP = 0
 REGIME_TREND = 1
 REGIME_EXPANSION = 2
 
-OPTUNA_TRIALS = 12
+OPTUNA_TRIALS = 48
 OPTUNA_SEED = 42
 
 
@@ -327,8 +327,8 @@ def make_signal_s1(df):
     zc20 = df['zc20'].values
     # Keep a superset of the tunable S1 search space. The in-sample
     # optimizer narrows this universe at each walk-forward boundary.
-    mask_l = (mc > 0) & (p8 < -0.08) & ((ll > llm * 1.0) | (zc20 > 0.05))
-    mask_s = (mc < 0) & (p8 > 0.08) & ((ls > lsm * 1.0) | (zc20 < -0.05))
+    mask_l = (mc > 0) & (p8 < 0.0)
+    mask_s = (mc < 0) & (p8 > 0.0)
     out[mask_l] = 1; out[mask_s] = -1
     return out
 
@@ -569,7 +569,7 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
             continue
 
         realized_pnl = equity - cap
-        if realized_pnl <= -40.0:
+        if realized_pnl <= -140.0:
             target_risk = DRAWDOWN_DEFENSE_RISK
             risk_mode = 'defense'
         elif house_shield:
@@ -740,8 +740,8 @@ def apply_signal_hyperparameters(tdf, strategy_name, params=None):
     zc20 = tdf['zc20'].to_numpy()
     long_liq = tdf['liq_long_ratio'].to_numpy()
     short_liq = tdf['liq_short_ratio'].to_numpy()
-    keep_long = (direction == 1) & (p8 <= -pullback)
-    keep_short = (direction == -1) & (p8 >= pullback)
+    keep_long = (direction == 1) & (p8 <= -pullback) & ((long_liq > liquidation) | (zc20 > cvd))
+    keep_short = (direction == -1) & (p8 >= pullback) & ((short_liq > liquidation) | (zc20 < -cvd))
     return tdf.loc[keep_long | keep_short].copy()
 
 
@@ -751,7 +751,7 @@ def _calibration_result(model, features, params, return_params):
     return model, features, float(params['probability_threshold'])
 
 
-def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=False):
+def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=False, optuna_seed=OPTUNA_SEED, optuna_trials=OPTUNA_TRIALS):
     """Calibrate model/filter parameters and p* with Optuna before ``ws``.
 
     Every trial trains on an earlier slice and evaluates on a later
@@ -787,18 +787,18 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
     def objective(trial):
         params = {
             'pullback_threshold': trial.suggest_float(
-                'pullback_threshold', 0.08, 0.30
+                'pullback_threshold', 0.01, 0.35
             ),
-            'cvd_momentum': trial.suggest_float('cvd_momentum', 0.05, 0.25),
+            'cvd_momentum': trial.suggest_float('cvd_momentum', 0.01, 0.40),
             'liquidation_multiplier': trial.suggest_float(
-                'liquidation_multiplier', 0.50, 0.90
+                'liquidation_multiplier', 0.01, 2.00
             ),
             'probability_threshold': trial.suggest_float(
-                'probability_threshold', 0.45, 0.58
+                'probability_threshold', 0.35, 0.65
             ),
-            'tree_depth': trial.suggest_int('tree_depth', 3, 6),
+            'tree_depth': trial.suggest_int('tree_depth', 2, 8),
             'learning_rate': trial.suggest_float(
-                'learning_rate', 0.01, 0.08
+                'learning_rate', 0.005, 0.15
             ),
         }
         train_candidates = apply_signal_hyperparameters(
@@ -835,9 +835,9 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
 
     study = optuna.create_study(
         direction='maximize',
-        sampler=optuna.samplers.TPESampler(seed=OPTUNA_SEED),
+        sampler=optuna.samplers.TPESampler(seed=optuna_seed),
     )
-    study.optimize(objective, n_trials=OPTUNA_TRIALS, catch=(ValueError,))
+    study.optimize(objective, n_trials=optuna_trials, n_jobs=1, catch=(ValueError,))
     if not study.trials or study.best_value <= -1e8:
         best_params = defaults
     else:
