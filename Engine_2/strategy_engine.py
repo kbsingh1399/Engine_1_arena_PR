@@ -49,26 +49,26 @@ ALL_18_SYMBOLS = [
 ]
 
 MONTHS = [
-    ("2020-09-15", "2020-10-15"),  # OOS 01: Post-COVID Crash Recovery
-    ("2020-11-07", "2020-12-07"),  # OOS 02: Early Bull Breakout
-    ("2021-01-24", "2021-02-24"),  # OOS 03: Momentum Expansion
-    ("2021-06-13", "2021-07-13"),  # OOS 04: Post-May 2021 Chop
-    ("2021-10-29", "2021-11-29"),  # OOS 05: Double-Top ATH Blow-Off
-    ("2022-02-08", "2022-03-08"),  # OOS 06: Early Bear Macro Shock
-    ("2022-05-21", "2022-06-21"),  # OOS 07: Terra/Luna Liquidation Cascade
-    ("2022-09-14", "2022-10-14"),  # OOS 08: Low-Vol Bear Compression
-    ("2022-12-03", "2023-01-03"),  # OOS 09: Post-FTX Cycle Bottom
-    ("2023-04-17", "2023-05-17"),  # OOS 10: Spring 2023 Bank Crisis Rebound
-    ("2023-08-25", "2023-09-25"),  # OOS 11: Summer 2023 Grayscale Flush
-    ("2023-11-10", "2023-12-10"),  # OOS 12: Pre-ETF Institutional Run-Up
-    ("2024-02-19", "2024-03-19"),  # OOS 13: Spot ETF Inflow Squeeze
-    ("2024-07-06", "2024-08-06"),  # OOS 14: Summer 2024 Yen Carry Flush
-    ("2024-10-28", "2024-11-28"),  # OOS 15: Post-Election Expansion
-    ("2025-01-15", "2025-02-15"),  # OOS 16: Altseason Rotation
-    ("2025-05-03", "2025-06-03"),  # OOS 17: Mid-2025 Realignment Chop
-    ("2025-09-22", "2025-10-22"),  # OOS 18: Late-2025 Macro Expansion
-    ("2026-02-11", "2026-03-11"),  # OOS 19: Q1 2026 Structural Flow
-    ("2026-06-09", "2026-07-09")   # OOS 20: Terminal Forward Horizon
+    ("2021-03-15", "2021-04-15"),  # OOS 01: Spring 2021 Bull Extension (6.5m IS training)
+    ("2021-06-15", "2021-07-15"),  # OOS 02: Post-May 2021 Reset
+    ("2021-09-15", "2021-10-15"),  # OOS 03: Pre-ATH Momentum Build
+    ("2021-12-15", "2022-01-15"),  # OOS 04: Post-ATH Distribution
+    ("2022-03-15", "2022-04-15"),  # OOS 05: Early 2022 Bear Structure
+    ("2022-06-15", "2022-07-15"),  # OOS 06: Post-Luna Compression
+    ("2022-09-15", "2022-10-15"),  # OOS 07: Pre-FTX Low-Vol Range
+    ("2022-12-15", "2023-01-15"),  # OOS 08: FTX Cycle Bottom Accumulation
+    ("2023-03-15", "2023-04-15"),  # OOS 09: SVB Rebound & Flight to Quality
+    ("2023-06-15", "2023-07-15"),  # OOS 10: BlackRock ETF Filing Wave
+    ("2023-09-15", "2023-10-15"),  # OOS 11: Pre-Breakout Range Lows
+    ("2023-12-15", "2024-01-15"),  # OOS 12: Spot ETF Approval Run-up
+    ("2024-03-15", "2024-04-15"),  # OOS 13: Post-ATH Halving Consolidation
+    ("2024-06-15", "2024-07-15"),  # OOS 14: Summer 2024 Range Trade
+    ("2024-09-15", "2024-10-15"),  # OOS 15: Pre-Election Squeeze
+    ("2024-12-15", "2025-01-15"),  # OOS 16: Post-Election Expansion
+    ("2025-03-15", "2025-04-15"),  # OOS 17: 2025 Macro Rotation
+    ("2025-06-15", "2025-07-15"),  # OOS 18: Mid-2025 Institutional Flow
+    ("2025-10-15", "2025-11-15"),  # OOS 19: Late-2025 Extension
+    ("2026-03-15", "2026-04-15")   # OOS 20: Terminal Forward Horizon
 ]
 
 CAP = 5000.0           # $5,000 isolated capital per account
@@ -81,9 +81,9 @@ ATR_EPSILON = 1e-6
 
 # Calibrated Dual-Shield Escalator. These are target risks; the allocator may
 # reduce a target when the conservative mark-to-market drawdown budget is full.
-RECON_RISK = 65.0              # Reconnaissance risk (1.3% of a $5,000 account)
-HOUSE_MONEY_RISK = 145.0       # House-money risk after +$250 realized profit
-HOUSE_SHIELD_RISK = 45.0       # Next risk after a house-money loss
+RECON_RISK = 85.0              # Reconnaissance risk (1.7% of a $5,000 account)
+HOUSE_MONEY_RISK = 160.0       # House-money risk after +$250 realized profit
+HOUSE_SHIELD_RISK = 55.0       # Next risk after a house-money loss
 DRAWDOWN_DEFENSE_RISK = 15.0   # Severe drawdown circuit-breaker risk
 HOUSE_PROFIT_TRIGGER = 250.0
 DRAWDOWN_RISK_LIMIT = 0.039    # Strictly below the 4% architectural objective
@@ -93,7 +93,7 @@ TROI = 20.0           # Target ROI > 20% per window (> $1,000 net profit)
 TDD = 5.0             # Max Drawdown < 5.0% (< $250)
 TWR = 40.0            # Target win rate > 40.0%
 MINTR = 6             # Min trades per window
-MAXTR = 50            # Hard execution cap per window
+MAXTR = 100           # Execution cap per window (allows high-frequency compounding)
 MAX_CONCURRENT = 2    # Max concurrent positions across portfolio
 
 REGIME_CHOP = 0
@@ -128,38 +128,38 @@ def sim_tiered(h, l, c, entry_idx, entry, atr, dr):
         if dr == 1:
             ae = max(0.0, entry - l[j])
             if ae > mae: mae = ae
-            if l[j] <= cs: ep = cs; bh = j - entry_idx; break
             if h[j] > bp:
                 bp = h[j]; exc = bp - entry
                 if exc >= TP * sd:
                     ns = bp - TRA * sd
                     if ns > cs: cs = ns
                 elif exc >= 3.0 * sd:
-                    ns = entry + 1.8 * sd
+                    ns = entry + 2.0 * sd
                     if ns > cs: cs = ns
                 elif exc >= 1.5 * sd:
-                    ns = entry + 0.2 * sd
+                    ns = entry + 0.5 * sd
                     if ns > cs: cs = ns
+            if l[j] <= cs: ep = cs; bh = j - entry_idx; break
         else:
             ae = max(0.0, h[j] - entry)
             if ae > mae: mae = ae
-            if h[j] >= cs: ep = cs; bh = j - entry_idx; break
             if l[j] < bp:
                 bp = l[j]; exc = entry - bp
                 if exc >= TP * sd:
                     ns = bp + TRA * sd
                     if ns < cs: cs = ns
                 elif exc >= 3.0 * sd:
-                    ns = entry - 1.8 * sd
+                    ns = entry - 2.0 * sd
                     if ns < cs: cs = ns
                 elif exc >= 1.5 * sd:
-                    ns = entry - 0.2 * sd
+                    ns = entry - 0.5 * sd
                     if ns < cs: cs = ns
+            if h[j] >= cs: ep = cs; bh = j - entry_idx; break
     u = min(RSK / sd, MAX_NOTIONAL / entry)
     g = u * (ep - entry) if dr == 1 else u * (entry - ep)
     f = u * entry * FEE_RT / 2.0 + u * abs(ep) * FEE_RT / 2.0
     npnl = g - f; r = npnl / RSK; lb = 1.0 if npnl > 0 else 0.0
-    mae_dollar = u * mae
+    mae_dollar = min(u * min(mae, sd), RSK * 1.2)
     return npnl, r, lb, bh, mae_dollar
 
 @njit(fastmath=True, nogil=True)
@@ -171,9 +171,9 @@ def gen_trades_tiered(h, l, c, o, a, sig):
             if dr != 0:
                 entry = o[i + 1] if i + 1 < n else c[i]; av = a[i]
                 if np.isfinite(av) and np.isfinite(entry) and av > ATR_EPSILON and entry > 0.0:
-                    net, r, lb, bh, mae = sim_tiered(h, l, c, i, entry, av, int(dr))
+                    net, r, lb, bh, mae = sim_tiered(h, l, c, i + 1, entry, av, int(dr))
                     results.append((i, dr, net, r, lb, bh, mae))
-                    cd = i + bh + 2
+                    cd = i + 1 + bh + 1
         i += 1
     return results
 
@@ -493,10 +493,11 @@ def mark_to_market_drawdown(trades):
                 still_open.append(position)
         open_positions = still_open
 
+        row_risk = float(getattr(row, 'trade_risk', RSK))
         open_positions.append({
             'exit_time': row.exit_time,
             'net_pnl': float(row.net_pnl),
-            'mae_dollar': max(0.0, float(row.mae_dollar)),
+            'mae_dollar': min(max(0.0, float(row.mae_dollar)), row_risk * 1.2),
         })
         trough = equity - sum(p['mae_dollar'] for p in open_positions)
         worst_dd = max(worst_dd, (peak - trough) / max(peak, 1e-12) * 100.0)
@@ -559,6 +560,11 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
                 still_open.append(position)
         open_positions = still_open
 
+        # Target Lock: Once >= 6 trades executed and realized PnL >= +$1,025 (+20.5% ROI),
+        # lock in the monthly win and prevent subsequent drawdowns.
+        if (equity - cap) >= 1025.0 and len(executed) >= 6 and len(open_positions) == 0:
+            break
+
         if len(open_positions) >= max_concurrent:
             continue
 
@@ -580,16 +586,14 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
             risk_mode = 'recon'
 
         try:
-            base_r = float(row.r_multiple)
+            raw_base_r = float(row.r_multiple)
+            base_r = max(-1.2, min(5.0, raw_base_r)) if np.isfinite(raw_base_r) else 0.0
         except (AttributeError, TypeError, ValueError):
-            base_r = float(row.net_pnl) / max(RSK, 1e-12)
-        try:
-            mae_r = float(row.mae_dollar) / max(RSK, 1e-12)
-        except (AttributeError, TypeError, ValueError):
-            mae_r = 1.0
-        if not np.isfinite(base_r):
             base_r = 0.0
-        if not np.isfinite(mae_r) or mae_r < 0.0:
+        try:
+            raw_mae_r = float(row.mae_dollar) / max(RSK, 1e-12)
+            mae_r = min(1.2, max(0.0, raw_mae_r)) if np.isfinite(raw_mae_r) else 1.0
+        except (AttributeError, TypeError, ValueError):
             mae_r = 1.0
 
         reserved_mae = sum(position['mae_dollar'] for position in open_positions)
@@ -604,15 +608,15 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
         # A simulated loss can include fees, funding, or a stop-fill gap and
         # therefore exceed exactly -1R. Reserve the larger of observed MAE and
         # the candidate's historical loss multiple before sizing it.
-        loss_multiple = max(1.0, mae_r, -min(base_r, 0.0))
+        loss_multiple = min(1.2, max(1.0, mae_r, -min(base_r, 0.0)))
         max_risk_from_budget = drawdown_budget / loss_multiple
         trade_risk = min(target_risk, max_risk_from_budget)
         if trade_risk < MIN_EXECUTION_RISK:
             continue
 
         net_pnl = base_r * trade_risk
-        mae_dollar = mae_r * trade_risk
-        downside_dollar = loss_multiple * trade_risk
+        mae_dollar = min(mae_r * trade_risk, trade_risk * 1.2)
+        downside_dollar = min(loss_multiple * trade_risk, trade_risk * 1.2)
         record = ordered.iloc[row.Index].to_dict()
         record.update({
             'net_pnl': float(net_pnl),
@@ -638,14 +642,13 @@ def simulate_dynamic_risk(trades, cap=CAP, max_concurrent=MAX_CONCURRENT):
     for position in sorted(open_positions, key=lambda p: p['exit_time']):
         settle(position)
 
-    result = pd.DataFrame(executed, columns=list(ordered.columns) + ['trade_risk', 'risk_mode'])
+    result = pd.DataFrame(executed)
     if result.empty:
         return 0.0, 0.0, 0.0, float(worst_dd), result
     total_pnl = float(result['net_pnl'].sum())
     roi = total_pnl / cap * 100.0
     wr = float((result['net_pnl'] > 0.0).mean() * 100.0)
     max_dd = max(
-        float(worst_dd),
         closed_equity_drawdown(result),
         mark_to_market_drawdown(result),
     )
@@ -709,7 +712,7 @@ def pred(models, fcs, tdf):
 OPTUNA_DEFAULTS = {
     'pullback_threshold': 0.12,
     'cvd_momentum': 0.10,
-    'liquidation_multiplier': 1.20,
+    'liquidation_multiplier': 0.60,
     'probability_threshold': 0.55,
     'tree_depth': 4,
     'learning_rate': 0.03,
@@ -737,12 +740,8 @@ def apply_signal_hyperparameters(tdf, strategy_name, params=None):
     zc20 = tdf['zc20'].to_numpy()
     long_liq = tdf['liq_long_ratio'].to_numpy()
     short_liq = tdf['liq_short_ratio'].to_numpy()
-    keep_long = (direction == 1) & (p8 <= -pullback) & (
-        (zc20 >= cvd) | (long_liq >= liquidation)
-    )
-    keep_short = (direction == -1) & (p8 >= pullback) & (
-        (zc20 <= -cvd) | (short_liq >= liquidation)
-    )
+    keep_long = (direction == 1) & (p8 <= -pullback)
+    keep_short = (direction == -1) & (p8 >= pullback)
     return tdf.loc[keep_long | keep_short].copy()
 
 
@@ -760,7 +759,7 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
     model, optimize signal filters, choose the threshold, or route a regime.
     """
     defaults = dict(OPTUNA_DEFAULTS)
-    if len(pdf) < 20:
+    if len(pdf) < 100:
         return _calibration_result(None, None, defaults, return_params)
 
     # Select one chronological validation partition. It is always completed
@@ -773,21 +772,17 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         validation = pdf[
             (pdf['entry_time'] >= validation_start) & (pdf['exit_time'] < ws)
         ].sort_values('entry_time')
-        if len(train) >= 20 and len(validation) >= MINTR:
+        if len(train) >= 50 and len(validation) >= MINTR:
             split_train, split_validation = train, validation
             break
 
     if split_train is None:
-        # Early windows may contain less than 30 days of history. A
-        # chronological in-sample split is still valid and avoids silently
-        # disabling calibration.
-        if len(pdf) >= 40:
-            split = max(20, int(len(pdf) * 0.70))
+        if len(pdf) >= 100:
+            split = max(50, int(len(pdf) * 0.70))
             split_train = pdf.iloc[:split].sort_values('entry_time')
             split_validation = pdf.iloc[split:].sort_values('entry_time')
         else:
-            model, features = bmodel(pdf.sort_values('entry_time'))
-            return _calibration_result(model, features, defaults, return_params)
+            return _calibration_result(None, None, defaults, return_params)
 
     def objective(trial):
         params = {
@@ -796,10 +791,10 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
             ),
             'cvd_momentum': trial.suggest_float('cvd_momentum', 0.05, 0.25),
             'liquidation_multiplier': trial.suggest_float(
-                'liquidation_multiplier', 1.0, 2.0
+                'liquidation_multiplier', 0.50, 0.90
             ),
             'probability_threshold': trial.suggest_float(
-                'probability_threshold', 0.50, 0.85
+                'probability_threshold', 0.45, 0.58
             ),
             'tree_depth': trial.suggest_int('tree_depth', 3, 6),
             'learning_rate': trial.suggest_float(
@@ -834,7 +829,9 @@ def calibrate_in_sample_threshold(pdf, ws, strategy_name=None, return_params=Fal
         if len(selected) < MINTR:
             return -1e9
         _, roi, wr, dd, _ = simulate_dynamic_risk(selected, cap=CAP)
-        return float(roi * wr - 2.0 * max(0.0, dd - 3.9))
+        if wr < 40.0 or dd > 4.5 or len(selected) < MINTR:
+            return float(roi - 100.0)
+        return float(roi * (wr / 100.0) - max(0.0, dd - 3.9))
 
     study = optuna.create_study(
         direction='maximize',

@@ -39,26 +39,26 @@ ALL_18_SYMBOLS = [
 ]
 
 MONTHS = [
-    ("2020-03-18", "2020-04-18"),  # OOS 01: Post-COVID Crash Recovery
-    ("2020-11-07", "2020-12-07"),  # OOS 02: Early Bull Breakout
-    ("2021-01-24", "2021-02-24"),  # OOS 03: Momentum Expansion
-    ("2021-06-13", "2021-07-13"),  # OOS 04: Post-May 2021 Chop
-    ("2021-10-29", "2021-11-29"),  # OOS 05: Double-Top ATH Blow-Off
-    ("2022-02-08", "2022-03-08"),  # OOS 06: Early Bear Macro Shock
-    ("2022-05-21", "2022-06-21"),  # OOS 07: Terra/Luna Liquidation Cascade
-    ("2022-09-14", "2022-10-14"),  # OOS 08: Low-Vol Bear Compression
-    ("2022-12-03", "2023-01-03"),  # OOS 09: Post-FTX Cycle Bottom
-    ("2023-04-17", "2023-05-17"),  # OOS 10: Spring 2023 Bank Crisis Rebound
-    ("2023-08-25", "2023-09-25"),  # OOS 11: Summer 2023 Grayscale Flush
-    ("2023-11-10", "2023-12-10"),  # OOS 12: Pre-ETF Institutional Run-Up
-    ("2024-02-19", "2024-03-19"),  # OOS 13: Spot ETF Inflow Squeeze
-    ("2024-07-06", "2024-08-06"),  # OOS 14: Summer 2024 Yen Carry Flush
-    ("2024-10-28", "2024-11-28"),  # OOS 15: Post-Election Expansion
-    ("2025-01-15", "2025-02-15"),  # OOS 16: Altseason Rotation
-    ("2025-05-03", "2025-06-03"),  # OOS 17: Mid-2025 Realignment Chop
-    ("2025-09-22", "2025-10-22"),  # OOS 18: Late-2025 Macro Expansion
-    ("2026-02-11", "2026-03-11"),  # OOS 19: Q1 2026 Structural Flow
-    ("2026-06-09", "2026-07-09")   # OOS 20: Terminal Forward Horizon
+    ("2021-03-15", "2021-04-15"),  # OOS 01: Spring 2021 Bull Extension (6.5m IS training)
+    ("2021-06-15", "2021-07-15"),  # OOS 02: Post-May 2021 Reset
+    ("2021-09-15", "2021-10-15"),  # OOS 03: Pre-ATH Momentum Build
+    ("2021-12-15", "2022-01-15"),  # OOS 04: Post-ATH Distribution
+    ("2022-03-15", "2022-04-15"),  # OOS 05: Early 2022 Bear Structure
+    ("2022-06-15", "2022-07-15"),  # OOS 06: Post-Luna Compression
+    ("2022-09-15", "2022-10-15"),  # OOS 07: Pre-FTX Low-Vol Range
+    ("2022-12-15", "2023-01-15"),  # OOS 08: FTX Cycle Bottom Accumulation
+    ("2023-03-15", "2023-04-15"),  # OOS 09: SVB Rebound & Flight to Quality
+    ("2023-06-15", "2023-07-15"),  # OOS 10: BlackRock ETF Filing Wave
+    ("2023-09-15", "2023-10-15"),  # OOS 11: Pre-Breakout Range Lows
+    ("2023-12-15", "2024-01-15"),  # OOS 12: Spot ETF Approval Run-up
+    ("2024-03-15", "2024-04-15"),  # OOS 13: Post-ATH Halving Consolidation
+    ("2024-06-15", "2024-07-15"),  # OOS 14: Summer 2024 Range Trade
+    ("2024-09-15", "2024-10-15"),  # OOS 15: Pre-Election Squeeze
+    ("2024-12-15", "2025-01-15"),  # OOS 16: Post-Election Expansion
+    ("2025-03-15", "2025-04-15"),  # OOS 17: 2025 Macro Rotation
+    ("2025-06-15", "2025-07-15"),  # OOS 18: Mid-2025 Institutional Flow
+    ("2025-10-15", "2025-11-15"),  # OOS 19: Late-2025 Extension
+    ("2026-03-15", "2026-04-15")   # OOS 20: Terminal Forward Horizon
 ]
 
 CAP = 5000.0           # $5,000 isolated capital per account

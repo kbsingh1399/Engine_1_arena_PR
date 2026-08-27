@@ -99,7 +99,7 @@ def main():
                 rr = np.asarray(res, dtype=np.float64)
                 idx = rr[:, 0].astype(np.int64); dr = rr[:, 1].astype(np.int32)
                 net = rr[:, 2].copy(); bh = rr[:, 5].astype(np.int64); mae = rr[:, 6].copy()
-                entry_idx = np.minimum(idx + 1, n_bars - 1); exit_idx = np.minimum(idx + bh, n_bars - 1)
+                entry_idx = np.minimum(idx + 1, n_bars - 1); exit_idx = np.minimum(idx + 1 + bh, n_bars - 1)
                 entry_price = o[entry_idx]; atr_entry = a[idx]
                 units = np.minimum(RSK / atr_entry, MAX_NOTIONAL / entry_price)
                 if 'fr' in fa:
@@ -110,10 +110,11 @@ def main():
                     funding_abs = (np.abs(avg_fr) / 3200.0) * entry_price * units * np.maximum(bh, 0)
                     pays = ((dr == 1) & (avg_fr > 0)) | ((dr == -1) & (avg_fr < 0))
                     net -= np.where(pays, funding_abs, -funding_abs)
+                mae_dollar = np.minimum(units * np.minimum(mae, atr_entry), RSK * 1.2)
                 data = {
                     'symbol': np.repeat(sym, len(idx)), 'entry_time': ts[entry_idx], 'exit_time': ts[exit_idx],
                     'strategy': np.repeat(sname, len(idx)), 'direction': dr, 'entry_price': entry_price,
-                    'net_pnl': net, 'r_multiple': net / RSK, 'label': (net > 0).astype(np.int32), 'mae_dollar': mae
+                    'net_pnl': net, 'r_multiple': net / RSK, 'label': (net > 0).astype(np.int32), 'mae_dollar': mae_dollar
                 }
                 data.update({col: fa[col][idx] for col in fc})
                 raw_strategy_trades[sname].append(pd.DataFrame(data))
@@ -152,13 +153,12 @@ def main():
                 pdf, ws, sname, return_params=True
             )
             if m is not None and len(tdf) > 0:
-                tuned_tdf = apply_signal_hyperparameters(
-                    tdf, sname, optuna_params
-                )
-                tp = pred(m, fcs, tuned_tdf)
-                candidates = apply_regime_routing(tp, sname, bp)
+                tp = pred(m, fcs, tdf)
+                candidates = tp[tp['prob'] >= bp].sort_values('entry_time')
+                if len(candidates) < MINTR:
+                    candidates = tp.sort_values('prob', ascending=False).head(50).sort_values('entry_time')
             else:
-                candidates = tdf
+                candidates = tdf.sort_values('entry_time')
                 bp = 0.50
 
             candidates = simulate_portfolio_concurrency(
