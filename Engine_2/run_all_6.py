@@ -188,6 +188,16 @@ def main():
             })
             log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (bp={bp:.2f})")
 
+            # STRICT FAIL-FAST GATE: Do not proceed if window fails target criteria
+            if not passed and os.environ.get("NO_FAIL_FAST", "0") != "1":
+                fail_reasons = []
+                if roi < TROI: fail_reasons.append(f"ROI={roi:.1f}% < {TROI}%")
+                if max_dd >= TDD: fail_reasons.append(f"MaxDD={max_dd:.1f}% >= {TDD}%")
+                if wr < TWR: fail_reasons.append(f"WR={wr:.1f}% < {TWR}%")
+                if nt < MINTR: fail_reasons.append(f"Trades={nt} < {MINTR}")
+                log(f"\n❌ [FAIL-FAST ABORT] {sname} Window {wi} failed criteria: {', '.join(fail_reasons)}. Execution halted immediately.")
+                sys.exit(1)
+
         all_results[sname] = {
             'account_id': s_idx,
             'paradigm': paradigm,
