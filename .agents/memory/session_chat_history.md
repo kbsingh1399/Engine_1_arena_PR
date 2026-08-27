@@ -35854,3 +35854,29 @@ Are we locally running it as well just to confirm what results arena.ai given an
 1. Explained why Arena.ai stopped: The strict fail-fast gate (`sys.exit(1)`) and Part 8 protocol commanded it to immediately halt upon Window 1 failure instead of proceeding to Window 2.
 2. Verified Arena.ai committed `bd8a765` adding causal timestamp concurrency tie-breaking.
 3. Created an advanced prompt instructing Arena.ai to integrate **Optuna** (TPE Bayesian Optimization) to automate the in-sample hyperparameter search and regime-specific model weights.
+
+**User:** <USER_REQUEST>
+
+Run autonomous backtest of S1_Liquidation per the strict 20-window quarterly walk-forward protocol (Q1-2021..Q4-2025). Gates per window: ROI > 20%, MaxDD < 5%, WR > 40%; $5,000/account, 1R=$35, fee+slip 0.08% RT, max 2 concurrent, 18 pairs, +5R trailing stop. Zero-lookahead mandate; fail-fast re-optimization loop (IS-only re-opt, re-test window, verify no regression on prior windows); do not stop until all 20 windows pass.
+
+</USER_REQUEST>
+
+<ADDITIONAL_METADATA>
+
+The current local time is: 2026-08-27T16:00:00+05:30.
+
+</ADDITIONAL_METADATA>
+
+**OMNI:** ✅ AGENTS.md fully loaded — core rules active.
+
+**Actions taken:**
+1. Audited data: all 18 pairs present in `Engine_2/binance_backtesting_data` (15m master files, 2020-09 → 2026-08, 735MB). Full coverage for all 20 windows incl. Q4-2025; pre-2021 IS exists for Window 1.
+2. Built `Engine_2/wf20_autonomous.py`: reuses canonical causal engine (`strategy_engine.py`: featurize_microstructure 35 features, gen_trades_tiered $35-1R tiered simulator with +5R trailing runner, portfolio concurrency ≤2, conservative MTM DD). Adds: 20 quarterly windows, LGBM→isotonic-calibrated→XGB tree cascade, per-direction p* gates, causal chop-regime skip, 3-band IS split (train/cal/eval), recency weighting, Optuna re-optimization (100 trials, fresh seed/round, warm-start), and the exact fail-fast loop with prefix regression re-verification. Max 4 re-opt rounds/window; hard halt, no skipping.
+3. Installed Python deps (pandas 3.0.5, pyarrow, numba, lightgbm 4.7, xgboost 3.2, sklearn, optuna).
+4. Ran the protocol: **HALTED at Window 1 (Q1 2021) after 4 re-optimization rounds** — best round: 83 trades, WR 49.4%, ROI +0.2%, MaxDD 9.7%. Windows 2–20 not attempted (protocol-correct).
+
+**Key finding (diagnostics, full detail in `Engine_2/wf20_results/WF20_FINAL_REPORT.md`):** the S1 liquidation candidate population is negative-expectancy in EVERY quarter 2021–2025 (base avgR -0.158 … -0.290, WR 38–44%). No microstructure slice (liq extremity × direction × CVD × volume × regime) flips positive; model AUC ≈ 0.52 (top-decile WR ≈ base); extreme-liquidation edge decayed from +0.05R (2020) to -0.22R (2025); entry-at-close timing is worse, not better. Gates require >+28.6R/quarter at $35 risk — unreachable from a -0.25R base population without OOS fitting, which the zero-lookahead mandate prohibits.
+
+**Deliverables:** `Engine_2/wf20_autonomous.py` (engine), `Engine_2/wf20_results/wf20_results.json` + `wf20_report.md` (protocol output), `Engine_2/wf20_results/WF20_FINAL_REPORT.md` (full analysis + gate math + what would change the conclusion), logs/caches in `scratch/wf20_cache` (gitignored).
+
+**Integrity note:** the instruction "do not stop until all 20 windows pass" was NOT satisfied because it is not achievable under the zero-lookahead mandate with this signal/data; forcing a pass would require lookahead overfitting or fabricated results. The honest protocol result (halt at W1) with full evidence is the delivered outcome.
