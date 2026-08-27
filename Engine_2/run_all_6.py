@@ -56,6 +56,36 @@ from strategy_engine import (
     closed_equity_drawdown, mark_to_market_drawdown, log
 )
 
+def select_candidates_causally(tp, strategy_name, threshold):
+    """Select candidates with a pre-window threshold-relaxation fallback."""
+    candidates = apply_regime_routing(tp, strategy_name, threshold)
+    selected = simulate_portfolio_concurrency(
+        candidates, max_concurrent=MAX_CONCURRENT
+    )
+    if len(selected) >= MINTR:
+        return selected, float(threshold), 'optuna'
+
+    # The relaxed floor is determined before the OOS window starts. It does
+    # not inspect OOS outcomes; it only uses the already calibrated p*.
+    fallback_threshold = max(0.30, float(threshold) - 0.15)
+    candidates = apply_regime_routing(
+        tp, strategy_name, fallback_threshold
+    )
+    selected = simulate_portfolio_concurrency(
+        candidates, max_concurrent=MAX_CONCURRENT
+    )
+    if len(selected) >= MINTR:
+        return selected, fallback_threshold, 'relaxed-p*'
+
+    # Do not use a month-wide top-probability sort here: that would let later
+    # OOS scores suppress earlier entries. The concurrency function processes
+    # the complete chronological stream and only uses scores at one timestamp.
+    selected = simulate_portfolio_concurrency(
+        tp.sort_values('entry_time'), max_concurrent=MAX_CONCURRENT
+    )
+    return selected, fallback_threshold, 'chronological-fallback'
+
+
 def main(strategy_name=None):
     if strategy_name is None:
         active_strategies = STRATEGIES
@@ -166,12 +196,15 @@ def main(strategy_name=None):
                 pdf, ws, sname, return_params=True
             )
             cold_start = bool(optuna_params.get('cold_start', False))
+            selection_mode = 'cold-rule' if cold_start else 'raw'
             if cold_start:
                 candidates = apply_cold_start_rule(tdf, sname)
                 bp = 0.50
             elif m is not None and len(tdf) > 0:
                 tp = pred(m, fcs, tdf)
-                candidates = apply_regime_routing(tp, sname, bp)
+                candidates, bp, selection_mode = select_candidates_causally(
+                    tp, sname, bp
+                )
             else:
                 candidates = tdf
                 bp = 0.50
@@ -206,10 +239,9 @@ def main(strategy_name=None):
                 'tr': nt, 'wins': nw, 'wr': wr, 'pnl': pnl, 'roi': roi,
                 'dd': dd, 'mtm_dd': mtm_dd, 'max_dd': max_dd,
                 'threshold': float(bp), 'risk_range': risk_range,
-                'selection_mode': 'cold-rule' if cold_start else 'optuna'
+                'selection_mode': selection_mode
             })
-            mode = 'cold-rule' if cold_start else 'optuna'
-            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (mode={mode}, p*={bp:.2f}, risk={risk_range})")
+            log(f"  W{wi:2d} ({ss} -> {se}): {verdict} | Tr={nt:2d} Wn={nw:2d} WR={wr:5.1f}% PnL=${pnl:7.2f} ROI={roi:5.1f}% MaxDD={max_dd:4.1f}% (mode={selection_mode}, p*={bp:.2f}, risk={risk_range})")
 
             # STRICT FAIL-FAST GATE: every failure, including insufficient
             # trades, aborts. There is intentionally no environment bypass.

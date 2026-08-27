@@ -225,6 +225,27 @@ def test_cold_start_conviction_is_causal_and_sorted_within_timestamp():
     assert selected['conviction'].round(6).tolist() == [0.60, 0.40, 0.30]
 
 
+def test_sparse_window_fallback_relaxes_only_the_pre_window_threshold():
+    from run_all_6 import select_candidates_causally
+
+    timestamps = pd.date_range("2021-01-01", periods=6, freq="2D")
+    candidates = pd.DataFrame(
+        {
+            "entry_time": timestamps,
+            "exit_time": timestamps + pd.Timedelta(hours=1),
+            "prob": [0.35] * 6,
+            "regime": [1] * 6,
+        }
+    )
+
+    selected, threshold, mode = select_candidates_causally(
+        candidates, "S1_Liquidation", 0.50
+    )
+    assert len(selected) == 6
+    assert threshold == 0.35
+    assert mode == "relaxed-p*"
+
+
 def test_same_timestamp_entries_use_conviction_and_keep_slots_occupied():
     from strategy_engine import simulate_portfolio_concurrency
 
