@@ -457,12 +457,13 @@ def optimize_and_train(X_train, y_train, learning_rate):
         max_iter=100, learning_rate=learning_rate, random_state=42
     )
     
+    X_train_f32 = np.ascontiguousarray(X_train, dtype=np.float32)
     ensemble = VotingClassifier(
         estimators=[('xgb', xgb_model), ('lgb', lgb_model), ('cat', cat_model), ('hist', hist_model)],
         voting='soft',
-        n_jobs=-1
+        n_jobs=1
     )
-    ensemble.fit(X_train, y_train)
+    ensemble.fit(X_train_f32, y_train)
     return ensemble
 
 # ─────────────────────────────────────────────────────────────────────────────
