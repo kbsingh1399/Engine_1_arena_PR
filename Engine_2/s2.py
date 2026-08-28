@@ -51,15 +51,15 @@ MIN_TRADES = 5           # Minimum statistical significance per month
 
 # Portfolio & Risk Mandates
 INITIAL_CAPITAL = 5000.0 # $5,000 Capital (INR / USD standardized)
-BASE_RISK = 45.0         # $45 Risk per trade (1R = 0.90%)
+BASE_RISK = 75.0         # $75 Risk per trade (1R = 1.50%)
 FEE_RATE = 0.0010        # 0.10% Round-trip taker fee + slippage
 MAX_CONCURRENT = 2       # Max 2 simultaneous open positions
 LEVERAGE = 10.0          # Margin = Notional / 10.0
 MAX_NOTIONAL = 50000.0   # Hard ceiling on trade notional
-HOUSE_PROFIT_TRIGGER = 55.0 # Unlocks House Money risk after 1 good win
-HOUSE_MONEY_RISK = 80.0  # Sustainable compounding without profit destruction on pullbacks
-HOUSE_SHIELD_RISK = 45.0 # Cushion risk during pullbacks
-DRAWDOWN_DEFENSE_RISK = 20.0 # Capital defense mode
+HOUSE_PROFIT_TRIGGER = 75.0 # Unlocks House Money risk after 1 good win
+HOUSE_MONEY_RISK = 150.0 # Sustainable compounding to achieve > 20% ROI safely
+HOUSE_SHIELD_RISK = 50.0 # Cushion risk during pullbacks
+DRAWDOWN_DEFENSE_RISK = 25.0 # Capital defense mode
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. DATA PREPARATION & CVD ORDER FLOW FEATURE EXTRACTION
