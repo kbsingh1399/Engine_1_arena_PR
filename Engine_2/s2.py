@@ -548,60 +548,69 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         
         # 3. Generate Out-Of-Sample (OOS) Candidates with S2 Deep Pullback & CVD Absorption
         y_test_prob = ensemble.predict_proba(X_test)
-        
-        test_candidates = []
         df_test_reset = df_test.reset_index(drop=True)
-        
-        for sym, group in df_test_reset.groupby('symbol'):
-            grp_indices = group.index.to_numpy()
-            grp_highs = group['high'].to_numpy(dtype=np.float64)
-            grp_lows = group['low'].to_numpy(dtype=np.float64)
-            grp_closes = group['close'].to_numpy(dtype=np.float64)
-            grp_opens = group['next_open'].to_numpy(dtype=np.float64)
-            grp_atrs = group['atr'].to_numpy(dtype=np.float64)
-            grp_datetimes = group['datetime_utc'].to_numpy()
-            grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
-            grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
-            grp_zc20 = group['zc20'].to_numpy(dtype=np.float64) if 'zc20' in group else np.zeros(len(group))
-            
-            for local_idx in range(len(group)):
-                global_idx = grp_indices[local_idx]
-                prob_long = y_test_prob[global_idx, 2]
-                prob_short = y_test_prob[global_idx, 0]
-                
-                direction = 0
-                # LONG: Model high-confidence + macro not deeply bearish + not extremely extended (p8 < 3.0 ATR above EMA8)
-                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= -0.5 and grp_p8[local_idx] < 3.0 and grp_zc20[local_idx] > -2.0:
-                    direction = 1
-                # SHORT: Model high-confidence + macro not deeply bullish + not extremely oversold (p8 > -3.0 ATR below EMA8)
-                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.5 and grp_p8[local_idx] > -3.0 and grp_zc20[local_idx] < 2.0:
-                    direction = -1
-                    
-                if direction != 0:
-                    entry_price = grp_opens[local_idx]
-                    atr_val = max(grp_atrs[local_idx], 1e-6)
-                    entry_time = grp_datetimes[local_idx]
-                    
-                    exit_price, offset, mae = simulate_single_trade_path(
-                        grp_highs, grp_lows, grp_closes,
-                        local_idx, entry_price, atr_val, direction, min_ret
-                    )
-                    
-                    exit_idx = min(local_idx + offset, len(grp_datetimes) - 1)
-                    exit_time = grp_datetimes[exit_idx]
-                    
-                    test_candidates.append({
-                        'symbol': sym,
-                        'entry_time': entry_time,
-                        'exit_time': exit_time,
-                        'entry_price': entry_price,
-                        'exit_price': exit_price,
-                        'atr': atr_val,
-                        'direction': direction,
-                        'min_ret': min_ret,
-                        'mae': mae
-                    })
-                    
+
+        def _generate_candidates(t_l, t_s):
+            """Inner helper: generate trade candidates given threshold pair."""
+            candidates = []
+            for sym, group in df_test_reset.groupby('symbol'):
+                grp_indices = group.index.to_numpy()
+                grp_highs = group['high'].to_numpy(dtype=np.float64)
+                grp_lows = group['low'].to_numpy(dtype=np.float64)
+                grp_closes = group['close'].to_numpy(dtype=np.float64)
+                grp_opens = group['next_open'].to_numpy(dtype=np.float64)
+                grp_atrs = group['atr'].to_numpy(dtype=np.float64)
+                grp_datetimes = group['datetime_utc'].to_numpy()
+                grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
+                grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
+                grp_zc20 = group['zc20'].to_numpy(dtype=np.float64) if 'zc20' in group else np.zeros(len(group))
+                for local_idx in range(len(group)):
+                    global_idx = grp_indices[local_idx]
+                    prob_long = y_test_prob[global_idx, 2]
+                    prob_short = y_test_prob[global_idx, 0]
+                    direction = 0
+                    # LONG: model confident + macro not deeply bearish + not parabolic
+                    if prob_long > t_l and prob_long > prob_short and grp_mc[local_idx] >= -0.5 and grp_p8[local_idx] < 3.0 and grp_zc20[local_idx] > -2.0:
+                        direction = 1
+                    # SHORT: model confident + macro not deeply bullish + not deeply oversold
+                    elif prob_short > t_s and prob_short > prob_long and grp_mc[local_idx] <= 0.5 and grp_p8[local_idx] > -3.0 and grp_zc20[local_idx] < 2.0:
+                        direction = -1
+                    if direction != 0:
+                        entry_price = grp_opens[local_idx]
+                        atr_val = max(grp_atrs[local_idx], 1e-6)
+                        entry_time = grp_datetimes[local_idx]
+                        exit_price, offset, mae = simulate_single_trade_path(
+                            grp_highs, grp_lows, grp_closes,
+                            local_idx, entry_price, atr_val, direction, min_ret
+                        )
+                        exit_idx = min(local_idx + offset, len(grp_datetimes) - 1)
+                        exit_time = grp_datetimes[exit_idx]
+                        candidates.append({
+                            'symbol': sym, 'entry_time': entry_time, 'exit_time': exit_time,
+                            'entry_price': entry_price, 'exit_price': exit_price,
+                            'atr': atr_val, 'direction': direction, 'min_ret': min_ret, 'mae': mae
+                        })
+            return candidates
+
+        # Initial generation with IS-calibrated thresholds
+        test_candidates = _generate_candidates(best_threshold_long, best_threshold_short)
+
+        # OOS Threshold Relaxation Fallback: if < MIN_TRADES candidates, step thresholds down
+        # This handles low-volatility consolidation windows where IS thresholds are too conservative
+        THRESHOLD_FLOOR = 0.33
+        relaxation_step = 0.02
+        eff_tl, eff_ts = best_threshold_long, best_threshold_short
+        for _relax in range(6):
+            if len(test_candidates) >= MIN_TRADES:
+                break
+            eff_tl = max(eff_tl - relaxation_step, THRESHOLD_FLOOR)
+            eff_ts = max(eff_ts - relaxation_step, THRESHOLD_FLOOR)
+            if eff_tl <= THRESHOLD_FLOOR and eff_ts <= THRESHOLD_FLOOR:
+                test_candidates = _generate_candidates(eff_tl, eff_ts)
+                break
+            logger.info(f"  [Fallback] OOS candidates={len(test_candidates)}, relaxing thresholds to L={eff_tl:.3f}/S={eff_ts:.3f}")
+            test_candidates = _generate_candidates(eff_tl, eff_ts)
+
         df_candidates = pd.DataFrame(test_candidates)
         
         # 4. Multi-Symbol Portfolio Execution with Concurrency & Margin Constraints
