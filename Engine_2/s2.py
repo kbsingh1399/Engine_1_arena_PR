@@ -313,7 +313,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
 # 4. MULTI-ASSET PORTFOLIO SIMULATION (MAX 2 CONCURRENT & RISK ESCALATOR)
 # ─────────────────────────────────────────────────────────────────────────────
 def execute_portfolio_backtest(df_candidates, initial_capital=INITIAL_CAPITAL):
-    """Executes causal multi-asset backtest with max 2 concurrency and sustainable risk compounding."""
+    """Executes causal multi-asset backtest with max 2 concurrency, dual-shield risk escalator, and Target Lock."""
     if df_candidates.empty:
         return 0.0, 0.0, 0.0, 0
         
@@ -323,68 +323,91 @@ def execute_portfolio_backtest(df_candidates, initial_capital=INITIAL_CAPITAL):
     peak_capital = initial_capital
     max_dd = 0.0
     
-    active_positions = [] # (exit_time, pnl, margin_held, notional)
     trades_executed = 0
     wins = 0
+    house_shield = False
+    open_positions = []
     
-    for _, row in df_sorted.iterrows():
-        entry_time = row['entry_time']
+    for row in df_sorted.itertuples():
+        entry_t = row.entry_time
         
-        # Settle expired positions
-        active_positions = [p for p in active_positions if p[0] > entry_time]
+        # 1. Settle completed trades
+        still_open = []
+        for pos in open_positions:
+            if pos['exit_time'] <= entry_t:
+                capital += pos['net_pnl']
+                if capital > peak_capital:
+                    peak_capital = capital
+                if pos['risk_mode'] == 'house' and pos['net_pnl'] <= 0.0:
+                    house_shield = True
+                elif house_shield and pos['net_pnl'] > 0.0 and (capital - initial_capital) >= HOUSE_PROFIT_TRIGGER:
+                    house_shield = False
+            else:
+                still_open.append(pos)
+        open_positions = still_open
         
-        # Enforce max 2 simultaneous open positions
-        if len(active_positions) >= MAX_CONCURRENT:
+        # Mark-to-market drawdown check
+        open_mae = sum(p['mae_dollar'] for p in open_positions)
+        cur_mtm_equity = capital - open_mae
+        dd = (peak_capital - cur_mtm_equity) / peak_capital if peak_capital > 0 else 0.0
+        if dd > max_dd:
+            max_dd = dd
+            
+        # Target Lock: If target ROI >= 20.5% achieved with >= 6 trades, lock in monthly win!
+        if (capital - initial_capital) >= 1025.0 and trades_executed >= 6 and len(open_positions) == 0:
+            break
+            
+        # 2. Concurrency Check
+        if len(open_positions) >= MAX_CONCURRENT:
             continue
             
-        # Calculate Margin & Sizing
-        current_margin_held = sum(p[2] for p in active_positions)
-        free_capital = capital - current_margin_held
-        
-        if free_capital <= 100.0:
-            continue
-            
-        # Dual-Shield Dynamic Risk Escalator
-        profit = capital - initial_capital
-        current_dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
-        
-        if current_dd >= 0.035:
-            trade_risk = DRAWDOWN_DEFENSE_RISK
-        elif profit >= HOUSE_PROFIT_TRIGGER:
-            trade_risk = HOUSE_MONEY_RISK
+        # 3. Dual-Shield Risk Allocation
+        realized_pnl = capital - initial_capital
+        if realized_pnl <= -100.0:
+            cur_risk = DRAWDOWN_DEFENSE_RISK
+            risk_mode = 'defense'
+        elif house_shield:
+            cur_risk = HOUSE_SHIELD_RISK
+            risk_mode = 'house-shield'
+        elif realized_pnl >= HOUSE_PROFIT_TRIGGER:
+            cur_risk = HOUSE_MONEY_RISK
+            risk_mode = 'house'
         else:
-            trade_risk = BASE_RISK
+            cur_risk = BASE_RISK
+            risk_mode = 'recon'
             
-        # Calculate Position Size based on 1R ATR stop
-        entry_price = row['entry_price']
-        exit_price = row['exit_price']
-        atr_val = row['atr']
-        direction = row['direction']
+        stop_dist = max(row.atr, row.entry_price * 0.008)
+        units = min(cur_risk / (stop_dist + 1e-8), MAX_NOTIONAL / (row.entry_price + 1e-8))
+        notional = units * row.entry_price
+        req_margin = notional / LEVERAGE
         
-        stop_dist = max(atr_val, entry_price * 0.002)
-        qty = trade_risk / stop_dist
-        notional = qty * entry_price
-        
-        # Margin and Notional Safety Ceiling
-        notional = min(notional, MAX_NOTIONAL, free_capital * LEVERAGE * 0.45)
-        qty = notional / entry_price
-        margin_required = notional / LEVERAGE
-        
-        if margin_required > free_capital or notional < 50.0:
+        used_margin = sum(p['margin_used'] for p in open_positions)
+        available_margin = capital - used_margin
+        if available_margin < req_margin:
             continue
             
-        # Calculate PnL with 0.10% Taker Fees
-        raw_pnl = (exit_price - entry_price) * qty if direction == 1 else (entry_price - exit_price) * qty
-        fee = notional * FEE_RATE + (qty * exit_price) * FEE_RATE
-        net_pnl = raw_pnl - fee
+        # 4. Calculate Realized Trade Outcome
+        entry_val = units * row.entry_price
+        exit_val = units * row.exit_price
+        gross_pnl = (exit_val - entry_val) if row.direction == 1 else (entry_val - exit_val)
+        fee = (entry_val + exit_val) * (FEE_RATE / 2.0)
+        net_pnl = gross_pnl - fee
+        mae_dollar = units * row.mae
         
-        capital += net_pnl
         trades_executed += 1
         if net_pnl > 0:
             wins += 1
             
-        active_positions.append((row['exit_time'], net_pnl, margin_required, notional))
+        open_positions.append({
+            'exit_time': row.exit_time,
+            'margin_used': req_margin,
+            'net_pnl': net_pnl,
+            'mae_dollar': mae_dollar,
+            'risk_mode': risk_mode
+        })
         
+    for pos in open_positions:
+        capital += pos['net_pnl']
         if capital > peak_capital:
             peak_capital = capital
         dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
@@ -488,14 +511,14 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         y_train_prob = ensemble.predict_proba(X_train)
         y_train_arr = np.asarray(y_train)
         
-        best_threshold_long = 0.44
-        best_threshold_short = 0.40
-        min_is_signals = max(30, int(horizon_months * 6.0))
+        best_threshold_long = 0.43
+        best_threshold_short = 0.39
+        min_is_signals = max(100, int(horizon_months * 25.0))
         best_score = -1e9
         best_precision = 0.0
         
-        for t_l in np.arange(0.42, 0.47, 0.01):
-            for t_s in np.arange(0.38, 0.44, 0.01):
+        for t_l in np.arange(0.38, 0.44, 0.01):
+            for t_s in np.arange(0.36, 0.41, 0.01):
                 mask_long = y_train_prob[:, 2] > t_l
                 mask_short = y_train_prob[:, 0] > t_s
                 n_long = np.count_nonzero(mask_long)
@@ -509,9 +532,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 acc_short = np.mean(y_train_arr[mask_short] == 0) if n_short > 0 else 0.0
                 weighted_precision = (acc_long * n_long + acc_short * n_short) / total_signals
                 
-                # Heavily weight high precision to avoid false breakouts
-                score = (weighted_precision - 0.50) * np.log1p(total_signals)
-                if score > best_score and weighted_precision >= 0.65:
+                # Balanced Precision & Trade Flow Objective
+                score = (weighted_precision - 0.42) * np.log1p(total_signals)
+                if score > best_score and weighted_precision >= 0.58:
                     best_score = score
                     best_precision = weighted_precision
                     best_threshold_long = t_l
@@ -538,16 +561,7 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             grp_datetimes = group['datetime_utc'].to_numpy()
             grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
             grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
-            
-            p_long_series = pd.Series(y_test_prob[grp_indices, 2])
-            p_short_series = pd.Series(y_test_prob[grp_indices, 0])
-            
-            # Rolling 7-day top 8% quantile threshold (stabilizes flow during low-vol consolidation)
-            q_long = p_long_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_long).to_numpy()
-            q_short = p_short_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_short).to_numpy()
-            
-            th_long_arr = np.maximum(np.minimum(q_long, best_threshold_long), 0.38)
-            th_short_arr = np.maximum(np.minimum(q_short, best_threshold_short), 0.36)
+            grp_zc20 = group['zc20'].to_numpy(dtype=np.float64) if 'zc20' in group else np.zeros(len(group))
             
             for local_idx in range(len(group)):
                 global_idx = grp_indices[local_idx]
@@ -555,9 +569,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > th_long_arr[local_idx] and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10:
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10 and grp_zc20[local_idx] > -1.0:
                     direction = 1
-                elif prob_short > th_short_arr[local_idx] and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10:
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10 and grp_zc20[local_idx] < 1.0:
                     direction = -1
                     
                 if direction != 0:
