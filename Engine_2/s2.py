@@ -353,8 +353,8 @@ def execute_portfolio_backtest(df_candidates, initial_capital=INITIAL_CAPITAL):
         if dd > max_dd:
             max_dd = dd
             
-        # Target Lock: If target ROI >= 20.5% achieved with >= 6 trades, lock in monthly win!
-        if (capital - initial_capital) >= 1025.0 and trades_executed >= 6 and len(open_positions) == 0:
+        # Target Lock: If monthly ROI >= 16% achieved with >= 5 trades, lock in win and protect capital!
+        if (capital - initial_capital) >= 800.0 and trades_executed >= 5 and len(open_positions) == 0:
             break
             
         # 2. Concurrency Check
@@ -513,12 +513,13 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         
         best_threshold_long = 0.43
         best_threshold_short = 0.39
-        min_is_signals = max(100, int(horizon_months * 25.0))
+        # Relaxed min_is_signals: horizon*12 prevents calibration starvation in tight windows
+        min_is_signals = max(50, int(horizon_months * 12.0))
         best_score = -1e9
         best_precision = 0.0
         
-        for t_l in np.arange(0.38, 0.44, 0.01):
-            for t_s in np.arange(0.36, 0.41, 0.01):
+        for t_l in np.arange(0.36, 0.46, 0.01):
+            for t_s in np.arange(0.34, 0.44, 0.01):
                 mask_long = y_train_prob[:, 2] > t_l
                 mask_short = y_train_prob[:, 0] > t_s
                 n_long = np.count_nonzero(mask_long)
@@ -533,8 +534,8 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 weighted_precision = (acc_long * n_long + acc_short * n_short) / total_signals
                 
                 # Balanced Precision & Trade Flow Objective
-                score = (weighted_precision - 0.42) * np.log1p(total_signals)
-                if score > best_score and weighted_precision >= 0.58:
+                score = (weighted_precision - 0.40) * np.log1p(total_signals)
+                if score > best_score and weighted_precision >= 0.55:
                     best_score = score
                     best_precision = weighted_precision
                     best_threshold_long = t_l
@@ -569,9 +570,11 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10 and grp_zc20[local_idx] > -1.0:
+                # LONG: Model high-confidence + macro not deeply bearish + not extremely extended (p8 < 3.0 ATR above EMA8)
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= -0.5 and grp_p8[local_idx] < 3.0 and grp_zc20[local_idx] > -2.0:
                     direction = 1
-                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10 and grp_zc20[local_idx] < 1.0:
+                # SHORT: Model high-confidence + macro not deeply bullish + not extremely oversold (p8 > -3.0 ATR below EMA8)
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.5 and grp_p8[local_idx] > -3.0 and grp_zc20[local_idx] < 2.0:
                     direction = -1
                     
                 if direction != 0:
@@ -659,15 +662,23 @@ def run_autonomous_loop():
         return
         
     configs = [
-        (12, 0.018, 0.03),  # High precision benchmark (50% WR, 4.0% DD on Window 1)
+        # Tier 1: Baseline CVD momentum configs with standard LR
+        (12, 0.015, 0.03),  # Generous return target - more signals captured
+        (12, 0.018, 0.03),  # High precision benchmark
         (12, 0.020, 0.03),  # Target return 2.0%
-        (12, 0.022, 0.03),  # Target return 2.2%
-        (12, 0.025, 0.03),  # Target return 2.5%
-        (18, 0.018, 0.03),
-        (18, 0.020, 0.03),
-        (24, 0.018, 0.03),
-        (12, 0.015, 0.03),
-        (18, 0.015, 0.03)
+        (12, 0.012, 0.03),  # Very relaxed target - focus on signal volume
+        (18, 0.015, 0.03),  # Extended training window
+        (18, 0.018, 0.03),  # 18m horizon standard
+        (18, 0.012, 0.03),  # 18m relaxed
+        (24, 0.015, 0.03),  # Long horizon for regime capture
+        (24, 0.012, 0.03),  # Long horizon generous target
+        # Tier 2: Higher LR variants for faster adaptation
+        (12, 0.015, 0.05),
+        (12, 0.018, 0.05),
+        (18, 0.015, 0.05),
+        # Tier 3: Lower LR for smoother probability calibration
+        (12, 0.015, 0.01),
+        (18, 0.015, 0.01),
     ]
     
     for horizon, min_ret, lr in configs:
