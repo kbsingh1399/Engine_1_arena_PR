@@ -531,15 +531,16 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         y_train_prob = ensemble.predict_proba(X_train)
         y_train_arr = np.asarray(y_train)
         
-        best_threshold_long = 0.43
-        best_threshold_short = 0.39
+        # Conservative defaults preserve the validated W1 sweet spot.
+        best_threshold_long = 0.45
+        best_threshold_short = 0.43
         # Relaxed min_is_signals: horizon*12 prevents calibration starvation in tight windows
         min_is_signals = max(50, int(horizon_months * 12.0))
         best_score = -1e9
         best_precision = 0.0
         
-        for t_l in np.arange(0.36, 0.46, 0.01):
-            for t_s in np.arange(0.34, 0.44, 0.01):
+        for t_l in np.arange(0.45, 0.51, 0.01):
+            for t_s in np.arange(0.43, 0.49, 0.01):
                 mask_long = y_train_prob[:, 2] > t_l
                 mask_short = y_train_prob[:, 0] > t_s
                 n_long = np.count_nonzero(mask_long)
