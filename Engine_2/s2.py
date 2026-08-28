@@ -495,9 +495,17 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             logger.error(f"Empty data partition in Window {w['window']}! Failing config.")
             return False
             
-        # Regime is inferred only from the historical partition. In particular, do not
-        # inspect OOS candles when deciding whether this is a compressed market.
-        vol_ratio_mean = float(df_train['vol_ratio'].mean()) if 'vol_ratio' in df_train.columns else 1.0
+        # Regime is inferred causally from only the recent 30 days immediately
+        # preceding OOS. A full 12-month IS average can hide a short compression
+        # regime (notably W2 after the May 2021 sell-off).
+        recent_train = df_train[
+            df_train['datetime_utc'] >= w['train_end'] - pd.Timedelta(days=30)
+        ]
+        vol_ratio_mean = (
+            float(recent_train['vol_ratio'].mean())
+            if not recent_train.empty and 'vol_ratio' in recent_train.columns
+            else 1.0
+        )
         vol_regime = 'consolidation' if vol_ratio_mean < 0.80 else 'normal'
         is_consolidation = vol_regime == 'consolidation'
         effective_min_ret = min_ret * 0.5 if is_consolidation else min_ret
@@ -612,24 +620,34 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                         })
             return candidates
 
-        # Initial generation with IS-calibrated thresholds
-        test_candidates = _generate_candidates(best_threshold_long, best_threshold_short)
-
-        # OOS Threshold Relaxation Fallback: if < MIN_TRADES candidates, step thresholds down
-        # This handles low-volatility consolidation windows where IS thresholds are too conservative
-        THRESHOLD_FLOOR = 0.33
-        relaxation_step = 0.02
-        eff_tl, eff_ts = best_threshold_long, best_threshold_short
-        for _relax in range(6):
-            if len(test_candidates) >= MIN_TRADES:
-                break
-            eff_tl = max(eff_tl - relaxation_step, THRESHOLD_FLOOR)
-            eff_ts = max(eff_ts - relaxation_step, THRESHOLD_FLOOR)
-            if eff_tl <= THRESHOLD_FLOOR and eff_ts <= THRESHOLD_FLOOR:
+        if is_consolidation:
+            # Consolidation is a separate strategy, not a threshold-relaxation
+            # fallback. _generate_candidates applies only the mandated RSI rules.
+            test_candidates = _generate_candidates(0.38, 0.38)
+            logger.info(
+                "  [Consolidation] RSI mean-reversion selected; threshold fallback skipped "
+                "(L/S probability floor=0.380)"
+            )
+        else:
+            # Normal-regime generation starts with IS-calibrated thresholds. The
+            # relaxation fallback is deliberately unavailable in consolidation.
+            test_candidates = _generate_candidates(best_threshold_long, best_threshold_short)
+            THRESHOLD_FLOOR = 0.33
+            relaxation_step = 0.02
+            eff_tl, eff_ts = best_threshold_long, best_threshold_short
+            for _relax in range(6):
+                if len(test_candidates) >= MIN_TRADES:
+                    break
+                eff_tl = max(eff_tl - relaxation_step, THRESHOLD_FLOOR)
+                eff_ts = max(eff_ts - relaxation_step, THRESHOLD_FLOOR)
+                if eff_tl <= THRESHOLD_FLOOR and eff_ts <= THRESHOLD_FLOOR:
+                    test_candidates = _generate_candidates(eff_tl, eff_ts)
+                    break
+                logger.info(
+                    f"  [Fallback] OOS candidates={len(test_candidates)}, "
+                    f"relaxing thresholds to L={eff_tl:.3f}/S={eff_ts:.3f}"
+                )
                 test_candidates = _generate_candidates(eff_tl, eff_ts)
-                break
-            logger.info(f"  [Fallback] OOS candidates={len(test_candidates)}, relaxing thresholds to L={eff_tl:.3f}/S={eff_ts:.3f}")
-            test_candidates = _generate_candidates(eff_tl, eff_ts)
 
         df_candidates = pd.DataFrame(test_candidates)
         
