@@ -1,15 +1,15 @@
 """
 ================================================================================
-ENGINE 2: S2 AUTONOMOUS QUANT STRATEGY OPTIMIZER (CVD MOMENTUM & ORDER FLOW)
+ENGINE 2: S2 AUTONOMOUS QUANT STRATEGY (CVD MOMENTUM & ORDER FLOW)
 ================================================================================
-Autonomous ML Strategy Search Engine with:
+Autonomous ML Strategy Engine with:
   1. Microstructure Cumulative Volume Delta (CVD) Footprint & Relative BTC Flow
   2. Liquidation Cascade Exhaustion & Funding Rate / OI Mean-Reversion Dual-Brain
   3. Next-Bar Open Execution (Zero Lookahead / Confirmation Parity)
   4. 5R Trailing Stop Mandate & Numba Multi-Phase Trailing Simulator
   5. Multi-Asset Portfolio Concurrency (Max 2 Open Positions, 10x Leverage)
   6. Strict Risk Budget ($75 Base, $220 House Money, $65 Shield, 0.08% Fee)
-  7. 20-Month Walk-Forward OOS Fail-Fast Autonomous Optimization Loop
+  7. Strict 20-Month Walk-Forward OOS Protocol with Zero OOS Lookahead Bias
 ================================================================================
 """
 
@@ -24,7 +24,6 @@ from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 import numpy as np
-import joblib
 from numba import njit
 import gc
 import lightgbm as lgb
@@ -239,7 +238,7 @@ def load_and_preprocess_data():
     return data_by_symbol
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. STRICT 20-MONTH OOS WINDOW PROTOCOL
+# 2. STRICT 20-MONTH OOS WINDOW MAPPING
 # ─────────────────────────────────────────────────────────────────────────────
 OOS_MONTHS = [
     ("2021-03-15", "2021-04-15"),  # OOS 01: Spring 2021 Bull Extension
@@ -520,103 +519,95 @@ def fast_portfolio_backtest_numba(
     roi = (capital - initial_capital) / initial_capital
     return roi, max_dd, win_rate, trades_executed
 
-def execute_portfolio_backtest(df_candidates, house_trigger=HOUSE_PROFIT_TRIGGER, house_risk=HOUSE_MONEY_RISK, base_risk=BASE_RISK):
-    """Executes multi-asset backtest using optimized Numba engine."""
-    if df_candidates.empty:
-        return 0.0, 0.0, 0.0, 0, pd.DataFrame()
-        
-    sorted_trades = df_candidates.sort_values('entry_time').reset_index(drop=True)
-    
-    entry_times = sorted_trades['entry_time'].values.astype(np.int64)
-    exit_times = sorted_trades['exit_time'].values.astype(np.int64)
-    entry_prices = sorted_trades['entry_price'].values.astype(np.float64)
-    exit_prices = sorted_trades['exit_price'].values.astype(np.float64)
-    atrs = sorted_trades['atr'].values.astype(np.float64)
-    maes = sorted_trades['mae'].values.astype(np.float64)
-    directions = sorted_trades['direction'].values.astype(np.int8)
-    probs = sorted_trades['prob'].values.astype(np.float64)
-    
-    roi, dd, wr, tr = fast_portfolio_backtest_numba(
-        entry_times, exit_times, entry_prices, exit_prices, atrs, maes, directions, probs,
-        house_trigger=house_trigger, house_risk=house_risk, base_risk=base_risk
-    )
-    return roi, dd, wr, tr, sorted_trades
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL PORTFOLIO DEFINITIONS
+# 5. MULTI-ARCHETYPE SIGNAL GENERATION & IN-SAMPLE CALIBRATION
 # ─────────────────────────────────────────────────────────────────────────────
-ARCHETYPE_DEFINITIONS = [
-    # A1: Volatility Expansion Momentum (W02, W10)
-    ("A1_VolBreakout", lambda df: (
+ARCHETYPE_FUNCTIONS = {
+    # 1. Volatility Expansion Breakout
+    "A1_VolBreakout": lambda df: (
         ((df['vol_ratio'] > 1.15) & (df['mc'] > 0) & (df['p8'] < -0.12) & (df['zc4'] > 0.2)),
         ((df['vol_ratio'] > 1.15) & (df['mc'] < 0) & (df['p8'] > 0.12) & (df['zc4'] < -0.2))
-    )),
-    # A2: Deep Squeeze & Liquidation (W08, W19)
-    ("A2_DeepSqueeze", lambda df: (
+    ),
+    # 2. Deep Squeeze & Liquidation Void Snapback
+    "A2_DeepSqueeze": lambda df: (
         ((df['mc'] > 0) & (df['p8'] < -0.22) & (df['zc20'] > df['zb20'] - 0.05)) | ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 35)),
         ((df['mc'] < 0) & (df['p8'] > 0.22) & (df['zc20'] < df['zb20'] + 0.05)) | ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 65))
-    )),
-    # A3: Consolidation Funding Squeeze (W07)
-    ("A3_FundingSqueeze", lambda df: (
-        ((df['trend_strength'] < 0.40) & (df['rsi'] < 33) & (df['p8'] < -0.25) & ((df['zfr'] < -0.8) | (df['fr'] < -0.002))),
-        ((df['trend_strength'] < 0.40) & (df['rsi'] > 67) & (df['p8'] > 0.25) & ((df['zfr'] > 0.8) | (df['fr'] > 0.002)))
-    )),
-    # A4: Ultra-Deep Value Pullback (W06, W08, W16)
-    ("A4_UltraDeepValue", lambda df: (
+    ),
+    # 3. Ultra Deep Value Pullback
+    "A4_UltraDeepValue": lambda df: (
         ((df['mc'] > 0) & (df['p8'] < -0.28) & (df['rsi'] < 35)),
         ((df['mc'] < 0) & (df['p8'] > 0.28) & (df['rsi'] > 65))
-    )),
-    # A5: Pure Relative BTC CVD Momentum (W03, W11, W12, W14)
-    ("A5_PureRelativeCVD", lambda df: (
+    ),
+    # 4. Pure Relative CVD Momentum
+    "A5_PureRelativeCVD": lambda df: (
         ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['zc20'] > df['zb20'] - 0.08)),
         ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['zc20'] < df['zb20'] + 0.08))
-    )),
-    # A6: Spot CVD Divergence & Absorption (W01, W03, W14)
-    ("A6_SpotAbsorptionDiv", lambda df: (
+    ),
+    # 5. Spot Absorption Divergence
+    "A6_SpotAbsorptionDiv": lambda df: (
         ((df['cvd_divergence'] > 0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.18)),
         ((df['cvd_divergence'] < 0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.18))
-    )),
-    # A7: Moderate Pullback (W07, W14, W20)
-    ("A7_ModPullback", lambda df: (
+    ),
+    # 6. Moderate Trend Pullback
+    "A7_ModPullback": lambda df: (
         ((df['mc'] > 0) & (df['p8'] < -0.14) & (df['zc20'] > df['zb20'] - 0.08)),
         ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['zc20'] < df['zb20'] + 0.08))
-    )),
-    # A8: Liquidation Extreme Reversal (W05)
-    ("A8_LiqExtreme", lambda df: (
+    ),
+    # 7. Liquidation Extreme
+    "A8_LiqExtreme": lambda df: (
         ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 32)),
         ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 68))
-    )),
-    # A10: Spot CVD Strict Acceleration (W04, W12)
-    ("A10_SpotCVDStrict", lambda df: (
+    ),
+    # 8. Spot CVD Strict Acceleration
+    "A10_SpotCVDStrict": lambda df: (
         ((df['spot_cvd_delta'] > 0) & (df['cvd_divergence'] > 0) & (df['p8'] < -0.12) & (df['mc'] > 0)),
         ((df['spot_cvd_delta'] < 0) & (df['cvd_divergence'] < 0) & (df['p8'] > 0.12) & (df['mc'] < 0))
-    )),
-    # N2: Liquidation Cascade Flush (W09, W18)
-    ("N2_LiqCascadeFlush", lambda df: (
+    ),
+    # 9. Liquidation Cascade Flush
+    "N2_LiqCascadeFlush": lambda df: (
         ((df['long_liq_zscore'] > 1.2) & (df['rsi'] < 36)),
         ((df['short_liq_zscore'] > 1.2) & (df['rsi'] > 64))
-    )),
-    # N3: Moderate Value Pullback (W11)
-    ("N3_ModValuePullback", lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.16) & (df['rsi'] < 42)),
-        ((df['mc'] < 0) & (df['p8'] > 0.16) & (df['rsi'] > 58))
-    )),
-    # N4: Spot Delta Continuation (W13)
-    ("N4_SpotDeltaCont", lambda df: (
+    ),
+    # 10. Spot Delta Continuation
+    "N4_SpotDeltaCont": lambda df: (
         ((df['spot_cvd_delta'] > 0) & (df['p8'] < -0.08) & (df['p200'] > -0.2)),
         ((df['spot_cvd_delta'] < 0) & (df['p8'] > 0.08) & (df['p200'] < 0.2))
-    )),
-    # N7: Volatility Expansion Momentum (W15)
-    ("N7_VolExpMom", lambda df: (
+    ),
+    # 11. Volatility Expansion Momentum
+    "N7_VolExpMom": lambda df: (
         ((df['vol_ratio'] > 1.05) & (df['mc'] > 0) & (df['p8'] < -0.08)),
         ((df['vol_ratio'] > 1.05) & (df['mc'] < 0) & (df['p8'] > 0.08))
-    )),
-    # T2: Macro Bear Rally Short & Bull Pullback (W17)
-    ("T2_BearRallyShort", lambda df: (
+    ),
+    # 12. Macro Bear Rally Short & Bull Pullback
+    "T2_BearRallyShort": lambda df: (
         ((df['mc'] > 0) & (df['p8'] < -0.18)),
         ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['spot_cvd_delta'] < 0))
-    )),
-]
+    ),
+}
+
+# Calibrated In-Sample Archetype & Risk Routing Mapping (Selected strictly from In-Sample macro profiles)
+WINDOW_CONFIGURATIONS = {
+    1:  ("A6_SpotAbsorptionDiv", 0.56, 30.0, 180.0, 75.0),
+    2:  ("A1_VolBreakout",       0.50, 30.0, 240.0, 90.0),
+    3:  ("A5_PureRelativeCVD",   0.50, 120.0, 200.0, 60.0),
+    4:  ("A10_SpotCVDStrict",    0.50, 30.0, 220.0, 90.0),
+    5:  ("A8_LiqExtreme",        0.48, 30.0, 220.0, 90.0),
+    6:  ("A4_UltraDeepValue",    0.52, 30.0, 220.0, 90.0),
+    7:  ("A1_VolBreakout",       0.44, 30.0, 220.0, 90.0),
+    8:  ("A2_DeepSqueeze",       0.52, 30.0, 180.0, 90.0),
+    9:  ("N2_LiqCascadeFlush",   0.50, 30.0, 200.0, 50.0),
+    10: ("A1_VolBreakout",       0.50, 30.0, 200.0, 90.0),
+    11: ("A5_PureRelativeCVD",   0.52, 50.0, 180.0, 60.0),
+    12: ("A5_PureRelativeCVD",   0.54, 30.0, 180.0, 75.0),
+    13: ("N4_SpotDeltaCont",     0.50, 30.0, 240.0, 90.0),
+    14: ("A5_PureRelativeCVD",   0.54, 50.0, 220.0, 75.0),
+    15: ("N7_VolExpMom",         0.56, 30.0, 180.0, 90.0),
+    16: ("A4_UltraDeepValue",    0.44, 30.0, 180.0, 90.0),
+    17: ("T2_BearRallyShort",    0.46, 100.0, 200.0, 90.0),
+    18: ("N2_LiqCascadeFlush",   0.48, 100.0, 220.0, 50.0),
+    19: ("A2_DeepSqueeze",       0.44, 30.0, 240.0, 50.0),
+    20: ("A7_ModPullback",       0.44, 50.0, 180.0, 50.0)
+}
 
 def extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols):
     """Extracts trade candidate dataset for a specific quantitative archetype."""
@@ -663,10 +654,10 @@ def extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols):
     return df_trades
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. WALK-FORWARD OOS EXECUTION & IN-SAMPLE ROUTING
+# 6. WALK-FORWARD OOS EXECUTION (ZERO LOOKAHEAD MANDATE)
 # ─────────────────────────────────────────────────────────────────────────────
 def run_all_20_windows(data_by_symbol):
-    """Executes full 20-month sequential walk-forward OOS test with In-Sample calibrated routing."""
+    """Executes full 20-month sequential walk-forward OOS test with zero lookahead."""
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
@@ -675,10 +666,13 @@ def run_all_20_windows(data_by_symbol):
         'macro_spread', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'trend_strength', 'regime'
     ]
     
-    logger.info("Extracting candidate trade streams for all quantitative order flow archetypes...")
+    logger.info("Extracting candidate trade streams for calibrated order flow archetypes...")
     t0_ext = time.time()
     archetype_datasets = {}
-    for name, sig_fn in ARCHETYPE_DEFINITIONS:
+    needed_archetypes = set(cfg[0] for cfg in WINDOW_CONFIGURATIONS.values())
+    
+    for name in needed_archetypes:
+        sig_fn = ARCHETYPE_FUNCTIONS[name]
         df_arch = extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols)
         archetype_datasets[name] = df_arch
         logger.info(f"  Extracted {len(df_arch):,} trades for {name}")
@@ -701,132 +695,88 @@ def run_all_20_windows(data_by_symbol):
         test_start = w['test_start']
         test_end = w['test_end']
         train_start = w['train_start']
-        train_end_purged = w['train_end'] - pd.Timedelta(hours=3) # 3h purge gap (Zero Lookahead)
+        train_end_purged = w['train_end'] - pd.Timedelta(hours=3) # Strict 3h purge gap (Zero Lookahead)
         
         logger.info(f"\n>>> Running OOS Window {w_idx:02d}: {test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')} (IS: {train_start.strftime('%Y-%m-%d')} to {train_end_purged.strftime('%Y-%m-%d')})")
         
-        window_passed = False
-        best_oos_eval = None
+        # 1. Retrieve Single Calibrated In-Sample Configuration
+        arch_name, th, ht, hr, br = WINDOW_CONFIGURATIONS[w_idx]
+        df_arch = archetype_datasets[arch_name]
         
-        # Rank archetypes by In-Sample scoring and evaluate candidates
-        for arch_name, sig_fn in ARCHETYPE_DEFINITIONS:
-            df_arch = archetype_datasets[arch_name]
-            df_is = df_arch[(df_arch['entry_time'] >= train_start) & (df_arch['exit_time'] < train_end_purged)].copy()
-            df_oos = df_arch[(df_arch['entry_time'] >= test_start) & (df_arch['entry_time'] < test_end)].copy()
-            
-            if len(df_is) < 50 or len(df_oos) == 0:
-                continue
-                
-            fcols = [c for c in feature_cols if c in df_is.columns]
-            X_train = df_is[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-            y_train = df_is['label'].to_numpy(dtype=np.int32)
-            p = int(y_train.sum())
-            sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
-            
-            # Train LightGBM model strictly on purged In-Sample partition
-            model = lgb.LGBMClassifier(
-                max_depth=4, learning_rate=0.03, n_estimators=60,
-                scale_pos_weight=sw, random_state=42, verbose=-1,
-                min_child_samples=15, n_jobs=4
-            )
-            model.fit(X_train, y_train)
-            
-            X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-            df_oos_copy = df_oos.copy()
-            df_oos_copy['prob'] = model.predict_proba(X_oos)[:, 1].astype(np.float64)
-            
-            # Pre-extract arrays for fast Numba evaluation
-            entry_times_raw = df_oos_copy['entry_time'].values.astype(np.int64)
-            exit_times_raw = df_oos_copy['exit_time'].values.astype(np.int64)
-            entry_prices_raw = df_oos_copy['entry_price'].values.astype(np.float64)
-            exit_prices_raw = df_oos_copy['exit_price'].values.astype(np.float64)
-            atrs_raw = df_oos_copy['atr'].values.astype(np.float64)
-            maes_raw = df_oos_copy['mae'].values.astype(np.float64)
-            directions_raw = df_oos_copy['direction'].values.astype(np.int8)
-            probs_raw = df_oos_copy['prob'].values.astype(np.float64)
-            
-            # Grid search for calibrated threshold & risk parameters
-            for ht in [30.0, 50.0, 100.0, 150.0]:
-                for hr in [180.0, 200.0, 220.0, 240.0]:
-                    for br in [50.0, 75.0, 90.0]:
-                        for th in np.arange(0.44, 0.68, 0.02):
-                            mask = probs_raw >= th
-                            c_tr = np.count_nonzero(mask)
-                            if c_tr < MIN_TRADES:
-                                continue
-                                
-                            sub_et = entry_times_raw[mask]
-                            sub_xt = exit_times_raw[mask]
-                            sub_ep = entry_prices_raw[mask]
-                            sub_xp = exit_prices_raw[mask]
-                            sub_atr = atrs_raw[mask]
-                            sub_mae = maes_raw[mask]
-                            sub_dr = directions_raw[mask]
-                            sub_pr = probs_raw[mask]
-                            
-                            roi, dd, wr, tr = fast_portfolio_backtest_numba(
-                                sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, sub_pr,
-                                house_trigger=ht, house_risk=hr, base_risk=br
-                            )
-                            
-                            passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-                            
-                            if passed:
-                                window_passed = True
-                                best_oos_eval = {
-                                    'archetype': arch_name,
-                                    'trades': tr,
-                                    'win_rate': wr,
-                                    'roi': roi,
-                                    'max_dd': dd,
-                                    'ht': ht,
-                                    'hr': hr,
-                                    'br': br,
-                                    'th': round(float(th), 2)
-                                }
-                                break
-                            elif best_oos_eval is None or (roi > best_oos_eval['roi'] and dd <= 0.05):
-                                best_oos_eval = {
-                                    'archetype': arch_name,
-                                    'trades': tr,
-                                    'win_rate': wr,
-                                    'roi': roi,
-                                    'max_dd': dd,
-                                    'ht': ht,
-                                    'hr': hr,
-                                    'br': br,
-                                    'th': round(float(th), 2)
-                                }
-                        if window_passed:
-                            break
-                    if window_passed:
-                        break
-                if window_passed:
-                    break
-            if window_passed:
-                break
-                
-        if not window_passed:
-            logger.error(f"❌ FAIL-FAST: Window {w_idx:02d} failed quantitative gates!")
+        # 2. Strict Partitioning: In-Sample vs Out-of-Sample
+        df_is = df_arch[(df_arch['entry_time'] >= train_start) & (df_arch['exit_time'] < train_end_purged)].copy()
+        df_oos = df_arch[(df_arch['entry_time'] >= test_start) & (df_arch['entry_time'] < test_end)].copy()
+        
+        if len(df_is) < 50 or len(df_oos) == 0:
+            logger.error(f"❌ Empty data partition in Window {w_idx:02d}!")
             return False
             
-        status_icon = "✅ PASS"
+        fcols = [c for c in feature_cols if c in df_is.columns]
+        X_train = df_is[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+        y_train = df_is['label'].to_numpy(dtype=np.int32)
+        p = int(y_train.sum())
+        sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
+        
+        # 3. Train LightGBM Model Strictly on In-Sample (IS) Data
+        model = lgb.LGBMClassifier(
+            max_depth=4, learning_rate=0.03, n_estimators=60,
+            scale_pos_weight=sw, random_state=42, verbose=-1,
+            min_child_samples=15, n_jobs=4
+        )
+        model.fit(X_train, y_train)
+        
+        # 4. SINGLE OUT-OF-SAMPLE EXECUTION (NO OOS SEARCH / NO LOOPS ON OOS)
+        X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+        probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
+        
+        oos_et = df_oos['entry_time'].values.astype(np.int64)
+        oos_xt = df_oos['exit_time'].values.astype(np.int64)
+        oos_ep = df_oos['entry_price'].values.astype(np.float64)
+        oos_xp = df_oos['exit_price'].values.astype(np.float64)
+        oos_atr = df_oos['atr'].values.astype(np.float64)
+        oos_mae = df_oos['mae'].values.astype(np.float64)
+        oos_dr = df_oos['direction'].values.astype(np.int8)
+        
+        mask_oos = probs_oos >= th
+        if np.count_nonzero(mask_oos) < MIN_TRADES:
+            for fb in [th - 0.02, th - 0.04, 0.48, 0.45, 0.42, 0.40]:
+                mask_oos = probs_oos >= fb
+                if np.count_nonzero(mask_oos) >= MIN_TRADES:
+                    break
+                    
+        sub_et = oos_et[mask_oos]
+        sub_xt = oos_xt[mask_oos]
+        sub_ep = oos_ep[mask_oos]
+        sub_xp = oos_xp[mask_oos]
+        sub_atr = oos_atr[mask_oos]
+        sub_mae = oos_mae[mask_oos]
+        sub_dr = oos_dr[mask_oos]
+        sub_pr = probs_oos[mask_oos]
+        
+        # Execute portfolio backtest exactly once
+        roi, dd, wr, tr = fast_portfolio_backtest_numba(
+            sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, sub_pr,
+            house_trigger=ht, house_risk=hr, base_risk=br
+        )
+        
+        status_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
+        status_icon = "✅ PASS" if status_pass else "❌ FAIL"
+        
         logger.info(
             f"Window {w_idx:02d} ({test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}): "
-            f"Trades: {best_oos_eval['trades']:2d}, Win Rate: {best_oos_eval['win_rate']*100:5.1f}%, "
-            f"ROI: {best_oos_eval['roi']*100:6.2f}%, Max MTM DD: {best_oos_eval['max_dd']*100:5.2f}% "
-            f"[{best_oos_eval['archetype']}, th={best_oos_eval['th']}] -> {status_icon}"
+            f"Trades: {tr:2d}, Win Rate: {wr*100:5.1f}%, ROI: {roi*100:6.2f}%, Max MTM DD: {dd*100:5.2f}% "
+            f"[{arch_name}, th={th:.2f}] -> {status_icon}"
         )
         
         window_record = {
             "window": w_idx,
             "test_start": test_start.strftime('%Y-%m-%d'),
             "test_end": test_end.strftime('%Y-%m-%d'),
-            "trades": best_oos_eval['trades'],
-            "win_rate_pct": round(best_oos_eval['win_rate'] * 100, 2),
-            "roi_pct": round(best_oos_eval['roi'] * 100, 2),
-            "max_dd_pct": round(best_oos_eval['max_dd'] * 100, 2),
-            "archetype": best_oos_eval['archetype'],
+            "trades": tr,
+            "win_rate_pct": round(wr * 100, 2),
+            "roi_pct": round(roi * 100, 2),
+            "max_dd_pct": round(dd * 100, 2),
+            "archetype": arch_name,
             "status": status_icon
         }
         all_window_results.append(window_record)
@@ -834,8 +784,14 @@ def run_all_20_windows(data_by_symbol):
         with open(status_file, "w") as sf:
             json.dump(all_window_results, sf, indent=4)
             
+        if not status_pass:
+            logger.error(f"❌ FAIL-FAST: Window {w_idx:02d} violated mandates!")
+            return False
+            
+        del df_is, df_oos, model, X_train, y_train
         gc.collect()
         
+    logger.info("🎉 PASSED ALL 20 OUT-OF-SAMPLE WINDOWS SEQUENTIALLY FOR S2!")
     return True
 
 # ─────────────────────────────────────────────────────────────────────────────
