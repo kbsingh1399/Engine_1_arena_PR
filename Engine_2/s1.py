@@ -582,22 +582,15 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             p_long_series = pd.Series(y_test_prob[grp_indices, 2])
             p_short_series = pd.Series(y_test_prob[grp_indices, 0])
             
-            # Rolling 7-day top 8% quantile threshold (stabilizes flow during low-vol consolidation)
-            q_long = p_long_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_long).to_numpy()
-            q_short = p_short_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_short).to_numpy()
-            
-            th_long_arr = np.maximum(np.minimum(q_long, best_threshold_long), 0.38)
-            th_short_arr = np.maximum(np.minimum(q_short, best_threshold_short), 0.36)
-            
             for local_idx in range(len(group)):
                 global_idx = grp_indices[local_idx]
                 prob_long = y_test_prob[global_idx, 2]
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > th_long_arr[local_idx] and prob_long > prob_short and grp_mc[local_idx] >= 0 and grp_p8[local_idx] < 0.1:
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0 and grp_p8[local_idx] < 0.1:
                     direction = 1
-                elif prob_short > th_short_arr[local_idx] and prob_short > prob_long and grp_mc[local_idx] <= 0 and grp_p8[local_idx] > -0.1:
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0 and grp_p8[local_idx] > -0.1:
                     direction = -1
                     
                 if direction != 0:
