@@ -588,9 +588,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0 and grp_p8[local_idx] < 0.1:
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] > 0 and grp_p8[local_idx] < 0.0:
                     direction = 1
-                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0 and grp_p8[local_idx] > -0.1:
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] < 0 and grp_p8[local_idx] > 0.0:
                     direction = -1
                     
                 if direction != 0:
