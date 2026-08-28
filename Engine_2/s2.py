@@ -73,27 +73,22 @@ def load_and_preprocess_data():
     for d in search_dirs:
         if d and os.path.exists(d):
             found_master = glob.glob(os.path.join(d, "*_15m_master_*.parquet"))
-            found_footprint = glob.glob(os.path.join(d, "Master_*_15m_Final_Footprint.parquet"))
-            found = found_master if found_master else found_footprint
-            if not found:
-                found = glob.glob(os.path.join(d, "*.parquet"))
-            if found:
-                files = sorted(list(set(found)))
-                logger.info(f"Discovered {len(files)} parquet files in: {d}")
+            if not found_master:
+                found_master = [f for f in glob.glob(os.path.join(d, "*.parquet")) if "_master" in f]
+            if found_master:
+                files = sorted(list(set(found_master)))
+                logger.info(f"Discovered {len(files)} master historical parquet files in: {d}")
                 break
     
     if not files:
         logger.error("No master parquet files found in any search path!")
-        return pd.DataFrame()
+        return {}
 
     data_by_symbol = {}
     loaded_symbols = set()
     for f in sorted(files):
         base_name = os.path.basename(f)
-        if base_name.startswith("Master_"):
-            symbol = base_name.split('_')[1]
-        else:
-            symbol = base_name.split('_')[0]
+        symbol = base_name.split('_')[0]
             
         if symbol in loaded_symbols or not symbol.endswith("USDT"):
             continue
