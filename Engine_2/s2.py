@@ -464,7 +464,8 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
     for w in windows:
         logger.info(f"--- Testing OOS Window {w['window']}: {w['test_start'].strftime('%Y-%m-%d')} to {w['test_end'].strftime('%Y-%m-%d')} ---")
         
-        train_slices = [df[(df['datetime_utc'] >= w['train_start']) & (df['datetime_utc'] < w['train_end'])] for df in data_by_symbol.values()]
+        train_end_purged = w['train_end'] - pd.Timedelta(hours=3) # 12-bar (3h) purge to prevent seam leakage
+        train_slices = [df[(df['datetime_utc'] >= w['train_start']) & (df['datetime_utc'] < train_end_purged)] for df in data_by_symbol.values()]
         test_slices = [df[(df['datetime_utc'] >= w['test_start']) & (df['datetime_utc'] < w['test_end'])] for df in data_by_symbol.values()]
         
         df_train = pd.concat(train_slices, ignore_index=True)
@@ -491,7 +492,6 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         y_train_prob = ensemble.predict_proba(X_train)
         y_train_arr = np.asarray(y_train)
         
-        best_threshold_long = 0.44
         best_threshold_long = 0.44
         best_threshold_short = 0.40
         min_is_signals = max(30, int(horizon_months * 6.0))
@@ -543,15 +543,25 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
             grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
             
+            p_long_series = pd.Series(y_test_prob[grp_indices, 2])
+            p_short_series = pd.Series(y_test_prob[grp_indices, 0])
+            
+            # Rolling 7-day top 8% quantile threshold (stabilizes flow during low-vol consolidation)
+            q_long = p_long_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_long).to_numpy()
+            q_short = p_short_series.rolling(window=672, min_periods=48).quantile(0.92).fillna(best_threshold_short).to_numpy()
+            
+            th_long_arr = np.maximum(np.minimum(q_long, best_threshold_long), 0.38)
+            th_short_arr = np.maximum(np.minimum(q_short, best_threshold_short), 0.36)
+            
             for local_idx in range(len(group)):
                 global_idx = grp_indices[local_idx]
                 prob_long = y_test_prob[global_idx, 2]
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10:
+                if prob_long > th_long_arr[local_idx] and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10:
                     direction = 1
-                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10:
+                elif prob_short > th_short_arr[local_idx] and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10:
                     direction = -1
                     
                 if direction != 0:
