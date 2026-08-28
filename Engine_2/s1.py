@@ -528,13 +528,13 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         prior_short = max(float(np.mean(y_train_arr == 0)), 0.05)
         
         best_threshold_long = 0.43
-        best_threshold_short = 0.40
-        min_is_signals = max(30, int(horizon_months * 8.0))
+        best_threshold_short = 0.39
+        min_is_signals = max(100, int(horizon_months * 25.0))
         best_score = -1e9
         best_precision = 0.0
         
-        for t_l in np.arange(0.42, 0.47, 0.01):
-            for t_s in np.arange(0.40, 0.45, 0.01):
+        for t_l in np.arange(0.38, 0.44, 0.01):
+            for t_s in np.arange(0.36, 0.41, 0.01):
                 mask_long = y_train_prob[:, 2] > t_l
                 mask_short = y_train_prob[:, 0] > t_s
                 n_long = np.count_nonzero(mask_long)
@@ -548,9 +548,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 acc_short = np.mean(y_train_arr[mask_short] == 0) if n_short > 0 else 0.0
                 weighted_precision = (acc_long * n_long + acc_short * n_short) / total_signals
                 
-                # Balanced High Precision & Trade Flow Objective
-                score = (weighted_precision - 0.50) * np.log1p(total_signals)
-                if score > best_score and weighted_precision >= 0.65:
+                # Balanced Precision & Trade Flow Objective
+                score = (weighted_precision - 0.42) * np.log1p(total_signals)
+                if score > best_score and weighted_precision >= 0.58:
                     best_score = score
                     best_precision = weighted_precision
                     best_threshold_long = t_l
@@ -561,7 +561,7 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             f"(In-Sample Precision: {best_precision:.2%})"
         )
         
-        # 3. Generate Out-Of-Sample (OOS) Candidates with Rolling Quantile Adaptation
+        # 3. Generate Out-Of-Sample (OOS) Candidates
         y_test_prob = ensemble.predict_proba(X_test)
         
         test_candidates = []
@@ -578,8 +578,6 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             grp_datetimes = group['datetime_utc'].to_numpy()
             grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
             grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
-            p_long_series = pd.Series(y_test_prob[grp_indices, 2])
-            p_short_series = pd.Series(y_test_prob[grp_indices, 0])
             
             for local_idx in range(len(group)):
                 global_idx = grp_indices[local_idx]
@@ -587,9 +585,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 prob_short = y_test_prob[global_idx, 0]
                 
                 direction = 0
-                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] > 0 and grp_p8[local_idx] < 0.0:
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0 and grp_p8[local_idx] < 0.10:
                     direction = 1
-                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] < 0 and grp_p8[local_idx] > 0.0:
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0 and grp_p8[local_idx] > -0.10:
                     direction = -1
                     
                 if direction != 0:
