@@ -578,6 +578,7 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             grp_atrs = group['atr'].to_numpy(dtype=np.float64)
             grp_datetimes = group['datetime_utc'].to_numpy()
             grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
+            grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
             p_long_series = pd.Series(y_test_prob[grp_indices, 2])
             p_short_series = pd.Series(y_test_prob[grp_indices, 0])
             
