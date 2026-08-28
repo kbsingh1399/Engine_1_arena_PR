@@ -276,11 +276,11 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 if gain >= 5.0 * stop_dist: # 5R Milestone Hit -> Dynamic 0.8R Trailing Runner
                     new_stop = best_price - 0.8 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 3.5 * stop_dist:
+                elif gain >= 3.8 * stop_dist:
                     new_stop = entry_price + 2.0 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = entry_price + 0.1 * stop_dist
+                elif gain >= 2.5 * stop_dist:
+                    new_stop = entry_price + 0.5 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
             if lows[j] <= cur_stop:
                 exit_price = cur_stop
@@ -296,11 +296,11 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 if gain >= 5.0 * stop_dist: # 5R Milestone Hit -> Dynamic 0.8R Trailing Runner
                     new_stop = best_price + 0.8 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 3.5 * stop_dist:
+                elif gain >= 3.8 * stop_dist:
                     new_stop = entry_price - 2.0 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = entry_price - 0.1 * stop_dist
+                elif gain >= 2.5 * stop_dist:
+                    new_stop = entry_price - 0.5 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
             if highs[j] >= cur_stop:
                 exit_price = cur_stop
@@ -659,11 +659,15 @@ def run_autonomous_loop():
         return
         
     configs = [
-        (12, 0.015, 0.03),  # High-Conviction Benchmark: Window 1 (83.33% WR, +23.11% ROI)
-        (18, 0.015, 0.03),
-        (6, 0.015, 0.03),
-        (12, 0.018, 0.03),
-        (24, 0.015, 0.03)
+        (12, 0.018, 0.03),  # High precision benchmark (50% WR, 4.0% DD on Window 1)
+        (12, 0.020, 0.03),  # Target return 2.0%
+        (12, 0.022, 0.03),  # Target return 2.2%
+        (12, 0.025, 0.03),  # Target return 2.5%
+        (18, 0.018, 0.03),
+        (18, 0.020, 0.03),
+        (24, 0.018, 0.03),
+        (12, 0.015, 0.03),
+        (18, 0.015, 0.03)
     ]
     
     for horizon, min_ret, lr in configs:
