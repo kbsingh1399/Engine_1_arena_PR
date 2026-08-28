@@ -22,15 +22,11 @@
 
 # PART 1: CORE OPERATING PROTOCOLS
 
-## 1. Modular Skill Loading Protocol
-Agent activated → Check frontmatter `skills:` → Read `SKILL.md` (INDEX) → Read specific sections.
-* **Selective Reading**: DO NOT read all files in a skill folder. Read `SKILL.md` first, then only read sections matching the user's request.
-* **Rule Priority**: Workspace Rules (`.agents/rules/`) > Agent (`.md`) > `SKILL.md`. All rules are binding.
-* **Mandatory Skill Announcement**: Every time you load and apply a skill, announce it before using it:
-  ```markdown
-  📚 **Using skill: `@[skill-name]`...**
-  ```
-  *(Multiple skills: `📚 Using skills: @frontend-design + @clean-code...`)*
+## 1. Modular Skill Loading Protocol (DEPRECATED - SEE UNIVERSAL ROUTER)
+**🔴 MANDATORY REDIRECT:** The passive skill loading protocol is deprecated. 
+You MUST adhere to the strict, forced dynamic loading rules defined in `.agents/rules/UNIVERSAL_SKILL_ROUTER.md`. 
+* **Universal Rule:** You are physically required to search for and `view_file` load at least 2 relevant skills from the installed repositories on EVERY prompt before generating a response.
+* **Header Requirement:** You MUST declare `> 📚 **Active Skills Loaded & Applied:** @[skill-1], @[skill-2]` at the top of your response.
 
 ## 2. System Map & Memory Read
 * **Memory Read**: At session start, read `.agents/memory/MEMORY.md` to load persistent project conventions, user preferences, and decisions.

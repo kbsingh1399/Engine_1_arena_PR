@@ -20,8 +20,28 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from Engine_2.run_all_18 import ENGINE_1_CRYPTO_SYMBOLS, ASSET_LISTING_DATES
-from Engine_2.run_historical_pipeline import run_pipeline
+from Engine_2.run_historical_pipeline import run_pipeline, ENGINE_1_CRYPTO_SYMBOLS
+
+ASSET_LISTING_DATES = {
+    "BTCUSDT": "2020-09-01",
+    "ETHUSDT": "2020-09-01",
+    "XRPUSDT": "2020-09-01",
+    "SOLUSDT": "2020-09-14",
+    "BNBUSDT": "2020-09-01",
+    "DOGEUSDT": "2020-09-01",
+    "ADAUSDT": "2020-09-01",
+    "TRXUSDT": "2020-09-01",
+    "LINKUSDT": "2020-09-01",
+    "AVAXUSDT": "2020-09-23",
+    "SUIUSDT": "2023-05-03",
+    "NEARUSDT": "2020-10-15",
+    "DOTUSDT": "2020-09-01",
+    "LTCUSDT": "2020-09-01",
+    "BCHUSDT": "2020-09-01",
+    "APTUSDT": "2022-10-18",
+    "OPUSDT": "2022-06-01",
+    "ARBUSDT": "2023-03-23",
+}
 
 def preflight_sync_missing_data(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", max_workers: int = 16):
     """
