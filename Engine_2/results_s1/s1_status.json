@@ -4518,5 +4518,35 @@
         "roi_pct": -3.92,
         "max_dd_pct": 21.99,
         "status": "\u274c FAIL"
+    },
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 107,
+        "win_rate_pct": 38.32,
+        "roi_pct": -5.23,
+        "max_dd_pct": 22.93,
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 107,
+        "win_rate_pct": 38.32,
+        "roi_pct": -5.23,
+        "max_dd_pct": 22.93,
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 124,
+        "win_rate_pct": 33.06,
+        "roi_pct": -13.82,
+        "max_dd_pct": 24.94,
+        "status": "\u274c FAIL"
     }
 ]
