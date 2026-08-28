@@ -492,15 +492,14 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         y_train_arr = np.asarray(y_train)
         
         best_threshold_long = 0.44
-        best_threshold_long = 0.43
-        best_threshold_short = 0.39
-        # Enforce healthy statistical signal density (at least 20 signals per month across 18 assets)
-        min_is_signals = max(100, int(horizon_months * 25.0))
+        best_threshold_long = 0.44
+        best_threshold_short = 0.40
+        min_is_signals = max(30, int(horizon_months * 6.0))
         best_score = -1e9
         best_precision = 0.0
         
-        for t_l in np.arange(0.38, 0.46, 0.01):
-            for t_s in np.arange(0.36, 0.44, 0.01):
+        for t_l in np.arange(0.42, 0.47, 0.01):
+            for t_s in np.arange(0.38, 0.44, 0.01):
                 mask_long = y_train_prob[:, 2] > t_l
                 mask_short = y_train_prob[:, 0] > t_s
                 n_long = np.count_nonzero(mask_long)
@@ -514,8 +513,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 acc_short = np.mean(y_train_arr[mask_short] == 0) if n_short > 0 else 0.0
                 weighted_precision = (acc_long * n_long + acc_short * n_short) / total_signals
                 
-                score = (weighted_precision - 0.42) * np.log1p(total_signals)
-                if score > best_score and weighted_precision >= 0.58:
+                # Heavily weight high precision to avoid false breakouts
+                score = (weighted_precision - 0.50) * np.log1p(total_signals)
+                if score > best_score and weighted_precision >= 0.65:
                     best_score = score
                     best_precision = weighted_precision
                     best_threshold_long = t_l
@@ -549,9 +549,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 p_short = grp_probs[local_idx, 0]
                 p_long = grp_probs[local_idx, 2]
                 
-                # S2 Core Strategy: Microstructure CVD Footprint Momentum (zc20 > 0.0) with Trend Pullback (<0.10)
-                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > 0.0)
-                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < -0.0)
+                # S2 Core Strategy: Microstructure CVD Footprint Absorption (zc20 > -1.0) with Trend Pullback (<0.10)
+                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > -1.0)
+                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < 1.0)
                 
                 direction = 1 if is_long else (-1 if is_short else 0)
                 if direction != 0:
