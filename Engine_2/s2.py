@@ -543,15 +543,16 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
             grp_mcs = grp['mc'].to_numpy() if 'mc' in grp.columns else np.zeros(len(grp))
             grp_p8s = grp['p8'].to_numpy() if 'p8' in grp.columns else np.zeros(len(grp))
             grp_zc20s = grp['zc20'].to_numpy() if 'zc20' in grp.columns else np.zeros(len(grp))
+            grp_liq_zs = grp['liq_zscore_24h'].to_numpy() if 'liq_zscore_24h' in grp.columns else np.zeros(len(grp))
             grp_datetimes = grp['datetime_utc'].to_numpy()
             
             for local_idx in range(len(grp) - 1):
                 p_short = grp_probs[local_idx, 0]
                 p_long = grp_probs[local_idx, 2]
                 
-                # S2 Core Strategy: Microstructure CVD Footprint Absorption (zc20 > -1.0) with Trend Pullback (<0.10)
-                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > -1.0)
-                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < 1.0)
+                # S2 Core Strategy: Institutional Liquidation Flush + CVD Absorption
+                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > -1.0) and (grp_liq_zs[local_idx] > 0.5)
+                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < 1.0) and (grp_liq_zs[local_idx] > 0.5)
                 
                 direction = 1 if is_long else (-1 if is_short else 0)
                 if direction != 0:
