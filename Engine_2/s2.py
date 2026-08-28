@@ -549,9 +549,9 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
                 p_short = grp_probs[local_idx, 0]
                 p_long = grp_probs[local_idx, 2]
                 
-                # S2 Core Strategy: Deep Pullback Discount (p8 < -0.20) + Bullish CVD (zc20 > -0.5)
-                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < -0.15) and (grp_zc20s[local_idx] > -1.0)
-                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > 0.15) and (grp_zc20s[local_idx] < 1.0)
+                # S2 Core Strategy: Microstructure CVD Footprint Momentum (zc20 > 0.0) with Trend Pullback (<0.10)
+                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > 0.0)
+                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < -0.0)
                 
                 direction = 1 if is_long else (-1 if is_short else 0)
                 if direction != 0:
