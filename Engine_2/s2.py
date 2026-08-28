@@ -530,31 +530,30 @@ def run_single_config(data_by_symbol, horizon_months, min_ret, lr):
         y_test_prob = ensemble.predict_proba(X_test)
         
         test_candidates = []
-        for sym, grp in df_test.groupby('symbol'):
-            grp_indices = grp.index
-            grp_pos = [df_test.index.get_loc(idx) for idx in grp_indices]
-            grp_probs = y_test_prob[grp_pos]
+        df_test_reset = df_test.reset_index(drop=True)
+        
+        for sym, group in df_test_reset.groupby('symbol'):
+            grp_indices = group.index.to_numpy()
+            grp_highs = group['high'].to_numpy(dtype=np.float64)
+            grp_lows = group['low'].to_numpy(dtype=np.float64)
+            grp_closes = group['close'].to_numpy(dtype=np.float64)
+            grp_opens = group['next_open'].to_numpy(dtype=np.float64)
+            grp_atrs = group['atr'].to_numpy(dtype=np.float64)
+            grp_datetimes = group['datetime_utc'].to_numpy()
+            grp_mc = group['mc'].to_numpy(dtype=np.float64) if 'mc' in group else np.zeros(len(group))
+            grp_p8 = group['p8'].to_numpy(dtype=np.float64) if 'p8' in group else np.zeros(len(group))
             
-            grp_opens = grp['next_open'].to_numpy()
-            grp_highs = grp['high'].to_numpy()
-            grp_lows = grp['low'].to_numpy()
-            grp_closes = grp['close'].to_numpy()
-            grp_atrs = grp['atr'].to_numpy()
-            grp_mcs = grp['mc'].to_numpy() if 'mc' in grp.columns else np.zeros(len(grp))
-            grp_p8s = grp['p8'].to_numpy() if 'p8' in grp.columns else np.zeros(len(grp))
-            grp_zc20s = grp['zc20'].to_numpy() if 'zc20' in grp.columns else np.zeros(len(grp))
-            grp_liq_zs = grp['liq_zscore_24h'].to_numpy() if 'liq_zscore_24h' in grp.columns else np.zeros(len(grp))
-            grp_datetimes = grp['datetime_utc'].to_numpy()
-            
-            for local_idx in range(len(grp) - 1):
-                p_short = grp_probs[local_idx, 0]
-                p_long = grp_probs[local_idx, 2]
+            for local_idx in range(len(group)):
+                global_idx = grp_indices[local_idx]
+                prob_long = y_test_prob[global_idx, 2]
+                prob_short = y_test_prob[global_idx, 0]
                 
-                # S2 Core Strategy: Institutional Liquidation Flush + CVD Absorption
-                is_long = (p_long > best_threshold_long) and (grp_mcs[local_idx] >= 0.0) and (grp_p8s[local_idx] < 0.10) and (grp_zc20s[local_idx] > -1.0) and (grp_liq_zs[local_idx] > 0.5)
-                is_short = (p_short > best_threshold_short) and (grp_mcs[local_idx] <= 0.0) and (grp_p8s[local_idx] > -0.10) and (grp_zc20s[local_idx] < 1.0) and (grp_liq_zs[local_idx] > 0.5)
-                
-                direction = 1 if is_long else (-1 if is_short else 0)
+                direction = 0
+                if prob_long > best_threshold_long and prob_long > prob_short and grp_mc[local_idx] >= 0.0 and grp_p8[local_idx] < 0.10:
+                    direction = 1
+                elif prob_short > best_threshold_short and prob_short > prob_long and grp_mc[local_idx] <= 0.0 and grp_p8[local_idx] > -0.10:
+                    direction = -1
+                    
                 if direction != 0:
                     entry_price = grp_opens[local_idx]
                     atr_val = max(grp_atrs[local_idx], 1e-6)
