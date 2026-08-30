@@ -1,17 +1,17 @@
 {
     "mcpServers": {
         "context7": {
-            "command": "npx",
+            "command": "npx.cmd",
             "args": [
                 "-y",
-                "@upstash/context7-mcp",
-                "--api-key",
-                "YOUR_API_KEY"
+                "@upstash/context7-mcp"
             ]
         },
         "reticle": {
-            "command": "reticle",
+            "command": "npx.cmd",
             "args": [
+                "-y",
+                "@reticlehq/server",
                 "mcp"
             ]
         }
