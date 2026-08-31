@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S2 - CVD MOMENTUM BREAKOUT (6R RUNNER GEOMETRY)
+ENGINE 2: S2 - CVD DELTA MOMENTUM (5.5R RUNNER & DYNAMIC COMPOUNDER)
 ================================================================================
 """
 
@@ -37,9 +37,9 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 45.0
-MAX_HOUSE_RISK = 260.0
-MIN_DEFENSE_RISK = 15.0
+BASE_RISK = 62.5
+MAX_HOUSE_RISK = 275.0
+MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
 LEVERAGE = 10.0
@@ -88,12 +88,18 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if highs[j] > best_price:
                 best_price = highs[j]
                 gain = best_price - entry_price
-                if gain >= 6.0 * stop_dist:
-                    exit_price = entry_price + 6.0 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price + 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = best_price - 1.6 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price + 3.0 * stop_dist
+                    if new_stop > cur_stop: cur_stop = new_stop
+                elif gain >= 2.5 * stop_dist:
+                    new_stop = entry_price + 1.5 * stop_dist
+                    if new_stop > cur_stop: cur_stop = new_stop
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price + 0.20 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -109,12 +115,18 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if lows[j] < best_price:
                 best_price = lows[j]
                 gain = entry_price - best_price
-                if gain >= 6.0 * stop_dist:
-                    exit_price = entry_price - 6.0 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price - 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = best_price + 1.6 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price - 3.0 * stop_dist
+                    if new_stop < cur_stop: cur_stop = new_stop
+                elif gain >= 2.5 * stop_dist:
+                    new_stop = entry_price - 1.5 * stop_dist
+                    if new_stop < cur_stop: cur_stop = new_stop
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price - 0.20 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
                     
     return exit_price, exit_offset
@@ -145,8 +157,8 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
     return results
 
 def s2_signal_predicate(df):
-    long_mask = (df['zc4'] > 1.2) & (df['spot_cvd_delta'] > 0) & (df['p21'] > 0.002) & (df['rsi'] > 50)
-    short_mask = (df['zc4'] < -1.2) & (df['spot_cvd_delta'] < 0) & (df['p21'] < -0.002) & (df['rsi'] < 50)
+    long_mask = (df['spot_cvd_delta'] > 0) & (df['spot_cvd_accel'] > 0) & (df['mc'] > 0) & (df['btc_trend'] > -0.02)
+    short_mask = (df['spot_cvd_delta'] < 0) & (df['spot_cvd_accel'] < 0) & (df['mc'] < 0) & (df['btc_trend'] < 0.02)
     return long_mask, short_mask
 
 def load_s2_trades(feature_cols):
@@ -230,13 +242,6 @@ def load_s2_trades(feature_cols):
             df['zc_rel_btc'] = (df['zc20'] - df.get('zb20', 0.0)).astype(np.float32)
             df['zc4_rel_btc'] = (df['zc4'] - df.get('zb4', 0.0)).astype(np.float32)
             
-            long_liq = df.get('long_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            short_liq = df.get('short_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            denom = long_liq + short_liq + 1e-8
-            df['liq_imbalance'] = ((long_liq - short_liq) / denom).astype(np.float32)
-            vol_q = df.get('volume_quote', df['close'] * df.get('volume_base', 1.0))
-            df['liq_vol_ratio'] = (denom / (vol_q + 1e-8)).astype(np.float32)
-            
             c = df['close']
             df['p8'] = ((c - c.ewm(span=8).mean()) / c.ewm(span=8).mean()).clip(-1.0, 1.0).astype(np.float32)
             df['p21'] = ((c - c.ewm(span=21).mean()) / c.ewm(span=21).mean()).clip(-1.0, 1.0).astype(np.float32)
@@ -304,7 +309,7 @@ def load_s2_trades(feature_cols):
 def fast_portfolio_backtest_numba(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=45.0, max_house_risk=260.0, min_defense_risk=15.0,
+    fee_rate=0.0009, base_risk=62.5, max_house_risk=275.0, min_defense_risk=18.0,
     dd_limit=0.042
 ):
     n = len(entry_times)
@@ -350,10 +355,10 @@ def fast_portfolio_backtest_numba(
             continue
             
         realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 60.0, 140.0)
+        streak_bonus = min(consecutive_wins * 65.0, 150.0)
         
         if realized_pnl > 0.0:
-            target_risk = min(base_risk + 0.80 * realized_pnl + streak_bonus, max_house_risk)
+            target_risk = min(base_risk + 0.85 * realized_pnl + streak_bonus, max_house_risk)
         else:
             damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
             target_risk = max(min_defense_risk, base_risk * damping)
@@ -432,7 +437,7 @@ def run_s2_walkforward():
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
-        'liq_imbalance', 'liq_vol_ratio', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
+        'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
     ]
     
     df_all = load_s2_trades(feature_cols)
