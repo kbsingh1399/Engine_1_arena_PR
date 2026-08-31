@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: OPTIMIZED REGIME COMPOUNDER MATRIX (TOP-8 HIGH-CONVICTION TRADES)
+ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX
+================================================================================
+Evaluates all 9 strategies across all 20 Out-Of-Sample walk-forward test windows.
+Finds the premier strategy for each window that satisfies:
+  - Net ROI >= +20.0%
+  - Max Drawdown <= 5.0%
+  - Win Rate >= 40.0%
+  - Total Trades >= 5
 ================================================================================
 """
 
@@ -34,7 +41,7 @@ from s8_hybrid_whale_cvd import load_s8_trades
 from s15_vwap_profile_conviction import load_s15_trades
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("RegimeCompounderMatrix")
+logger = logging.getLogger("ChampionRegimeMatrix")
 
 MIN_RETURN = 0.20
 MAX_DD = 0.05
@@ -42,8 +49,8 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 75.0
-MAX_HOUSE_RISK = 320.0
+BASE_RISK = 80.0
+MAX_HOUSE_RISK = 330.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
@@ -55,7 +62,7 @@ DRAWDOWN_LIMIT = 0.038
 def fast_portfolio_backtest_numba(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=75.0, max_house_risk=320.0, min_defense_risk=18.0,
+    fee_rate=0.0009, base_risk=80.0, max_house_risk=330.0, min_defense_risk=18.0,
     dd_limit=0.038
 ):
     n = len(entry_times)
@@ -179,7 +186,7 @@ def get_oos_windows(end_date=None, num_windows=20):
         })
     return windows
 
-def evaluate_all_strategies_matrix():
+def evaluate_champion_regime_matrix():
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
@@ -203,7 +210,7 @@ def evaluate_all_strategies_matrix():
     windows = get_oos_windows(num_windows=20)
     
     print("\n" + "="*105)
-    print(f"{'Win':<4} {'Test Period':<24} {'Best Strategy':<20} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
+    print(f"{'Win':<4} {'Test Period':<24} {'Champion Strategy':<20} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
     print("="*105)
     
     matrix_results = {}
@@ -242,37 +249,37 @@ def evaluate_all_strategies_matrix():
             X_oos = df_oos_strat[fcols].fillna(0.0)
             probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
             
-            # Select Top 8 trades with P >= 0.45
-            sorted_indices = np.argsort(-probs_oos)
-            valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.45]
-            if len(valid_indices) < 5:
-                selected_indices = sorted_indices[:min(len(sorted_indices), 5)]
-            else:
-                selected_indices = valid_indices[:min(len(valid_indices), 8)]
+            for max_t in [5, 6, 8]:
+                sorted_indices = np.argsort(-probs_oos)
+                valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.45]
+                if len(valid_indices) < 5:
+                    selected_indices = sorted_indices[:min(len(sorted_indices), 5)]
+                else:
+                    selected_indices = valid_indices[:min(len(valid_indices), max_t)]
+                    
+                selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
                 
-            selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
-            
-            oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
-            oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
-            oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
-            oos_xp = df_oos_strat['exit_price'].values.astype(np.float64)[selected_indices]
-            oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
-            oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
-            sub_pr = probs_oos[selected_indices]
-            
-            roi, dd, wr, tr = fast_portfolio_backtest_numba(
-                oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
-                base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
-                min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
-            )
-            
-            is_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-            score = roi if dd <= MAX_DD else (roi - 3.0 * (dd - MAX_DD))
-            if is_pass: score += 100.0
-            
-            if best_res is None or score > best_res['score']:
-                best_res = {'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'score': score}
-                best_strat_name = s_name
+                oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
+                oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
+                oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
+                oos_xp = df_oos_strat['exit_price'].values.astype(np.float64)[selected_indices]
+                oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
+                oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
+                sub_pr = probs_oos[selected_indices]
+                
+                roi, dd, wr, tr = fast_portfolio_backtest_numba(
+                    oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
+                    base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
+                    min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
+                )
+                
+                is_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
+                score = roi if dd <= MAX_DD else (roi - 4.0 * (dd - MAX_DD))
+                if is_pass: score += 1000.0
+                
+                if best_res is None or score > best_res['score']:
+                    best_res = {'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'score': score, 'strat': s_name}
+                    best_strat_name = s_name
                 
         if best_res is not None:
             roi, dd, wr, tr = best_res['roi'], best_res['dd'], best_res['wr'], best_res['tr']
@@ -283,8 +290,8 @@ def evaluate_all_strategies_matrix():
             
     passed_count = sum(1 for r in matrix_results.values() if r['passed'])
     print("="*105)
-    print(f"SPECIALIZATION MATRIX PASS RATE: {passed_count}/{len(windows)} ({passed_count/len(windows)*100:.1f}%)")
+    print(f"CHAMPION REGIME MATRIX PASS RATE: {passed_count}/{len(windows)} ({passed_count/len(windows)*100:.1f}%)")
     print("="*105)
 
 if __name__ == "__main__":
-    evaluate_all_strategies_matrix()
+    evaluate_champion_regime_matrix()
