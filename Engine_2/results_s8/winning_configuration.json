@@ -1,8 +1,0 @@
-{
-    "strategy": "S8_Hybrid_Whale_CVD",
-    "horizon_months": 18,
-    "concurrency": 2,
-    "leverage": 10.0,
-    "all_20_windows_passed": true,
-    "timestamp_utc": "2026-08-31T08:26:39.720347"
-}
