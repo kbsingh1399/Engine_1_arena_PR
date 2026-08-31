@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX ($84 BASE RISK)
+ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX ($88 BASE RISK & DEEP SEARCH)
 ================================================================================
 """
 
@@ -42,8 +42,8 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 84.0
-MAX_HOUSE_RISK = 340.0
+BASE_RISK = 88.0
+MAX_HOUSE_RISK = 350.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
@@ -55,7 +55,7 @@ DRAWDOWN_LIMIT = 0.038
 def fast_portfolio_backtest_numba(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=84.0, max_house_risk=340.0, min_defense_risk=18.0,
+    fee_rate=0.0009, base_risk=88.0, max_house_risk=350.0, min_defense_risk=18.0,
     dd_limit=0.038
 ):
     n = len(entry_times)
@@ -101,7 +101,7 @@ def fast_portfolio_backtest_numba(
             continue
             
         realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 90.0, 210.0)
+        streak_bonus = min(consecutive_wins * 95.0, 220.0)
         
         if realized_pnl > 0.0:
             target_risk = min(base_risk + 1.10 * realized_pnl + streak_bonus, max_house_risk)
@@ -281,7 +281,7 @@ def evaluate_champion_regime_matrix():
             X_oos = df_oos_strat[fcols].fillna(0.0)
             probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
             
-            for p_th in [0.48, 0.44, 0.40, 0.35]:
+            for p_th in [0.48, 0.44, 0.40, 0.35, 0.30]:
                 for max_t in [5, 6, 8]:
                     sorted_indices = np.argsort(-probs_oos)
                     valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= p_th]
