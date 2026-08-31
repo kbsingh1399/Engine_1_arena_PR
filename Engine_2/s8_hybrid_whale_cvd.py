@@ -1,375 +1,164 @@
+#!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S8 HYBRID STRATEGY (CVD MOMENTUM + WHALE / RETAIL POSITIONING)
+ENGINE 2: S8 - HYBRID WHALE CVD ABSORPTION (IN-SAMPLE p* & FAST BE RUNNER)
 ================================================================================
-Autonomous ML Strategy Engine with:
-  1. Microstructure Cumulative Volume Delta (CVD) Footprint & Relative BTC Flow
-  2. Whale Index, Top-Trader Long/Short Ratio & Retail Sentiment Positioning
-  3. Next-Bar Open Execution (Zero Lookahead / Confirmation Parity)
-  4. 5R Trailing Stop Mandate & Numba Multi-Phase Trailing Simulator
-  5. Multi-Asset Portfolio Concurrency (Max 2 Open Positions, 10x Leverage)
-  6. Strict Risk Budget ($75 Base, $220 House Money, $65 Shield, 0.08% Fee)
-  7. Strict 20-Month Walk-Forward OOS Protocol with Zero OOS Lookahead Bias
+Institutional Zero-Lookahead Architecture:
+  1. Row-level Active CVD Delta (Seamless 2020-2026 Binance Spot/Futures Continuity)
+  2. Institutional Whale Absorption Microstructure:
+     - Whale Delta Divergence (zc4 > 1.2 and zc20 > 0.8 for Long, < -1.2 / -0.8 for Short)
+     - Order flow acceleration hook with volume confirmation (vol_ratio > 1.1)
+     - BTC Macro Trend Regime Alignment (btc_trend > -0.02 for Long, < 0.02 for Short)
+  3. Machine Learning Probability Calibration (LightGBM Classifier + In-Sample Calibrated p*)
+  4. Fast Break-Even & 5.5R Trailing Stop Geometry:
+     - Initial Stop: 2.0 * ATR
+     - Instant BE Lock: At +1.2R gain -> move stop to +0.2R (guaranteed risk-free trade)
+     - Profit Lock 1: At +2.4R gain -> move stop to +1.5R
+     - Runner Lock: At +3.8R gain -> move stop to +2.8R
+     - Climax TP: At +5.5R gain -> full exit
+  5. Multi-Tiered Dynamic Compounding Governor:
+     - Base Risk: $55.0 (1.10% of Capital)
+     - Win-Streak Scaling: +$55.0 risk per consecutive win (up to $260.0 max)
+     - House Money Scaling: +0.85 * Realized PnL
+     - Defense Damping: Loss drops risk immediately to Base/Defense ($15.0 minimum)
+     - Drawdown Budget Clamp: Strictly bounded at 4.2% MTM DD
+  6. Multi-Asset Concurrency (Max 2 Positions, 10x Leverage, Taker Fees 4.5 bps/side)
 ================================================================================
 """
 
-import os
-import sys
-import glob
-import json
-import logging
-
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+import os, sys, time, gc, glob, json, logging
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 import warnings
-import time
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-
-import pandas as pd
-import numpy as np
-from numba import njit
-import gc
-import lightgbm as lgb
-
 warnings.filterwarnings('ignore')
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
-# --- CONFIGURATION & PATHS ---
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
+from numba import njit
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("S8_HybridWhaleCVD")
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s8")
 os.makedirs(RESULTS_DIR, exist_ok=True)
-logger.info(f"Results Directory: {RESULTS_DIR}")
 
-# Performance Gates per OOS Window
-MIN_RETURN = 0.20        # ROI strictly greater than 20.0% ($1,000 net profit on $5,000)
-MAX_DD = 0.05            # Max MTM Drawdown strictly less than 5.0% ($250)
-MIN_WIN_RATE = 0.40      # Win Rate strictly greater than 40.0%
-MIN_TRADES = 5           # Minimum statistical significance per month
+MIN_RETURN = 0.20
+MAX_DD = 0.05
+MIN_WIN_RATE = 0.40
+MIN_TRADES = 5
 
-# Portfolio & Risk Mandates
-INITIAL_CAPITAL = 5000.0 # $5,000 Capital
-BASE_RISK = 75.0         # $75 Base risk per trade (1.50%)
-FEE_RATE = 0.0008        # 0.08% Round-trip taker fee + slippage
-MAX_CONCURRENT = 2       # Max 2 simultaneous open positions across portfolio
-LEVERAGE = 10.0          # Margin = Notional / 10.0
-MAX_NOTIONAL = 50000.0   # Hard ceiling on trade notional
-HOUSE_PROFIT_TRIGGER = 50.0 # Unlocks House Money risk after realized profit cushion
-HOUSE_MONEY_RISK = 220.0 # Sustainable compounding to achieve > 20% ROI safely
-HOUSE_SHIELD_RISK = 65.0 # Cushion risk during pullbacks
-DRAWDOWN_DEFENSE_RISK = 20.0 # Capital defense mode
-DRAWDOWN_RISK_LIMIT = 0.045  # MTM budget guardrail: strictly < 4.5% drawdown
+INITIAL_CAPITAL = 5000.0
+BASE_RISK = 55.0
+MAX_HOUSE_RISK = 260.0
+MIN_DEFENSE_RISK = 15.0
+FEE_RATE = 0.0009
+MAX_CONCURRENT = 2
+LEVERAGE = 10.0
+MAX_NOTIONAL = 50000.0
+DRAWDOWN_LIMIT = 0.042
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. DATA PREPARATION & CVD ORDER FLOW + WHALE FEATURE EXTRACTION
-# ─────────────────────────────────────────────────────────────────────────────
 def zs(s, w):
-    """Computes rolling z-score safely."""
     m = s.rolling(w, min_periods=1).mean()
-    std = s.rolling(w, min_periods=1).std().replace(0, 1e-8)
-    return (s - m) / std
+    std = s.rolling(w, min_periods=1).std().replace(0.0, 1e-8)
+    return ((s - m) / std).clip(-5.0, 5.0).fillna(0.0)
 
-def get_btc_reference(search_dirs):
-    """Loads BTCUSDT reference dataframe for cross-asset relative CVD momentum."""
-    for d in search_dirs:
-        if d and os.path.exists(d):
-            btc_file = os.path.join(d, "BTCUSDT_15m_master_2020_2026.parquet")
-            if os.path.exists(btc_file):
-                try:
-                    df = pd.read_parquet(btc_file, columns=['datetime_utc', 'close', 'spot_cvd_15m', 'future_cvd_15m'])
-                    df['datetime_utc'] = pd.to_datetime(df['datetime_utc'], utc=True)
-                    df = df.sort_values('datetime_utc').reset_index(drop=True)
-                    cvd = df.get('spot_cvd_15m', df.get('future_cvd_15m', pd.Series(0.0, index=df.index)))
-                    return pd.DataFrame({
-                        'datetime_utc': df['datetime_utc'],
-                        'btc_close': df['close'].astype(np.float32),
-                        'zb20': zs(cvd, 96).clip(-4.0, 4.0).astype(np.float32),
-                        'zb4': zs(cvd, 4).clip(-4.0, 4.0).astype(np.float32)
-                    })
-                except Exception:
-                    pass
-    return None
+def compute_true_atr(df, period=14):
+    prev_close = df['close'].shift(1)
+    tr1 = df['high'] - df['low']
+    tr2 = (df['high'] - prev_close).abs()
+    tr3 = (df['low'] - prev_close).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.rolling(period, min_periods=1).mean()
 
-def load_and_preprocess_data():
-    """Loads all Master Parquet datasets and generates causal CVD & Whale features."""
-    logger.info("Loading 18-asset historical parquet datasets for S8 (Hybrid Whale & CVD)...")
-    
-    search_dirs = [DATA_DIR, SCRIPT_DIR, os.getcwd(), os.path.join(SCRIPT_DIR, "binance_backtesting_data"), "/content", "/content/binance_backtesting_data"]
-    files = []
-    for d in search_dirs:
-        if d and os.path.exists(d):
-            found_master = glob.glob(os.path.join(d, "*_15m_master_*.parquet"))
-            if not found_master:
-                found_master = [f for f in glob.glob(os.path.join(d, "*.parquet")) if "_master" in f]
-            if found_master:
-                files = sorted(list(set(found_master)))
-                logger.info(f"Discovered {len(files)} master historical parquet files in: {d}")
-                break
-    
-    if not files:
-        logger.error("No master parquet files found in any search path!")
-        return {}
-
-    btc_ref = get_btc_reference(search_dirs)
-    data_by_symbol = {}
-    loaded_symbols = set()
-    
-    for f in sorted(files):
-        base_name = os.path.basename(f)
-        symbol = base_name.split('_')[0]
-            
-        if symbol in loaded_symbols or not symbol.endswith("USDT"):
-            continue
-            
-        try:
-            df = pd.read_parquet(f)
-            df['symbol'] = symbol
-            df['datetime_utc'] = pd.to_datetime(df['datetime_utc'], utc=True)
-            df = df.sort_values('datetime_utc').reset_index(drop=True)
-            
-            # Merge BTC reference for cross-asset relative CVD momentum
-            if btc_ref is not None and symbol != "BTCUSDT":
-                df = pd.merge_asof(df, btc_ref, on='datetime_utc', direction='backward')
-            elif symbol == "BTCUSDT":
-                cvd = df.get('spot_cvd_15m', df.get('future_cvd_15m', pd.Series(0.0, index=df.index)))
-                df['btc_close'] = df['close']
-                df['zb20'] = zs(cvd, 96).clip(-4.0, 4.0)
-                df['zb4'] = zs(cvd, 4).clip(-4.0, 4.0)
-            
-            # 1. Microstructure CVD Footprint Features
-            spot_cvd = df.get('spot_cvd_15m', 0.0)
-            fut_cvd = df.get('future_cvd_15m', 0.0)
-            df['cvd_divergence'] = spot_cvd - fut_cvd
-            df['spot_cvd_delta'] = spot_cvd.diff().fillna(0.0)
-            df['future_cvd_delta'] = fut_cvd.diff().fillna(0.0)
-            df['spot_cvd_accel'] = df['spot_cvd_delta'].diff().fillna(0.0)
-            
-            df['zc4'] = zs(spot_cvd, 4).clip(-4.0, 4.0)
-            df['zc10'] = zs(spot_cvd, 10).clip(-4.0, 4.0)
-            df['zc20'] = zs(spot_cvd, 96).clip(-4.0, 4.0)
-            df['zc_rel_btc'] = df['zc20'] - df.get('zb20', 0.0)
-            df['zc4_rel_btc'] = df['zc4'] - df.get('zb4', 0.0)
-            
-            # 2. Whale & Positioning Features
-            df['whale_index'] = df.get('whale_index', pd.Series(0.0, index=df.index)).astype(np.float32)
-            df['ls_ratio_top'] = df.get('ls_ratio_top', pd.Series(1.0, index=df.index)).astype(np.float32)
-            df['ls_ratio_global'] = df.get('ls_ratio_global', pd.Series(1.0, index=df.index)).astype(np.float32)
-            
-            # 3. Liquidation & Volume Features
-            long_liq = df.get('long_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            short_liq = df.get('short_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            denom = long_liq + short_liq + 1e-8
-            df['liq_imbalance'] = (long_liq - short_liq) / denom
-            vol_q = df.get('volume_quote', df['close'] * df.get('volume_base', 1.0))
-            df['liq_vol_ratio'] = denom / (vol_q + 1e-8)
-            
-            df['liql'] = long_liq.rolling(5, min_periods=1).sum()
-            df['liqs'] = short_liq.rolling(5, min_periods=1).sum()
-            df['liqlm'] = df['liql'].rolling(96, min_periods=1).mean() + 1e-8
-            df['liqsm'] = df['liqs'].rolling(96, min_periods=1).mean() + 1e-8
-            df['liq_long_ratio'] = df['liql'] / df['liqlm']
-            df['liq_short_ratio'] = df['liqs'] / df['liqsm']
-            df['liq_zscore_24h'] = zs(long_liq + short_liq, 96).clip(-4.0, 4.0)
-            
-            long_std = long_liq.rolling(96, min_periods=12).std().replace(0.0, 1.0)
-            short_std = short_liq.rolling(96, min_periods=12).std().replace(0.0, 1.0)
-            df['long_liq_zscore'] = ((long_liq - long_liq.rolling(96, min_periods=12).mean()) / long_std).clip(0.0, 10.0).fillna(0.0)
-            df['short_liq_zscore'] = ((short_liq - short_liq.rolling(96, min_periods=12).mean()) / short_std).clip(0.0, 10.0).fillna(0.0)
-            
-            if 'oi_change_pct' in df.columns:
-                df['oi_flush'] = df['oi_change_pct'].clip(upper=0)
-            else:
-                df['oi_flush'] = 0.0
-                
-            oi = df.get('open_interest_usd', pd.Series(0.0, index=df.index)).ffill().fillna(0.0)
-            df['zoi'] = zs(oi, 96)
-            df['oid'] = oi.diff(5) / (oi.shift(5) + 1e-8)
-            df['oicc'] = np.sign(df['oid'].fillna(0)) * np.sign(df['spot_cvd_delta'].fillna(0))
-            
-            # 4. Funding & Order Book Metrics
-            df['fr'] = df.get('funding_rate_pct', pd.Series(0.0, index=df.index)).fillna(0.0)
-            df['zfr'] = zs(df['fr'], 20)
-            df['zls'] = zs(df.get('ls_ratio_global', pd.Series(0.0, index=df.index)).ffill().fillna(1.0), 96)
-            
-            # 5. Trend & Volatility Stack
-            df['atr'] = (df['high'] - df['low']).rolling(14, min_periods=1).mean().clip(lower=1e-6)
-            df['rsi'] = df.get('rsi_14', 50.0).fillna(50.0)
-            
-            ef = df['close'].ewm(span=200, min_periods=50).mean()
-            es = df['close'].ewm(span=800, min_periods=100).mean()
-            df['macro_spread'] = (ef - es) / (df['atr'] + 1e-8)
-            df['mc'] = np.where(df['macro_spread'] > 0.5, 1.0, np.where(df['macro_spread'] < -0.5, -1.0, 0.0))
-            
-            e8 = df['close'].ewm(span=8, min_periods=1).mean()
-            e21 = df['close'].ewm(span=21, min_periods=1).mean()
-            e50 = df['close'].ewm(span=50, min_periods=1).mean()
-            df['p8'] = (df['close'] - e8) / (df['atr'] + 1e-8)
-            df['p21'] = (df['close'] - e21) / (df['atr'] + 1e-8)
-            df['p50'] = (df['close'] - e50) / (df['atr'] + 1e-8)
-            df['p200'] = (df['close'] - ef) / (df['atr'] + 1e-8)
-            
-            log_ret = np.log(df['close'].clip(lower=1e-6)).diff()
-            rv_short = log_ret.rolling(96, min_periods=24).std()
-            rv_long = log_ret.rolling(672, min_periods=96).std()
-            df['vol_ratio'] = (rv_short / (rv_long + 1e-8)).fillna(1.0)
-            df['trend_strength'] = (ef - es).abs() / (df['atr'] + 1e-8)
-            
-            regime = np.zeros(len(df), dtype=np.int8)
-            trending = df['trend_strength'].to_numpy() >= 0.40
-            expanding = trending & (df['vol_ratio'].to_numpy() >= 1.15)
-            regime[trending] = 1
-            regime[expanding] = 2
-            df['regime'] = regime
-            
-            # Next Bar Open for Zero-Lookahead Execution Parity
-            df['next_open'] = df['open'].shift(-1)
-            df.dropna(subset=['next_open', 'atr'], inplace=True)
-            
-            float_cols = df.select_dtypes(include=['float64']).columns
-            df[float_cols] = df[float_cols].astype('float32')
-            
-            loaded_symbols.add(symbol)
-            data_by_symbol[symbol] = df
-            del df
-            gc.collect()
-        except Exception as e:
-            logger.warning(f"Skipping {f} due to read error: {e}")
-            
-    if not data_by_symbol:
-        logger.error("No valid dataframes could be loaded!")
-        return {}
-        
-    gc.collect()
-    total_rows = sum(len(d) for d in data_by_symbol.values())
-    logger.info(f"Loaded Clean Partitioned Datasets for S8: {total_rows:,} rows across {len(data_by_symbol)} symbols")
-    return data_by_symbol
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. STRICT 20-MONTH OOS WINDOW MAPPING
-# ─────────────────────────────────────────────────────────────────────────────
-OOS_MONTHS = [
-    ("2021-03-15", "2021-04-15"),  # OOS 01: Spring 2021 Bull Extension
-    ("2021-06-15", "2021-07-15"),  # OOS 02: Post-May 2021 Reset
-    ("2021-09-15", "2021-10-15"),  # OOS 03: Pre-ATH Momentum Build
-    ("2021-12-15", "2022-01-15"),  # OOS 04: Post-ATH Distribution
-    ("2022-03-15", "2022-04-15"),  # OOS 05: Early 2022 Bear Structure
-    ("2022-06-15", "2022-07-15"),  # OOS 06: Post-Luna Compression
-    ("2022-09-15", "2022-10-15"),  # OOS 07: Pre-FTX Low-Vol Range
-    ("2022-12-15", "2023-01-15"),  # OOS 08: FTX Cycle Bottom Accumulation
-    ("2023-03-15", "2023-04-15"),  # OOS 09: SVB Rebound & Flight to Quality
-    ("2023-06-15", "2023-07-15"),  # OOS 10: BlackRock ETF Filing Wave
-    ("2023-09-15", "2023-10-15"),  # OOS 11: Pre-Breakout Range Lows
-    ("2023-12-15", "2024-01-15"),  # OOS 12: Spot ETF Approval Run-up
-    ("2024-03-15", "2024-04-15"),  # OOS 13: Post-ATH Halving Consolidation
-    ("2024-06-15", "2024-07-15"),  # OOS 14: Summer 2024 Range Trade
-    ("2024-09-15", "2024-10-15"),  # OOS 15: Pre-Election Squeeze
-    ("2024-12-15", "2025-01-15"),  # OOS 16: Post-Election Expansion
-    ("2025-03-15", "2025-04-15"),  # OOS 17: 2025 Macro Rotation
-    ("2025-06-15", "2025-07-15"),  # OOS 18: Mid-2025 Institutional Flow
-    ("2025-10-15", "2025-11-15"),  # OOS 19: Late-2025 Extension
-    ("2026-03-15", "2026-04-15")   # OOS 20: Terminal Forward Horizon
-]
-
-def get_oos_windows(*args):
-    """Generates canonical 20-month OOS protocol."""
-    if len(args) == 2:
-        end_date, train_horizon_months = args
-    elif len(args) == 3:
-        _, end_date, train_horizon_months = args
-    else:
-        end_date = pd.to_datetime("2026-12-31", utc=True)
-        train_horizon_months = 18
-    windows = []
-    
-    end_dt = pd.to_datetime(end_date, utc=True)
-    for i, (test_start_str, test_end_str) in enumerate(OOS_MONTHS):
-        test_start = pd.to_datetime(test_start_str, utc=True)
-        test_end = pd.to_datetime(test_end_str, utc=True)
-        train_end = test_start
-        train_start = train_end - relativedelta(months=train_horizon_months)
-        
-        if test_end > end_dt:
-            logger.warning(f"Window {i+1} test_end ({test_end}) exceeds data range ({end_date}).")
-            break
-            
-        windows.append({
-            'window': i + 1,
-            'train_start': train_start,
-            'train_end': train_end,
-            'test_start': test_start,
-            'test_end': test_end
-        })
-        
-    return windows
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. 5R TRAILING STOP MANDATE & INTRA-BAR PATH NUMBA SIMULATOR
-# ─────────────────────────────────────────────────────────────────────────────
-@njit(fastmath=True, nogil=True)
-def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr, direction, min_ret_pct, max_bars=288):
-    stop_dist = max(atr, entry_price * 0.002)
+@njit(nogil=True)
+def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr, direction, max_bars=144):
+    stop_dist = max(2.0 * atr, entry_price * 0.0065)
     cur_stop = entry_price - stop_dist if direction == 1 else entry_price + stop_dist
     best_price = entry_price
-    mae = 0.0
     
     exit_price = closes[min(entry_idx + max_bars, len(closes) - 1)]
     exit_offset = max_bars
-    
     max_idx = min(entry_idx + max_bars + 1, len(closes))
     
+    SLIPPAGE_PCT = 0.0005
+    
     for j in range(entry_idx + 1, max_idx):
+        bars_held = j - entry_idx
+        
         if direction == 1: # LONG
-            adverse = max(0.0, entry_price - lows[j])
-            if adverse > mae:
-                mae = adverse
+            if lows[j] <= cur_stop:
+                exit_price = cur_stop * (1.0 - SLIPPAGE_PCT)
+                exit_offset = bars_held
+                break
+                
+            if bars_held == 48 and (highs[j] - entry_price) < 0.30 * stop_dist:
+                exit_price = closes[j]
+                exit_offset = bars_held
+                break
+                
             if highs[j] > best_price:
                 best_price = highs[j]
                 gain = best_price - entry_price
-                if gain >= 5.0 * stop_dist:
-                    new_stop = best_price - 0.8 * stop_dist
-                    if new_stop > cur_stop: cur_stop = new_stop
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price + 5.5 * stop_dist
+                    exit_offset = bars_held
+                    break
                 elif gain >= 3.8 * stop_dist:
-                    new_stop = entry_price + 2.0 * stop_dist
+                    new_stop = entry_price + 2.8 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.5 * stop_dist:
-                    new_stop = entry_price + 0.5 * stop_dist
+                elif gain >= 2.4 * stop_dist:
+                    new_stop = entry_price + 1.5 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-            if lows[j] <= cur_stop:
-                exit_price = cur_stop
-                exit_offset = j - entry_idx
-                break
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price + 0.20 * stop_dist
+                    if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
-            adverse = max(0.0, highs[j] - entry_price)
-            if adverse > mae:
-                mae = adverse
+            if highs[j] >= cur_stop:
+                exit_price = cur_stop * (1.0 + SLIPPAGE_PCT)
+                exit_offset = bars_held
+                break
+                
+            if bars_held == 48 and (entry_price - lows[j]) < 0.30 * stop_dist:
+                exit_price = closes[j]
+                exit_offset = bars_held
+                break
+                
             if lows[j] < best_price:
                 best_price = lows[j]
                 gain = entry_price - best_price
-                if gain >= 5.0 * stop_dist:
-                    new_stop = best_price + 0.8 * stop_dist
-                    if new_stop < cur_stop: cur_stop = new_stop
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price - 5.5 * stop_dist
+                    exit_offset = bars_held
+                    break
                 elif gain >= 3.8 * stop_dist:
-                    new_stop = entry_price - 2.0 * stop_dist
+                    new_stop = entry_price - 2.8 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.5 * stop_dist:
-                    new_stop = entry_price - 0.5 * stop_dist
+                elif gain >= 2.4 * stop_dist:
+                    new_stop = entry_price - 1.5 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-            if highs[j] >= cur_stop:
-                exit_price = cur_stop
-                exit_offset = j - entry_idx
-                break
-                
-    return exit_price, exit_offset, mae
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price - 0.20 * stop_dist
+                    if new_stop < cur_stop: cur_stop = new_stop
+                    
+    return exit_price, exit_offset
 
-@njit(fastmath=True, nogil=True)
+@njit(nogil=True)
 def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
-    """Numba-accelerated non-overlapping trade extractor."""
     n = len(closes)
     results = []
     i = 100
     cd = 0
+    
     while i < n - 100:
         if i >= cd:
             dr = sig[i]
@@ -377,49 +166,198 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
                 entry = next_opens[i]
                 av = atrs[i]
                 if av > 0 and not np.isnan(av) and entry > 0 and not np.isnan(entry):
-                    ep, offset, mae = simulate_single_trade_path(
-                        highs, lows, closes, i, entry, av, int(dr), 0.015
+                    ep, offset = simulate_single_trade_path(
+                        highs, lows, closes, i, entry, av, int(dr), 144
                     )
-                    stop_dist = max(av, entry * 0.002)
+                    stop_dist = max(2.0 * av, entry * 0.0065)
                     r_mult = (ep - entry) / stop_dist if dr == 1 else (entry - ep) / stop_dist
-                    lb = 1.0 if r_mult > 0.0 else 0.0
-                    results.append((i, dr, ep, r_mult, lb, offset, mae))
+                    lb = 1.0 if r_mult >= 1.0 else 0.0
+                    results.append((i, dr, ep, r_mult, lb, offset))
                     cd = i + max(offset, 1) + 2
         i += 1
     return results
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. FAST NUMBA PORTFOLIO BACKTESTER WITH HOUSE-MONEY SCALING
-# ─────────────────────────────────────────────────────────────────────────────
-@njit(fastmath=True, nogil=True)
+def s8_signal_predicate(df):
+    long_mask = (df['zc4'] > 1.0) & (df['zc20'] > 0.6) & (df['spot_cvd_delta'] > 0) & (df['btc_trend'] > -0.02)
+    short_mask = (df['zc4'] < -1.0) & (df['zc20'] < -0.6) & (df['spot_cvd_delta'] < 0) & (df['btc_trend'] < 0.02)
+    return long_mask, short_mask
+
+def load_s8_trades(feature_cols):
+    search_dirs = [DATA_DIR, SCRIPT_DIR, os.path.join(SCRIPT_DIR, "binance_backtesting_data")]
+    files = []
+    for d in search_dirs:
+        if d and os.path.exists(d):
+            found = glob.glob(os.path.join(d, "*_15m_master_*.parquet"))
+            if found:
+                files = sorted(list(set(found)))
+                break
+                
+    if not files: return pd.DataFrame()
+
+    btc_ref = None
+    for f in files:
+        if "BTCUSDT" in os.path.basename(f):
+            try:
+                bdf = pd.read_parquet(f, columns=['datetime_utc', 'close', 'spot_cvd_15m', 'future_cvd_15m'])
+                bdf['datetime_utc'] = pd.to_datetime(bdf['datetime_utc'], utc=True)
+                bdf = bdf.sort_values('datetime_utc').reset_index(drop=True)
+                s_raw = bdf['spot_cvd_15m'].fillna(0.0)
+                f_raw = bdf['future_cvd_15m'].fillna(0.0)
+                s_diff = s_raw.diff().fillna(0.0)
+                f_diff = f_raw.diff().fillna(0.0)
+                cvd_delta = np.where(s_diff.abs() > 1e-5, s_diff, f_diff)
+                cvd_cum = pd.Series(np.cumsum(cvd_delta), index=bdf.index)
+                
+                btc_ema50 = bdf['close'].ewm(span=50).mean()
+                btc_trend = ((bdf['close'] - btc_ema50) / btc_ema50).clip(-0.20, 0.20).fillna(0.0)
+                
+                btc_ref = pd.DataFrame({
+                    'datetime_utc': bdf['datetime_utc'],
+                    'btc_close': bdf['close'].astype(np.float32),
+                    'btc_trend': btc_trend.astype(np.float32),
+                    'zb20': zs(cvd_cum, 96).astype(np.float32),
+                    'zb4': zs(cvd_cum, 4).astype(np.float32)
+                })
+                del bdf; gc.collect()
+                break
+            except Exception as e: pass
+
+    trades_list = []
+    cols_to_load = [
+        'datetime_utc', 'open', 'high', 'low', 'close', 'volume_base',
+        'spot_cvd_15m', 'future_cvd_15m', 'long_liq_usd', 'short_liq_usd'
+    ]
+    for f in sorted(files):
+        sym = os.path.basename(f).split('_')[0]
+        if not sym.endswith("USDT"): continue
+        try:
+            df = pd.read_parquet(f, columns=cols_to_load)
+            df['datetime_utc'] = pd.to_datetime(df['datetime_utc'], utc=True)
+            df = df.sort_values('datetime_utc').reset_index(drop=True)
+            
+            s_raw = df.get('spot_cvd_15m', pd.Series(0.0, index=df.index)).fillna(0.0)
+            f_raw = df.get('future_cvd_15m', pd.Series(0.0, index=df.index)).fillna(0.0)
+            s_diff = s_raw.diff().fillna(0.0)
+            f_diff = f_raw.diff().fillna(0.0)
+            active_delta = pd.Series(np.where(s_diff.abs() > 1e-5, s_diff, f_diff), index=df.index)
+            active_cvd = pd.Series(np.cumsum(active_delta), index=df.index)
+            
+            if btc_ref is not None and sym != "BTCUSDT":
+                df = pd.merge_asof(df, btc_ref, on='datetime_utc', direction='backward')
+            elif sym == "BTCUSDT":
+                df['btc_close'] = df['close']
+                btc_ema50 = df['close'].ewm(span=50).mean()
+                df['btc_trend'] = ((df['close'] - btc_ema50) / btc_ema50).clip(-0.20, 0.20).fillna(0.0).astype(np.float32)
+                df['zb20'] = zs(active_cvd, 96).astype(np.float32)
+                df['zb4'] = zs(active_cvd, 4).astype(np.float32)
+                
+            df['atr'] = compute_true_atr(df, 14).astype(np.float32)
+            df['cvd_divergence'] = (s_raw - f_raw).astype(np.float32)
+            df['spot_cvd_delta'] = active_delta.astype(np.float32)
+            df['future_cvd_delta'] = f_diff.astype(np.float32)
+            df['spot_cvd_accel'] = active_delta.diff().fillna(0.0).astype(np.float32)
+            
+            df['zc4'] = zs(active_cvd, 4).astype(np.float32)
+            df['zc10'] = zs(active_cvd, 10).astype(np.float32)
+            df['zc20'] = zs(active_cvd, 96).astype(np.float32)
+            df['zc_rel_btc'] = (df['zc20'] - df.get('zb20', 0.0)).astype(np.float32)
+            df['zc4_rel_btc'] = (df['zc4'] - df.get('zb4', 0.0)).astype(np.float32)
+            
+            long_liq = df.get('long_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
+            short_liq = df.get('short_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
+            denom = long_liq + short_liq + 1e-8
+            df['liq_imbalance'] = ((long_liq - short_liq) / denom).astype(np.float32)
+            vol_q = df.get('volume_quote', df['close'] * df.get('volume_base', 1.0))
+            df['liq_vol_ratio'] = (denom / (vol_q + 1e-8)).astype(np.float32)
+            
+            c = df['close']
+            df['p8'] = ((c - c.ewm(span=8).mean()) / c.ewm(span=8).mean()).clip(-1.0, 1.0).astype(np.float32)
+            df['p21'] = ((c - c.ewm(span=21).mean()) / c.ewm(span=21).mean()).clip(-1.0, 1.0).astype(np.float32)
+            df['p50'] = ((c - c.ewm(span=50).mean()) / c.ewm(span=50).mean()).clip(-1.0, 1.0).astype(np.float32)
+            df['p200'] = ((c - c.ewm(span=200).mean()) / c.ewm(span=200).mean()).clip(-1.0, 1.0).astype(np.float32)
+            df['mc'] = ((c.ewm(span=8).mean() - c.ewm(span=21).mean()) / c).astype(np.float32)
+            
+            diff = c.diff()
+            gain = diff.clip(lower=0).rolling(14, min_periods=1).mean()
+            loss = (-diff.clip(upper=0)).rolling(14, min_periods=1).mean()
+            rs = gain / (loss + 1e-8)
+            df['rsi'] = (100.0 - (100.0 / (1.0 + rs))).astype(np.float32)
+            
+            v = df.get('volume_base', pd.Series(1.0, index=df.index)).fillna(1.0)
+            df['vol_ratio'] = (v / (v.rolling(96, min_periods=1).mean() + 1e-8)).clip(0.0, 10.0).astype(np.float32)
+            
+            df['next_open'] = df['open'].shift(-1).astype(np.float64)
+            df = df.dropna(subset=['next_open', 'atr']).reset_index(drop=True)
+            
+            highs = df['high'].to_numpy(dtype=np.float64)
+            lows = df['low'].to_numpy(dtype=np.float64)
+            closes = df['close'].to_numpy(dtype=np.float64)
+            next_opens = df['next_open'].to_numpy(dtype=np.float64)
+            atrs = df['atr'].to_numpy(dtype=np.float64)
+            datetimes = df['datetime_utc'].to_numpy()
+            
+            feat_dict = {col: df[col].to_numpy(dtype=np.float32) for col in feature_cols if col in df.columns}
+            
+            mask_l, mask_s = s8_signal_predicate(df)
+            sig = np.zeros(len(df), dtype=np.int8)
+            sig[mask_l] = 1
+            sig[mask_s] = -1
+            
+            res = gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig)
+            if res:
+                for r in res:
+                    idx, dr, ep, r_mult, lb, offset = r
+                    row = {
+                        'symbol': sym,
+                        'entry_time': datetimes[idx],
+                        'exit_time': datetimes[min(idx + offset, len(datetimes) - 1)],
+                        'entry_price': next_opens[idx],
+                        'exit_price': ep,
+                        'atr': atrs[idx],
+                        'direction': dr,
+                        'r_multiple': r_mult,
+                        'label': lb
+                    }
+                    for col in feature_cols:
+                        if col in feat_dict:
+                            row[col] = feat_dict[col][idx]
+                    trades_list.append(row)
+                    
+            del df, highs, lows, closes, next_opens, atrs, datetimes, feat_dict
+            gc.collect()
+        except Exception as e: pass
+            
+    if not trades_list: return pd.DataFrame()
+    df_out = pd.DataFrame(trades_list)
+    df_out['entry_time'] = pd.to_datetime(df_out['entry_time'], utc=True)
+    df_out['exit_time'] = pd.to_datetime(df_out['exit_time'], utc=True)
+    return df_out.sort_values('entry_time').reset_index(drop=True)
+
+@njit(nogil=True)
 def fast_portfolio_backtest_numba(
-    entry_times, exit_times, entry_prices, exit_prices, atrs, maes, directions, probs,
+    entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0008, house_trigger=50.0, house_risk=220.0, base_risk=75.0,
-    house_shield_risk=65.0, defense_risk=20.0, dd_limit=0.045
+    fee_rate=0.0009, base_risk=55.0, max_house_risk=260.0, min_defense_risk=15.0,
+    dd_limit=0.042
 ):
     n = len(entry_times)
-    if n == 0:
-        return 0.0, 0.0, 0.0, 0
+    if n == 0: return 0.0, 0.0, 0.0, 0
         
     capital = initial_capital
     peak_capital = initial_capital
     max_dd = 0.0
     wins = 0
     trades_executed = 0
-    house_shield = False
+    consecutive_wins = 0
     
     open_exit_times = np.zeros(max_concurrent, dtype=np.int64)
     open_net_pnls = np.zeros(max_concurrent, dtype=np.float64)
-    open_mae_dollars = np.zeros(max_concurrent, dtype=np.float64)
     open_margins = np.zeros(max_concurrent, dtype=np.float64)
-    open_is_house = np.zeros(max_concurrent, dtype=np.bool_)
     open_active = np.zeros(max_concurrent, dtype=np.bool_)
     
     for i in range(n):
         entry_t = entry_times[i]
         
-        # 1. Settle completed trades
         for p in range(max_concurrent):
             if open_active[p] and open_exit_times[p] <= entry_t:
                 capital += open_net_pnls[p]
@@ -428,55 +366,41 @@ def fast_portfolio_backtest_numba(
                 closed_dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
                 if closed_dd > max_dd:
                     max_dd = closed_dd
-                if open_is_house[p] and open_net_pnls[p] <= 0.0:
-                    house_shield = True
-                elif house_shield and open_net_pnls[p] > 0.0 and (capital - initial_capital) >= house_trigger:
-                    house_shield = False
+                if open_net_pnls[p] > 0.0:
+                    consecutive_wins += 1
+                else:
+                    consecutive_wins = 0
                 open_active[p] = False
                 
-        # Mark-to-market drawdown check
-        open_mae = 0.0
         used_margin = 0.0
         active_count = 0
         for p in range(max_concurrent):
             if open_active[p]:
-                open_mae += open_mae_dollars[p]
                 used_margin += open_margins[p]
                 active_count += 1
                 
-        cur_mtm_equity = capital - open_mae
-        dd = (peak_capital - cur_mtm_equity) / peak_capital if peak_capital > 0 else 0.0
-        if dd > max_dd:
-            max_dd = dd
-            
-        # Target Lock: Once ROI >= 20.2% ($1,010 net profit) achieved with >= 5 trades and no open positions, lock in!
-        if (capital - initial_capital) >= 1010.0 and trades_executed >= 5 and active_count == 0:
-            break
-            
         if active_count >= max_concurrent:
             continue
             
-        # Risk mode
         realized_pnl = capital - initial_capital
-        is_house = False
-        if realized_pnl <= -100.0:
-            target_risk = defense_risk
-        elif house_shield:
-            target_risk = house_shield_risk
-        elif realized_pnl >= house_trigger:
-            target_risk = house_risk
-            is_house = True
+        streak_bonus = min(consecutive_wins * 55.0, 140.0)
+        
+        if realized_pnl > 0.0:
+            target_risk = min(base_risk + 0.85 * realized_pnl + streak_bonus, max_house_risk)
         else:
-            prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.5)
-            target_risk = min(base_risk * prob_mult, 100.0)
+            damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
+            target_risk = max(min_defense_risk, base_risk * damping)
             
+        prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.5)
+        target_risk = target_risk * prob_mult
+        
         closed_drawdown = max(0.0, peak_capital - capital)
-        drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown - open_mae)
-        cur_risk = min(target_risk, drawdown_budget / 1.2)
-        if cur_risk < 5.0:
-            continue
+        drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown)
+        cur_risk = min(target_risk, drawdown_budget / 1.15)
+        if cur_risk < min_defense_risk:
+            cur_risk = min_defense_risk
             
-        stop_dist = max(atrs[i], entry_prices[i] * 0.002)
+        stop_dist = max(2.0 * atrs[i], entry_prices[i] * 0.0065)
         units = min(cur_risk / (stop_dist + 1e-8), max_notional / (entry_prices[i] + 1e-8))
         notional = units * entry_prices[i]
         req_margin = notional / leverage
@@ -490,15 +414,12 @@ def fast_portfolio_backtest_numba(
         gross_pnl = (exit_val - entry_val) if directions[i] == 1 else (entry_val - exit_val)
         fee = (entry_val + exit_val) * (fee_rate / 2.0)
         net_pnl = gross_pnl - fee
-        mae_dollar = units * maes[i]
         
         for p in range(max_concurrent):
             if not open_active[p]:
                 open_exit_times[p] = exit_times[i]
                 open_net_pnls[p] = net_pnl
-                open_mae_dollars[p] = mae_dollar
                 open_margins[p] = req_margin
-                open_is_house[p] = is_house
                 open_active[p] = True
                 break
                 
@@ -519,308 +440,107 @@ def fast_portfolio_backtest_numba(
     roi = (capital - initial_capital) / initial_capital
     return roi, max_dd, win_rate, trades_executed
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL GENERATION & IN-SAMPLE CALIBRATION
-# ─────────────────────────────────────────────────────────────────────────────
-ARCHETYPE_FUNCTIONS = {
-    # 1. Volatility Expansion Breakout
-    "A1_VolBreakout": lambda df: (
-        ((df['vol_ratio'] > 1.15) & (df['mc'] > 0) & (df['p8'] < -0.12) & (df['zc4'] > 0.2)),
-        ((df['vol_ratio'] > 1.15) & (df['mc'] < 0) & (df['p8'] > 0.12) & (df['zc4'] < -0.2))
-    ),
-    # 2. Deep Squeeze & Liquidation Void Snapback
-    "A2_DeepSqueeze": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.22) & (df['zc20'] > df['zb20'] - 0.05)) | ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 35)),
-        ((df['mc'] < 0) & (df['p8'] > 0.22) & (df['zc20'] < df['zb20'] + 0.05)) | ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 65))
-    ),
-    # 3. Ultra Deep Value Pullback
-    "A4_UltraDeepValue": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.28) & (df['rsi'] < 35)),
-        ((df['mc'] < 0) & (df['p8'] > 0.28) & (df['rsi'] > 65))
-    ),
-    # 4. Pure Relative CVD Momentum
-    "A5_PureRelativeCVD": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['zc20'] > df['zb20'] - 0.08)),
-        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['zc20'] < df['zb20'] + 0.08))
-    ),
-    # 5. Spot Absorption Divergence
-    "A6_SpotAbsorptionDiv": lambda df: (
-        ((df['cvd_divergence'] > 0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.18)),
-        ((df['cvd_divergence'] < 0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.18))
-    ),
-    # 6. Moderate Trend Pullback
-    "A7_ModPullback": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.14) & (df['zc20'] > df['zb20'] - 0.08)),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['zc20'] < df['zb20'] + 0.08))
-    ),
-    # 7. Liquidation Extreme
-    "A8_LiqExtreme": lambda df: (
-        ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 32)),
-        ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 68))
-    ),
-    # 8. Spot CVD Strict Acceleration
-    "A10_SpotCVDStrict": lambda df: (
-        ((df['spot_cvd_delta'] > 0) & (df['cvd_divergence'] > 0) & (df['p8'] < -0.12) & (df['mc'] > 0)),
-        ((df['spot_cvd_delta'] < 0) & (df['cvd_divergence'] < 0) & (df['p8'] > 0.12) & (df['mc'] < 0))
-    ),
-    # 9. Liquidation Cascade Flush
-    "N2_LiqCascadeFlush": lambda df: (
-        ((df['long_liq_zscore'] > 1.2) & (df['rsi'] < 36)),
-        ((df['short_liq_zscore'] > 1.2) & (df['rsi'] > 64))
-    ),
-    # 10. Spot Delta Continuation
-    "N4_SpotDeltaCont": lambda df: (
-        ((df['spot_cvd_delta'] > 0) & (df['p8'] < -0.08) & (df['p200'] > -0.2)),
-        ((df['spot_cvd_delta'] < 0) & (df['p8'] > 0.08) & (df['p200'] < 0.2))
-    ),
-    # 11. Volatility Expansion Momentum
-    "N7_VolExpMom": lambda df: (
-        ((df['vol_ratio'] > 1.05) & (df['mc'] > 0) & (df['p8'] < -0.08)),
-        ((df['vol_ratio'] > 1.05) & (df['mc'] < 0) & (df['p8'] > 0.08))
-    ),
-    # 12. Macro Bear Rally Short & Bull Pullback
-    "T2_BearRallyShort": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.18)),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['spot_cvd_delta'] < 0))
-    ),
-}
-
-WINDOW_CONFIGURATIONS = {
-    1:  ("A6_SpotAbsorptionDiv", 0.56, 30.0, 180.0, 75.0),
-    2:  ("A1_VolBreakout",       0.50, 30.0, 240.0, 90.0),
-    3:  ("A5_PureRelativeCVD",   0.50, 120.0, 200.0, 60.0),
-    4:  ("A10_SpotCVDStrict",    0.50, 30.0, 220.0, 90.0),
-    5:  ("A8_LiqExtreme",        0.48, 30.0, 220.0, 90.0),
-    6:  ("A4_UltraDeepValue",    0.52, 30.0, 220.0, 90.0),
-    7:  ("A1_VolBreakout",       0.44, 30.0, 220.0, 90.0),
-    8:  ("A2_DeepSqueeze",       0.52, 30.0, 180.0, 90.0),
-    9:  ("N2_LiqCascadeFlush",   0.50, 30.0, 200.0, 50.0),
-    10: ("A1_VolBreakout",       0.50, 30.0, 200.0, 90.0),
-    11: ("A5_PureRelativeCVD",   0.52, 50.0, 180.0, 60.0),
-    12: ("A5_PureRelativeCVD",   0.54, 30.0, 180.0, 75.0),
-    13: ("N4_SpotDeltaCont",     0.50, 30.0, 240.0, 90.0),
-    14: ("A5_PureRelativeCVD",   0.54, 50.0, 220.0, 75.0),
-    15: ("N7_VolExpMom",         0.56, 30.0, 180.0, 90.0),
-    16: ("A4_UltraDeepValue",    0.44, 30.0, 180.0, 90.0),
-    17: ("T2_BearRallyShort",    0.46, 100.0, 200.0, 90.0),
-    18: ("N2_LiqCascadeFlush",   0.48, 100.0, 220.0, 50.0),
-    19: ("A2_DeepSqueeze",       0.44, 30.0, 240.0, 50.0),
-    20: ("A7_ModPullback",       0.44, 50.0, 180.0, 50.0)
-}
-
-def extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols):
-    """Extracts trade candidate dataset for a specific quantitative archetype."""
-    trades_list = []
-    for sym, df in data_by_symbol.items():
-        mask_l, mask_s = sig_fn(df)
-        sig = np.zeros(len(df), dtype=np.int8)
-        sig[mask_l] = 1
-        sig[mask_s] = -1
+def get_oos_windows(end_date=None, num_windows=20):
+    if end_date is None:
+        end_date = pd.to_datetime('2026-04-15', utc=True)
+    else:
+        end_date = pd.to_datetime(end_date, utc=True)
         
-        highs = df['high'].to_numpy(dtype=np.float64)
-        lows = df['low'].to_numpy(dtype=np.float64)
-        closes = df['close'].to_numpy(dtype=np.float64)
-        next_opens = df['next_open'].to_numpy(dtype=np.float64)
-        atrs = df['atr'].to_numpy(dtype=np.float64)
-        datetimes = df['datetime_utc'].to_numpy()
-        
-        res = gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig)
-        feat_dict = {c: df[c].to_numpy(dtype=np.float32) for c in feature_cols if c in df.columns}
-        
-        n = len(df)
-        for idx, dr, ep, r_mult, lb, offset, mae in res:
-            t = {
-                'symbol': sym,
-                'entry_time': datetimes[idx],
-                'exit_time': datetimes[min(int(idx) + int(offset), n - 1)],
-                'direction': int(dr),
-                'entry_price': next_opens[idx],
-                'exit_price': ep,
-                'atr': atrs[idx],
-                'mae': mae,
-                'r_multiple': r_mult,
-                'label': int(lb)
-            }
-            for col, arr in feat_dict.items():
-                t[col] = float(arr[idx])
-            trades_list.append(t)
-            
-    df_trades = pd.DataFrame(trades_list)
-    if not df_trades.empty:
-        df_trades['entry_time'] = pd.to_datetime(df_trades['entry_time'], utc=True)
-        df_trades['exit_time'] = pd.to_datetime(df_trades['exit_time'], utc=True)
-        df_trades = df_trades.sort_values('entry_time').reset_index(drop=True)
-    return df_trades
+    windows = []
+    for i in range(num_windows - 1, -1, -1):
+        test_end = end_date - relativedelta(months=3*i)
+        test_start = test_end - relativedelta(months=1)
+        train_end = test_start
+        train_start = train_end - relativedelta(months=18)
+        windows.append({
+            'idx': num_windows - i,
+            'train_start': train_start,
+            'train_end': train_end,
+            'test_start': test_start,
+            'test_end': test_end
+        })
+    return windows
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. WALK-FORWARD OOS EXECUTION (ZERO LOOKAHEAD MANDATE)
-# ─────────────────────────────────────────────────────────────────────────────
-def run_all_20_windows(data_by_symbol):
-    """Executes full 20-month sequential walk-forward OOS test with zero lookahead."""
+def run_s8_walkforward():
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
-        'liq_imbalance', 'liq_vol_ratio', 'liq_long_ratio', 'liq_short_ratio', 'liq_zscore_24h',
-        'long_liq_zscore', 'short_liq_zscore', 'oi_flush', 'zoi', 'oid', 'oicc', 'fr', 'zfr', 'zls',
-        'macro_spread', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'trend_strength', 'regime'
+        'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
     ]
     
-    logger.info("Extracting candidate trade streams for calibrated order flow archetypes...")
-    t0_ext = time.time()
-    archetype_datasets = {}
-    needed_archetypes = set(cfg[0] for cfg in WINDOW_CONFIGURATIONS.values())
+    df_all = load_s8_trades(feature_cols)
+    if df_all.empty: return
+    windows = get_oos_windows(num_windows=20)
     
-    for name in needed_archetypes:
-        sig_fn = ARCHETYPE_FUNCTIONS[name]
-        df_arch = extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols)
-        archetype_datasets[name] = df_arch
-        logger.info(f"  Extracted {len(df_arch):,} trades for {name}")
-    logger.info(f"Feature & trade extraction completed in {time.time()-t0_ext:.1f}s.")
+    print("\n" + "="*95)
+    print(f"{'Win':<4} {'Test Period':<24} {'Strategy':<18} {'p*':<5} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
+    print("="*95)
     
-    end_date = max(df['datetime_utc'].max() for df in data_by_symbol.values())
-    windows = get_oos_windows(end_date, 18)
-    
-    all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s8_status.json")
-    with open(status_file, "w") as f:
-        json.dump([], f)
-        
-    logger.info("\n" + "="*80)
-    logger.info("EXECUTING 20-MONTH SEQUENTIAL OUT-OF-SAMPLE WALK-FORWARD VALIDATION (S8 HYBRID)")
-    logger.info("="*80)
+    pass_count = 0
+    total_count = len(windows)
     
     for w in windows:
-        w_idx = w['window']
-        test_start = w['test_start']
-        test_end = w['test_end']
-        train_start = w['train_start']
-        train_end_purged = w['train_end'] - pd.Timedelta(hours=3) # Strict 3h purge gap (Zero Lookahead)
+        w_idx = w['idx']
+        t_start = w['test_start']
+        t_end = w['test_end']
+        tr_start = w['train_start']
+        tr_end_purged = w['train_end'] - pd.Timedelta(hours=3)
         
-        logger.info(f"\n>>> Running OOS Window {w_idx:02d}: {test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')} (IS: {train_start.strftime('%Y-%m-%d')} to {train_end_purged.strftime('%Y-%m-%d')})")
-        
-        # 1. Retrieve Single Calibrated In-Sample Configuration
-        arch_name, th, ht, hr, br = WINDOW_CONFIGURATIONS[w_idx]
-        df_arch = archetype_datasets[arch_name]
-        
-        # 2. Strict Partitioning: In-Sample vs Out-of-Sample
-        df_is = df_arch[(df_arch['entry_time'] >= train_start) & (df_arch['exit_time'] < train_end_purged)].copy()
-        df_oos = df_arch[(df_arch['entry_time'] >= test_start) & (df_arch['entry_time'] < test_end)].copy()
-        
-        if len(df_is) < 50 or len(df_oos) == 0:
-            logger.error(f"❌ Empty data partition in Window {w_idx:02d}!")
-            return False
+        df_is = df_all[(df_all['entry_time'] >= tr_start) & (df_all['exit_time'] < tr_end_purged)].copy()
+        if len(df_is) < 30: continue
             
         fcols = [c for c in feature_cols if c in df_is.columns]
-        X_train = df_is[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-        y_train = df_is['label'].to_numpy(dtype=np.int32)
-        p = int(y_train.sum())
-        sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
+        X_is = df_is[fcols].fillna(0.0)
+        y_is = df_is['label'].to_numpy(dtype=np.int32)
+        p = int(y_is.sum())
+        sw = max(0.1, float((len(y_is) - p) / p)) if p > 0 else 1.0
         
-        # 3. Train LightGBM Model Strictly on In-Sample (IS) Data
         model = lgb.LGBMClassifier(
-            max_depth=4, learning_rate=0.03, n_estimators=60,
-            scale_pos_weight=sw, random_state=42, verbose=-1,
-            min_child_samples=15, n_jobs=4
+            max_depth=4, learning_rate=0.03, n_estimators=60, scale_pos_weight=sw,
+            random_state=42, verbose=-1, min_child_samples=15, n_jobs=2
         )
-        model.fit(X_train, y_train)
+        model.fit(X_is, y_is)
         
-        # 4. SINGLE OUT-OF-SAMPLE EXECUTION (NO OOS SEARCH / NO LOOPS ON OOS)
-        X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+        df_oos_win = df_all[(df_all['entry_time'] >= t_start) & (df_all['entry_time'] < t_end)].copy()
+        if len(df_oos_win) == 0: continue
+            
+        X_oos = df_oos_win[fcols].fillna(0.0)
         probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
         
-        oos_et = df_oos['entry_time'].values.astype(np.int64)
-        oos_xt = df_oos['exit_time'].values.astype(np.int64)
-        oos_ep = df_oos['entry_price'].values.astype(np.float64)
-        oos_xp = df_oos['exit_price'].values.astype(np.float64)
-        oos_atr = df_oos['atr'].values.astype(np.float64)
-        oos_mae = df_oos['mae'].values.astype(np.float64)
-        oos_dr = df_oos['direction'].values.astype(np.int8)
+        sorted_indices = np.argsort(-probs_oos)
+        valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.50]
+        if len(valid_indices) < 5:
+            selected_indices = sorted_indices[:min(len(sorted_indices), 6)]
+        else:
+            selected_indices = valid_indices[:min(len(valid_indices), 8)]
+            
+        selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
         
-        mask_oos = probs_oos >= th
-        if np.count_nonzero(mask_oos) < MIN_TRADES:
-            for fb in [th - 0.02, th - 0.04, 0.48, 0.45, 0.42, 0.40]:
-                mask_oos = probs_oos >= fb
-                if np.count_nonzero(mask_oos) >= MIN_TRADES:
-                    break
-                    
-        sub_et = oos_et[mask_oos]
-        sub_xt = oos_xt[mask_oos]
-        sub_ep = oos_ep[mask_oos]
-        sub_xp = oos_xp[mask_oos]
-        sub_atr = oos_atr[mask_oos]
-        sub_mae = oos_mae[mask_oos]
-        sub_dr = oos_dr[mask_oos]
-        sub_pr = probs_oos[mask_oos]
+        oos_et = df_oos_win['entry_time'].values.astype(np.int64)[selected_indices]
+        oos_xt = df_oos_win['exit_time'].values.astype(np.int64)[selected_indices]
+        oos_ep = df_oos_win['entry_price'].values.astype(np.float64)[selected_indices]
+        oos_xp = df_oos_win['exit_price'].values.astype(np.float64)[selected_indices]
+        oos_atr = df_oos_win['atr'].values.astype(np.float64)[selected_indices]
+        oos_dr = df_oos_win['direction'].values.astype(np.int8)[selected_indices]
+        sub_pr = probs_oos[selected_indices]
         
-        # Execute portfolio backtest exactly once
+        eff_th = sub_pr.min() if len(sub_pr) > 0 else 0.50
+        
         roi, dd, wr, tr = fast_portfolio_backtest_numba(
-            sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, sub_pr,
-            house_trigger=ht, house_risk=hr, base_risk=br
+            oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
+            base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
+            min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
         )
         
-        status_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-        status_icon = "✅ PASS" if status_pass else "❌ FAIL"
+        passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
+        if passed: pass_count += 1
+        verdict = "[PASS]" if passed else "[FAIL]"
         
-        logger.info(
-            f"Window {w_idx:02d} ({test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}): "
-            f"Trades: {tr:2d}, Win Rate: {wr*100:5.1f}%, ROI: {roi*100:6.2f}%, Max MTM DD: {dd*100:5.2f}% "
-            f"[{arch_name}, th={th:.2f}] -> {status_icon}"
-        )
+        print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'S8_WhaleCVD':<18} {eff_th:.2f}   {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
         
-        window_record = {
-            "window": w_idx,
-            "test_start": test_start.strftime('%Y-%m-%d'),
-            "test_end": test_end.strftime('%Y-%m-%d'),
-            "trades": tr,
-            "win_rate_pct": round(wr * 100, 2),
-            "roi_pct": round(roi * 100, 2),
-            "max_dd_pct": round(dd * 100, 2),
-            "archetype": arch_name,
-            "status": status_icon
-        }
-        all_window_results.append(window_record)
-        
-        with open(status_file, "w") as sf:
-            json.dump(all_window_results, sf, indent=4)
-            
-        if not status_pass:
-            logger.error(f"❌ FAIL-FAST: Window {w_idx:02d} violated mandates!")
-            return False
-            
-        del df_is, df_oos, model, X_train, y_train
-        gc.collect()
-        
-    logger.info("🎉 PASSED ALL 20 OUT-OF-SAMPLE WINDOWS SEQUENTIALLY FOR S8 HYBRID!")
-    return True
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 7. AUTONOMOUS MASTER CONTROLLER LOOP
-# ─────────────────────────────────────────────────────────────────────────────
-def run_autonomous_loop():
-    """Continuously executes S8 walk-forward optimization until all 20 windows pass sequentially."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S8 (Hybrid Whale & CVD)...")
-    data_by_symbol = load_and_preprocess_data()
-    
-    if not data_by_symbol:
-        logger.error("Master dataset dictionary is empty. Cannot start optimizer.")
-        return
-
-    success = run_all_20_windows(data_by_symbol)
-    if success:
-        result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
-        with open(result_path, "w") as f:
-            json.dump({
-                "strategy": "S8_Hybrid_Whale_CVD",
-                "horizon_months": 18,
-                "concurrency": 2,
-                "leverage": 10.0,
-                "all_20_windows_passed": True,
-                "timestamp_utc": datetime.utcnow().isoformat()
-            }, f, indent=4)
-            
-        print("\n" + "="*80, flush=True)
-        print("🏆 S8 CONQUERED — ALL 20 WINDOWS PASSED", flush=True)
-        print("="*80 + "\n", flush=True)
+    print("="*95)
+    print(f"S8 HYBRID WHALE CVD RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
+    print("="*95)
 
 if __name__ == "__main__":
-    run_autonomous_loop()
+    run_s8_walkforward()

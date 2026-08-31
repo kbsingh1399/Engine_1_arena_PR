@@ -1,100 +1,95 @@
-#!/usr/bin/env python3 -u
+#!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: PARALLEL MULTI-STRATEGY OOS HARNESS (S1, S2, S3, S8, S15)
+ENGINE 2: PARALLEL MULTI-STRATEGY CONQUEST RUNNER (ALL 9 STRATEGIES)
 ================================================================================
-Executes all 5 production strategies in parallel processes with real-time tracking
-and generates a consolidated cross-strategy 20/20 OOS summary report.
+Concurrent execution of all 9 institutional strategies across 20 OOS windows:
+  - S1:  Liquidation Cascade & Absorption
+  - S2:  CVD Momentum Breakout
+  - S3:  Macro Trend Following
+  - S4:  CVD Divergence & Liquidity Squeeze
+  - S5:  Liquidity Sweep & Absorption Reversal
+  - S6:  Volatility Compression & ATR Breakout
+  - S7:  Delta Climax Mean Reversion
+  - S8:  Hybrid Whale CVD Absorption
+  - S15: VWAP Profile Conviction
 ================================================================================
 """
 
-import os
-import sys
-import subprocess
-import time
-import json
+import os, sys, time, subprocess
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from datetime import datetime
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-STRATEGIES = [
-    ("S1_Liquidation_Cascade", os.path.join(ROOT_DIR, "s1_liquidation_cascade.py"), os.path.join(ROOT_DIR, "results_s1", "s1_status.json")),
-    ("S2_CVD_Momentum", os.path.join(ROOT_DIR, "s2_cvd_momentum.py"), os.path.join(ROOT_DIR, "results_s2", "s2_status.json")),
-    ("S3_Macro_Trend_Follow", os.path.join(ROOT_DIR, "s3_macro_trend_follow.py"), os.path.join(ROOT_DIR, "results_s3", "s3_status.json")),
-    ("S8_Hybrid_Whale_CVD", os.path.join(ROOT_DIR, "s8_hybrid_whale_cvd.py"), os.path.join(ROOT_DIR, "results_s8", "s8_status.json")),
-    ("S15_VWAP_Profile_Conviction", os.path.join(ROOT_DIR, "s15_vwap_profile_conviction.py"), os.path.join(ROOT_DIR, "results_s15_vwap_profile", "s15_status.json"))
+STRATEGY_SCRIPTS = [
+    ("S1_Liquidation_Cascade", os.path.join(SCRIPT_DIR, "s1_liquidation_cascade.py")),
+    ("S2_CVD_Momentum", os.path.join(SCRIPT_DIR, "s2_cvd_momentum.py")),
+    ("S3_Macro_Trend_Follow", os.path.join(SCRIPT_DIR, "s3_macro_trend_follow.py")),
+    ("S4_CVD_Divergence_Squeeze", os.path.join(SCRIPT_DIR, "s4_cvd_divergence_squeeze.py")),
+    ("S5_Liquidity_Sweep_Reversal", os.path.join(SCRIPT_DIR, "s5_liquidity_sweep_reversal.py")),
+    ("S6_Vol_Compression_Breakout", os.path.join(SCRIPT_DIR, "s6_volatility_compression_breakout.py")),
+    ("S7_Delta_Climax_MeanRev", os.path.join(SCRIPT_DIR, "s7_delta_climax_mean_reversion.py")),
+    ("S8_Hybrid_Whale_CVD", os.path.join(SCRIPT_DIR, "s8_hybrid_whale_cvd.py")),
+    ("S15_VWAP_Profile_Conviction", os.path.join(SCRIPT_DIR, "s15_vwap_profile_conviction.py")),
 ]
 
-def run_strategy(name, script_path):
-    t0 = time.time()
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Launching strategy: {name} ({os.path.basename(script_path)})", flush=True)
-    res = subprocess.run([sys.executable, script_path], capture_output=True, text=True, encoding="utf-8", errors="replace")
-    elapsed = time.time() - t0
-    success = (res.returncode == 0)
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {'✅' if success else '❌'} Finished {name} in {elapsed:.1f}s (Exit code: {res.returncode})", flush=True)
-    return name, script_path, success, res.stdout, res.stderr, elapsed
+def run_single_strategy(name_and_path):
+    name, script_path = name_and_path
+    if not os.path.exists(script_path):
+        return name, -1, f"File not found: {script_path}", 0.0
+        
+    start_t = time.time()
+    try:
+        proc = subprocess.run(
+            [sys.executable, script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+            cwd=SCRIPT_DIR
+        )
+        elapsed = time.time() - start_t
+        return name, proc.returncode, proc.stdout, elapsed
+    except Exception as e:
+        elapsed = time.time() - start_t
+        return name, -1, str(e), elapsed
 
 def main():
     print("=" * 80)
-    print("ENGINE 2: PARALLEL MULTI-STRATEGY 20-WINDOW OOS EXECUTION HARNESS")
-    print(f"Time: {datetime.utcnow().isoformat()}Z | Python: {sys.executable}")
+    print("LAUNCHING PARALLEL MULTI-STRATEGY SUITE (9 STRATEGIES x 20 OOS WINDOWS)")
+    print(f"Time: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} | Python: {sys.executable}")
     print("=" * 80)
     
-    t0_all = time.time()
-    
-    # Run strategies in parallel (up to 4 concurrent processes)
-    max_workers = min(len(STRATEGIES), 4)
+    total_start = time.time()
     results = {}
     
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(run_strategy, name, path): name for name, path, _ in STRATEGIES}
-        for fut in as_completed(futures):
-            name, path, success, stdout, stderr, elapsed = fut.result()
-            results[name] = {"success": success, "elapsed": elapsed, "stdout": stdout, "stderr": stderr}
-            
-    print("\n" + "=" * 80)
-    print("🏆 FINAL CONSOLIDATED 20/20 OOS PORTFOLIO SUMMARY")
-    print("=" * 80)
-    
-    table_rows = []
-    for name, script_path, status_path in STRATEGIES:
-        passes = 0
-        total_w = 20
-        avg_roi = 0.0
-        min_roi = 0.0
-        max_dd = 0.0
-        avg_wr = 0.0
-        total_tr = 0
-        
-        if os.path.exists(status_path):
+    with ProcessPoolExecutor(max_workers=min(len(STRATEGY_SCRIPTS), 6)) as executor:
+        futures = {executor.submit(run_single_strategy, item): item[0] for item in STRATEGY_SCRIPTS}
+        for future in as_completed(futures):
+            name = futures[future]
             try:
-                with open(status_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, list) and len(data) > 0:
-                    passes = sum(1 for w in data if "PASS" in str(w.get("status", "")).upper() or "✅" in str(w.get("status", "")))
-                    total_w = len(data)
-                    rois = [float(w.get("roi_pct", 0.0)) for w in data]
-                    dds = [float(w.get("max_dd_pct", 0.0)) for w in data]
-                    wrs = [float(w.get("win_rate_pct", 0.0)) for w in data]
-                    total_tr = sum(int(w.get("trades", 0)) for w in data)
-                    if rois:
-                        avg_roi = sum(rois) / len(rois)
-                        min_roi = min(rois)
-                    if dds:
-                        max_dd = max(dds)
-                    if wrs:
-                        avg_wr = sum(wrs) / len(wrs)
-            except Exception as e:
-                pass
-                
-        status_icon = "✅ 100% PASS" if passes == 20 else f"⚠️ {passes}/{total_w}"
-        print(f"{name:<20} | {status_icon} ({passes:2d}/20) | Avg ROI: {avg_roi:+6.2f}% | Min ROI: {min_roi:+6.2f}% | Max DD: {max_dd:5.2f}% | Avg WR: {avg_wr:5.1f}% | Trades: {total_tr:3d}")
-        
+                s_name, code, stdout, elapsed = future.result()
+                results[s_name] = (code, stdout, elapsed)
+                print(f"\n--- Output from {s_name} (Completed in {elapsed:.1f}s) ---\n")
+                print(stdout)
+            except Exception as exc:
+                print(f"[ERROR] Strategy {name} generated an exception: {exc}")
+
+    print("\n" + "=" * 80)
+    print("FINAL CONSOLIDATED PARALLEL SUITE EXECUTION")
     print("=" * 80)
-    print(f"Total Parallel Suite Execution Completed in {time.time() - t0_all:.1f}s.")
+    for name, (code, stdout, elapsed) in results.items():
+        status = "COMPLETED" if code == 0 else f"FAILED (code {code})"
+        print(f"• {name:<28} | {status:<10} | Runtime: {elapsed:.1f}s")
+    print("=" * 80)
+    print(f"Total Parallel Suite Execution Completed in {time.time() - total_start:.1f}s.\n")
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,27 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S2 - CVD MOMENTUM BREAKOUT (6R RUNNER GEOMETRY)
+ENGINE 2: S4 - CVD DIVERGENCE & LIQUIDITY SQUEEZE (5R ASYMMETRIC COMPOUNDING)
+================================================================================
+Institutional Zero-Lookahead Architecture:
+  1. Row-level Active CVD Delta (Seamless 2020-2026 Binance Spot/Futures Continuity)
+  2. CVD Divergence & Liquidity Squeeze:
+     - Spot vs. Futures CVD Divergence (Spot buying while Futures selling -> Short Squeeze)
+     - Extreme CVD divergence z-score (zc_divergence > 1.3 for Long, < -1.3 for Short)
+     - Macro BTC Trend Regime Alignment (btc_trend > -0.02 for Long, < 0.02 for Short)
+  3. Machine Learning Probability Conviction (LightGBM Classifier + In-Sample Calibrated p*)
+  4. Wide 5R Trailing Stop Geometry:
+     - Initial Stop: 2.0 * ATR
+     - Breakeven Lock: At +1.8R gain -> move stop to +0.5R
+     - Runner Lock: At +3.2R gain -> move stop to +2.2R
+     - Climax TP: At +5.5R gain -> full exit
+  5. Multi-Tiered Dynamic Compounding Governor:
+     - Base Risk: $50.0 (1.00% of Capital)
+     - Win-Streak Scaling: +$55.0 risk per consecutive win (up to $260.0 max)
+     - House Money Scaling: +0.85 * Realized PnL
+     - Defense Damping: Loss drops risk immediately to Base/Defense ($15.0 minimum)
+     - Drawdown Budget Clamp: Strictly bounded at 4.2% MTM DD
+  6. Multi-Asset Concurrency (Max 2 Positions, 10x Leverage, Taker Fees 4.5 bps/side)
 ================================================================================
 """
 
@@ -24,11 +44,11 @@ import lightgbm as lgb
 from numba import njit
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("S2_CVDMomentum")
+logger = logging.getLogger("S4_CVDDivergenceSqueeze")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s2")
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s4")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 MIN_RETURN = 0.20
@@ -37,7 +57,7 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 45.0
+BASE_RISK = 50.0
 MAX_HOUSE_RISK = 260.0
 MIN_DEFENSE_RISK = 15.0
 FEE_RATE = 0.0009
@@ -80,7 +100,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (highs[j] - entry_price) < 0.30 * stop_dist:
+            if bars_held == 48 and (highs[j] - entry_price) < 0.35 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -88,12 +108,15 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if highs[j] > best_price:
                 best_price = highs[j]
                 gain = best_price - entry_price
-                if gain >= 6.0 * stop_dist:
-                    exit_price = entry_price + 6.0 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price + 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = best_price - 1.6 * stop_dist
+                elif gain >= 3.2 * stop_dist:
+                    new_stop = entry_price + 2.2 * stop_dist
+                    if new_stop > cur_stop: cur_stop = new_stop
+                elif gain >= 1.8 * stop_dist:
+                    new_stop = entry_price + 0.50 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -101,7 +124,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (entry_price - lows[j]) < 0.30 * stop_dist:
+            if bars_held == 48 and (entry_price - lows[j]) < 0.35 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -109,12 +132,15 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if lows[j] < best_price:
                 best_price = lows[j]
                 gain = entry_price - best_price
-                if gain >= 6.0 * stop_dist:
-                    exit_price = entry_price - 6.0 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price - 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.0 * stop_dist:
-                    new_stop = best_price + 1.6 * stop_dist
+                elif gain >= 3.2 * stop_dist:
+                    new_stop = entry_price - 2.2 * stop_dist
+                    if new_stop < cur_stop: cur_stop = new_stop
+                elif gain >= 1.8 * stop_dist:
+                    new_stop = entry_price - 0.50 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
                     
     return exit_price, exit_offset
@@ -144,12 +170,14 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
         i += 1
     return results
 
-def s2_signal_predicate(df):
-    long_mask = (df['zc4'] > 1.2) & (df['spot_cvd_delta'] > 0) & (df['p21'] > 0.002) & (df['rsi'] > 50)
-    short_mask = (df['zc4'] < -1.2) & (df['spot_cvd_delta'] < 0) & (df['p21'] < -0.002) & (df['rsi'] < 50)
+def s4_signal_predicate(df):
+    """S4: Spot vs. Futures CVD Divergence & Short/Long Squeeze."""
+    long_mask = (df['zc_div'] > 1.2) & (df['spot_cvd_delta'] > 0) & (df['future_cvd_delta'] < 0) & (df['btc_trend'] > -0.02)
+    short_mask = (df['zc_div'] < -1.2) & (df['spot_cvd_delta'] < 0) & (df['future_cvd_delta'] > 0) & (df['btc_trend'] < 0.02)
     return long_mask, short_mask
 
-def load_s2_trades(feature_cols):
+def load_s4_trades(feature_cols):
+    logger.info("Loading 18-asset historical parquet datasets for S4 (CVD Divergence Squeeze)...")
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.path.join(SCRIPT_DIR, "binance_backtesting_data")]
     files = []
     for d in search_dirs:
@@ -219,7 +247,10 @@ def load_s2_trades(feature_cols):
                 df['zb4'] = zs(active_cvd, 4).astype(np.float32)
                 
             df['atr'] = compute_true_atr(df, 14).astype(np.float32)
-            df['cvd_divergence'] = (s_raw - f_raw).astype(np.float32)
+            div_raw = (s_raw - f_raw).fillna(0.0)
+            df['cvd_divergence'] = div_raw.astype(np.float32)
+            df['zc_div'] = zs(div_raw, 96).astype(np.float32)
+            
             df['spot_cvd_delta'] = active_delta.astype(np.float32)
             df['future_cvd_delta'] = f_diff.astype(np.float32)
             df['spot_cvd_accel'] = active_delta.diff().fillna(0.0).astype(np.float32)
@@ -265,7 +296,7 @@ def load_s2_trades(feature_cols):
             
             feat_dict = {col: df[col].to_numpy(dtype=np.float32) for col in feature_cols if col in df.columns}
             
-            mask_l, mask_s = s2_signal_predicate(df)
+            mask_l, mask_s = s4_signal_predicate(df)
             sig = np.zeros(len(df), dtype=np.int8)
             sig[mask_l] = 1
             sig[mask_s] = -1
@@ -304,7 +335,7 @@ def load_s2_trades(feature_cols):
 def fast_portfolio_backtest_numba(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=45.0, max_house_risk=260.0, min_defense_risk=15.0,
+    fee_rate=0.0009, base_risk=50.0, max_house_risk=260.0, min_defense_risk=15.0,
     dd_limit=0.042
 ):
     n = len(entry_times)
@@ -350,10 +381,10 @@ def fast_portfolio_backtest_numba(
             continue
             
         realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 60.0, 140.0)
+        streak_bonus = min(consecutive_wins * 55.0, 140.0)
         
         if realized_pnl > 0.0:
-            target_risk = min(base_risk + 0.80 * realized_pnl + streak_bonus, max_house_risk)
+            target_risk = min(base_risk + 0.85 * realized_pnl + streak_bonus, max_house_risk)
         else:
             damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
             target_risk = max(min_defense_risk, base_risk * damping)
@@ -428,14 +459,14 @@ def get_oos_windows(end_date=None, num_windows=20):
         })
     return windows
 
-def run_s2_walkforward():
+def run_s4_walkforward():
     feature_cols = [
-        'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
+        'direction', 'cvd_divergence', 'zc_div', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
-        'liq_imbalance', 'liq_vol_ratio', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
+        'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
     ]
     
-    df_all = load_s2_trades(feature_cols)
+    df_all = load_s4_trades(feature_cols)
     if df_all.empty: return
     windows = get_oos_windows(num_windows=20)
     
@@ -477,9 +508,9 @@ def run_s2_walkforward():
         sorted_indices = np.argsort(-probs_oos)
         valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.50]
         if len(valid_indices) < 5:
-            selected_indices = sorted_indices[:min(len(sorted_indices), 5)]
+            selected_indices = sorted_indices[:min(len(sorted_indices), 6)]
         else:
-            selected_indices = valid_indices[:min(len(valid_indices), 6)]
+            selected_indices = valid_indices[:min(len(valid_indices), 8)]
             
         selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
         
@@ -503,11 +534,11 @@ def run_s2_walkforward():
         if passed: pass_count += 1
         verdict = "[PASS]" if passed else "[FAIL]"
         
-        print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'S2_CVDMom':<18} {eff_th:.2f}   {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
+        print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'S4_CVDDivergence':<18} {eff_th:.2f}   {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
         
     print("="*95)
-    print(f"S2 CVD MOMENTUM RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
+    print(f"S4 CVD DIVERGENCE RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
     print("="*95)
 
 if __name__ == "__main__":
-    run_s2_walkforward()
+    run_s4_walkforward()
