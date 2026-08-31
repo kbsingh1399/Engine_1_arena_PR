@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: OPTIMIZED REGIME COMPOUNDER MATRIX (TOP-8 HIGH-CONVICTION TRADES)
+ENGINE 2: MULTI-STRATEGY DIVERSIFIED PORTFOLIO (TOP-8 CROSS-REGIME ENSEMBLE)
+================================================================================
+Combines high-conviction trades across uncorrelated microstructure alpha drivers:
+  - S1: Liquidation Cascades
+  - S8: Whale CVD Absorption
+  - S2: CVD Delta Momentum
+  - S15: VWAP Profile Value Area
+  - S4: CVD Divergence Squeeze
+  - S5: Liquidity Sweep Reversal
+  - S6: Volatility Compression Breakout
 ================================================================================
 """
 
@@ -34,7 +43,7 @@ from s8_hybrid_whale_cvd import load_s8_trades
 from s15_vwap_profile_conviction import load_s15_trades
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("RegimeCompounderMatrix")
+logger = logging.getLogger("MultiStrategyPortfolio")
 
 MIN_RETURN = 0.20
 MAX_DD = 0.05
@@ -179,7 +188,7 @@ def get_oos_windows(end_date=None, num_windows=20):
         })
     return windows
 
-def evaluate_all_strategies_matrix():
+def run_multi_strategy_portfolio():
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
@@ -189,24 +198,27 @@ def evaluate_all_strategies_matrix():
     ]
     
     strategies = {
-        'S8_WhaleCVD': load_s8_trades(feature_cols),
         'S1_Cascade': load_s1_trades(feature_cols),
-        'S15_VWAPProfile': load_s15_trades(feature_cols),
+        'S8_WhaleCVD': load_s8_trades(feature_cols),
         'S2_CVDMom': load_s2_trades(feature_cols),
+        'S15_VWAPProfile': load_s15_trades(feature_cols),
         'S4_CVDDivergence': load_s4_trades(feature_cols),
         'S5_LiqSweep': load_s5_trades(feature_cols),
-        'S6_VolCompression': load_s6_trades(feature_cols),
-        'S7_MeanReversion': load_s7_trades(feature_cols),
-        'S3_TrendFollow': load_s3_trades(feature_cols)
+        'S6_VolCompression': load_s6_trades(feature_cols)
     }
     
+    for s_name, df_s in strategies.items():
+        if not df_s.empty:
+            df_s['strategy'] = s_name
+            
     windows = get_oos_windows(num_windows=20)
     
     print("\n" + "="*105)
-    print(f"{'Win':<4} {'Test Period':<24} {'Best Strategy':<20} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
+    print(f"{'Win':<4} {'Test Period':<24} {'Portfolio Ensemble':<22} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
     print("="*105)
     
-    matrix_results = {}
+    pass_count = 0
+    total_count = len(windows)
     
     for w in windows:
         w_idx = w['idx']
@@ -215,8 +227,7 @@ def evaluate_all_strategies_matrix():
         tr_start = w['train_start']
         tr_end_purged = w['train_end'] - pd.Timedelta(hours=3)
         
-        best_res = None
-        best_strat_name = "None"
+        oos_candidates = []
         
         for s_name, df_s in strategies.items():
             if df_s.empty: continue
@@ -237,54 +248,42 @@ def evaluate_all_strategies_matrix():
             model.fit(X_is, y_is)
             
             df_oos_strat = df_s[(df_s['entry_time'] >= t_start) & (df_s['entry_time'] < t_end)].copy()
-            if df_oos_strat.empty: continue
+            if not df_oos_strat.empty:
+                X_oos = df_oos_strat[fcols].fillna(0.0)
+                df_oos_strat['prob'] = model.predict_proba(X_oos)[:, 1].astype(np.float64)
                 
-            X_oos = df_oos_strat[fcols].fillna(0.0)
-            probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
-            
-            # Select Top 8 trades with P >= 0.45
-            sorted_indices = np.argsort(-probs_oos)
-            valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.45]
-            if len(valid_indices) < 5:
-                selected_indices = sorted_indices[:min(len(sorted_indices), 5)]
-            else:
-                selected_indices = valid_indices[:min(len(valid_indices), 8)]
-                
-            selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
-            
-            oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
-            oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
-            oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
-            oos_xp = df_oos_strat['exit_price'].values.astype(np.float64)[selected_indices]
-            oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
-            oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
-            sub_pr = probs_oos[selected_indices]
-            
-            roi, dd, wr, tr = fast_portfolio_backtest_numba(
-                oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
-                base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
-                min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
-            )
-            
-            is_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-            score = roi if dd <= MAX_DD else (roi - 3.0 * (dd - MAX_DD))
-            if is_pass: score += 100.0
-            
-            if best_res is None or score > best_res['score']:
-                best_res = {'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'score': score}
-                best_strat_name = s_name
-                
-        if best_res is not None:
-            roi, dd, wr, tr = best_res['roi'], best_res['dd'], best_res['wr'], best_res['tr']
-            passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-            verdict = "[PASS]" if passed else "[FAIL]"
-            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {best_strat_name:<20} {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
-            matrix_results[w_idx] = {'strategy': best_strat_name, 'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'passed': passed}
-            
-    passed_count = sum(1 for r in matrix_results.values() if r['passed'])
+                # Take top 3 trades per strategy with P >= 0.50
+                top_s = df_oos_strat[df_oos_strat['prob'] >= 0.50].sort_values('prob', ascending=False).head(3)
+                if not top_s.empty:
+                    oos_candidates.append(top_s)
+                    
+        if not oos_candidates: continue
+        df_oos_all = pd.concat(oos_candidates, ignore_index=True)
+        df_oos_all = df_oos_all.sort_values('prob', ascending=False).head(8).sort_values('entry_time').reset_index(drop=True)
+        
+        oos_et = df_oos_all['entry_time'].values.astype(np.int64)
+        oos_xt = df_oos_all['exit_time'].values.astype(np.int64)
+        oos_ep = df_oos_all['entry_price'].values.astype(np.float64)
+        oos_xp = df_oos_all['exit_price'].values.astype(np.float64)
+        oos_atr = df_oos_all['atr'].values.astype(np.float64)
+        oos_dr = df_oos_all['direction'].values.astype(np.int8)
+        sub_pr = df_oos_all['prob'].values.astype(np.float64)
+        
+        roi, dd, wr, tr = fast_portfolio_backtest_numba(
+            oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
+            base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
+            min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
+        )
+        
+        passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
+        if passed: pass_count += 1
+        verdict = "[PASS]" if passed else "[FAIL]"
+        
+        print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'Top8Diversified':<22} {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
+        
     print("="*105)
-    print(f"SPECIALIZATION MATRIX PASS RATE: {passed_count}/{len(windows)} ({passed_count/len(windows)*100:.1f}%)")
+    print(f"MULTI-STRATEGY DIVERSIFIED PORTFOLIO RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
     print("="*105)
 
 if __name__ == "__main__":
-    evaluate_all_strategies_matrix()
+    run_multi_strategy_portfolio()
