@@ -179,7 +179,12 @@ class BinanceHistoricalFetcher:
                     rest_df[c] = rest_df[c].astype(int)
                 for c in ["open", "high", "low", "close", "volume", "quote_volume", "taker_buy_volume", "taker_buy_quote_volume"]:
                     rest_df[c] = rest_df[c].astype(float)
-                kline_dfs.append(rest_df)
+                
+                # Filter out currently forming unclosed candle to prevent partial bar contamination
+                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                rest_df = rest_df[rest_df["close_time"] < now_ms]
+                if not rest_df.empty:
+                    kline_dfs.append(rest_df)
         except Exception as e:
             print(f"[WARN] REST klines fetch failed for {symbol}: {e}")
 
@@ -291,10 +296,16 @@ class BinanceHistoricalFetcher:
                 rows = json.loads(raw.decode('utf-8'))
                 rest_df = pd.DataFrame(rows, columns=SPOT_COLS)
                 rest_df["open_time"] = rest_df["open_time"].astype(int)
+                rest_df["close_time"] = rest_df["close_time"].astype(int)
                 rest_df["close"] = rest_df["close"].astype(float)
                 rest_df["volume"] = rest_df["volume"].astype(float)
                 rest_df["taker_buy_volume"] = rest_df["taker_buy_volume"].astype(float)
-                spot_dfs.append(rest_df[["open_time", "close", "volume", "taker_buy_volume"]])
+                
+                # Filter out currently forming candle
+                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                rest_df = rest_df[rest_df["close_time"] < now_ms]
+                if not rest_df.empty:
+                    spot_dfs.append(rest_df[["open_time", "close", "volume", "taker_buy_volume"]])
         except Exception:
             pass
 

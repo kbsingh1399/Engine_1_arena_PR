@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 from ..core.canonical_indicators import (
+    get_merge_level,
     compute_ema_series,
     compute_wilder_rsi_series,
     compute_wilder_atr_series,
@@ -83,9 +84,10 @@ class HistoricalMetricsProcessor:
         df["ema_200"] = np.round(compute_ema_series(closes, 200), 2)
         df["ema_800"] = np.round(compute_ema_series(closes, 800), 2)
 
-        # 6. Developing Daily Session Value Area High (VAH) & Low (VAL) ($25.0 bucket)
-        print("[PROCESSOR] Computing Developing Daily Session Value Area (VAH / VAL)...")
-        svah, sval, pvah, pval = compute_session_value_area(open_times, highs, lows, closes, vols_base, bucket_size=25.0)
+        # 6. Developing Daily Session Value Area High (VAH) & Low (VAL)
+        m_lvl = get_merge_level(symbol)
+        print(f"[PROCESSOR] Computing Developing Daily Session Value Area (VAH / VAL) with bucket size {m_lvl}...")
+        svah, sval, pvah, pval = compute_session_value_area(open_times, highs, lows, closes, vols_base, bucket_size=m_lvl)
         df["session_vah"] = svah
         df["session_val"] = sval
         df["prev_day_vah"] = pvah
@@ -230,16 +232,16 @@ class HistoricalMetricsProcessor:
                 right_on="timestamp_ms",
                 direction="backward"
             )
-            raw_oi_btc = merged["sum_open_interest"].ffill().bfill().values
+            raw_oi_btc = merged["sum_open_interest"].ffill().values
             oi_btc = np.nan_to_num(raw_oi_btc, nan=0.0)
 
-            raw_oi_usd = merged["sum_open_interest_value"].ffill().bfill().values
+            raw_oi_usd = merged["sum_open_interest_value"].ffill().values
             oi_usd = np.where(np.isnan(raw_oi_usd), oi_btc * closes, raw_oi_usd)
 
-            raw_ls_glob = merged["count_long_short_ratio"].ffill().bfill().values
+            raw_ls_glob = merged["count_long_short_ratio"].ffill().values
             ls_glob = np.nan_to_num(raw_ls_glob, nan=1.0)
 
-            raw_ls_top = merged["sum_toptrader_long_short_ratio"].ffill().bfill().values
+            raw_ls_top = merged["sum_toptrader_long_short_ratio"].ffill().values
             ls_top = np.nan_to_num(raw_ls_top, nan=1.0)
 
             df["open_interest_k"] = np.round(oi_btc / 1000.0, 3)
@@ -252,17 +254,17 @@ class HistoricalMetricsProcessor:
             df["whale_index"] = np.round((top_long_p / np.maximum(glob_long_p, 0.0001)) * 100.0, 4)
 
             if "count_toptrader_long_short_ratio" in merged.columns:
-                raw_top_acc = merged["count_toptrader_long_short_ratio"].ffill().bfill().values
+                raw_top_acc = merged["count_toptrader_long_short_ratio"].ffill().values
                 df["top_account_ratio"] = np.round(np.nan_to_num(raw_top_acc, nan=1.0), 4)
             else:
                 df["top_account_ratio"] = np.round(ls_glob, 4)
 
+            fallback_taker = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
             if "sum_taker_long_short_vol_ratio" in merged.columns:
-                raw_taker_ratio = merged["sum_taker_long_short_vol_ratio"].ffill().bfill().values
-                fallback_taker = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
+                raw_taker_ratio = merged["sum_taker_long_short_vol_ratio"].ffill().values
                 df["taker_volume_ratio"] = np.round(np.where(np.isnan(raw_taker_ratio), fallback_taker, raw_taker_ratio), 4)
             else:
-                df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
+                df["taker_volume_ratio"] = fallback_taker
         else:
             df["open_interest_k"] = 0.0
             df["open_interest_usd"] = 0.0

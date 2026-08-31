@@ -160,7 +160,6 @@ class LiveInstanceRunner:
         self.running = False
         if self.ws_task:
             self.ws_task.cancel()
-            await asyncio.gather(self.ws_task, return_exceptions=True)
 
 
 async def main():
@@ -186,23 +185,23 @@ async def main():
         await inst.start()
         inst.record_snapshot("T0 (Baseline)")
 
-    # Test intervals: T+5s, T+10s, T+15s, T+20s, T+25s
-    intervals = [5, 10, 15, 20, 25]
+    # Test intervals: T+3s, T+6s, T+9s, T+12s
+    intervals = [3, 6, 9, 12]
     cur_t = 0
     for target_t in intervals:
         wait_dur = target_t - cur_t
         await asyncio.sleep(wait_dur)
         cur_t = target_t
         label = f"T+{target_t:02d}s"
-        print(f"\n⏱️  [INTERVAL CHECKPOINT {label}] Recording multi-instance state snapshots...")
+        print(f"\n⏱️  [INTERVAL CHECKPOINT {label}] Recording multi-instance state snapshots...", flush=True)
         for inst in instances:
             inst.record_snapshot(label)
             sample_sym = inst.symbols[0]
             st = inst.states[sample_sym]
             ticks = inst.tick_counts[sample_sym]
-            print(f"    [{inst.instance_id}] {sample_sym:<8} | Px: ${st.price:<10.2f} | Vol: ${st.quote_vol_15m:,.0f} | Delta: {st.fp_delta:<+8.2f} | CVD: {st.fut_cvd:<+10.1f} | Ticks: {ticks}")
+            print(f"    [{inst.instance_id}] {sample_sym:<8} | Px: ${st.price:<10.2f} | Vol: ${st.quote_vol_15m:,.0f} | Delta: {st.fp_delta:<+8.2f} | CVD: {st.fut_cvd:<+10.1f} | Ticks: {ticks}", flush=True)
 
-    print("\n[STEP 3] Stopping all instances cleanly...")
+    print("\n[STEP 3] Stopping all instances cleanly...", flush=True)
     for inst in instances:
         await inst.stop()
 

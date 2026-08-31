@@ -17,6 +17,20 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, Tuple
 
+def get_merge_level(symbol: str) -> float:
+    """Returns canonical tick merge level based on asset price scale."""
+    s = symbol.upper()
+    if s.startswith("BTC"):
+        return 25.0
+    elif s.startswith("ETH"):
+        return 1.0
+    elif any(s.startswith(x) for x in ["SOL", "BNB", "BCH", "AVAX", "LTC", "APT", "LINK"]):
+        return 0.1
+    elif any(s.startswith(x) for x in ["DOT", "NEAR", "SUI", "OP", "ARB"]):
+        return 0.01
+    else:
+        return 0.0001
+
 def compute_ema_series(prices: np.ndarray, period: int) -> np.ndarray:
     """
     Computes standard Exponential Moving Average seeded from the first available bar.

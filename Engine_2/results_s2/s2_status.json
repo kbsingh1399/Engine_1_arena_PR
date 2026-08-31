@@ -60,8 +60,8 @@
         "test_end": "2022-07-15",
         "trades": 5,
         "win_rate_pct": 100.0,
-        "roi_pct": 46.9,
-        "max_dd_pct": 0.46,
+        "roi_pct": 47.32,
+        "max_dd_pct": 0.33,
         "archetype": "A4_UltraDeepValue",
         "status": "\u2705 PASS"
     },
@@ -115,8 +115,8 @@
         "test_end": "2023-10-15",
         "trades": 17,
         "win_rate_pct": 58.82,
-        "roi_pct": 26.38,
-        "max_dd_pct": 4.38,
+        "roi_pct": 26.05,
+        "max_dd_pct": 4.22,
         "archetype": "A5_PureRelativeCVD",
         "status": "\u2705 PASS"
     },
@@ -126,8 +126,8 @@
         "test_end": "2024-01-15",
         "trades": 5,
         "win_rate_pct": 80.0,
-        "roi_pct": 26.77,
-        "max_dd_pct": 2.28,
+        "roi_pct": 26.56,
+        "max_dd_pct": 2.71,
         "archetype": "A5_PureRelativeCVD",
         "status": "\u2705 PASS"
     },
@@ -159,8 +159,8 @@
         "test_end": "2024-10-15",
         "trades": 6,
         "win_rate_pct": 66.67,
-        "roi_pct": 50.66,
-        "max_dd_pct": 4.74,
+        "roi_pct": 51.42,
+        "max_dd_pct": 4.85,
         "archetype": "N7_VolExpMom",
         "status": "\u2705 PASS"
     },
@@ -168,10 +168,10 @@
         "window": 16,
         "test_start": "2024-12-15",
         "test_end": "2025-01-15",
-        "trades": 7,
-        "win_rate_pct": 85.71,
-        "roi_pct": 51.24,
-        "max_dd_pct": 4.35,
+        "trades": 6,
+        "win_rate_pct": 66.67,
+        "roi_pct": 40.05,
+        "max_dd_pct": 4.55,
         "archetype": "A4_UltraDeepValue",
         "status": "\u2705 PASS"
     },
@@ -201,22 +201,11 @@
         "window": 19,
         "test_start": "2025-10-15",
         "test_end": "2025-11-15",
-        "trades": 12,
-        "win_rate_pct": 58.33,
-        "roi_pct": 52.98,
-        "max_dd_pct": 4.22,
+        "trades": 16,
+        "win_rate_pct": 50.0,
+        "roi_pct": 4.21,
+        "max_dd_pct": 6.61,
         "archetype": "A2_DeepSqueeze",
-        "status": "\u2705 PASS"
-    },
-    {
-        "window": 20,
-        "test_start": "2026-03-15",
-        "test_end": "2026-04-15",
-        "trades": 8,
-        "win_rate_pct": 75.0,
-        "roi_pct": 36.17,
-        "max_dd_pct": 2.83,
-        "archetype": "A7_ModPullback",
-        "status": "\u2705 PASS"
+        "status": "\u274c FAIL"
     }
 ]

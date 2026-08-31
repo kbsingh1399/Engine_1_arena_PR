@@ -343,7 +343,8 @@ _rest_bucket = TokenBucket(capacity=200, fill_rate=20)
 
 
 async def async_fetch(url: str, weight: int = 1, timeout: float = 10.0) -> Any:
-    """Non-blocking HTTP GET fetcher with gzip decompression and binance.vision fallback."""
+    """Non-blocking HTTP GET fetcher with token-bucket rate limiting, gzip decompression, and fallback."""
+    await _rest_bucket.consume(weight)
     loop = asyncio.get_running_loop()
 
     def _fetch(target_url: str):
@@ -400,7 +401,7 @@ class FuturesDepthBook:
         self.last_update_id = 0
         self.ready = False
         self.quality = DataQuality.UNAVAILABLE
-        self._buffer: list = []
+        self._buffer: deque = deque(maxlen=1000)
         self._lock = asyncio.Lock()
 
     async def sync_snapshot(self) -> None:
@@ -418,14 +419,18 @@ class FuturesDepthBook:
 
         url = f"{base}?symbol={self.symbol.upper()}&limit=1000"
         data = await async_fetch(url, weight=weight)
+        if not data or "lastUpdateId" not in data:
+            async with self._lock:
+                self.quality = DataQuality.UNAVAILABLE
+            return
 
         async with self._lock:
             self.last_update_id = data["lastUpdateId"]
-            self.bids = {float(p): float(q) for p, q in data["bids"] if float(q) > 0}
-            self.asks = {float(p): float(q) for p, q in data["asks"] if float(q) > 0}
+            self.bids = {float(p): float(q) for p, q in data.get("bids", []) if float(q) > 0}
+            self.asks = {float(p): float(q) for p, q in data.get("asks", []) if float(q) > 0}
 
             # Replay buffered updates that occurred during REST transit
-            for ev in self._buffer:
+            for ev in list(self._buffer):
                 u = ev["u"]
                 U = ev.get("U", 0)
                 pu = ev.get("pu", 0)
@@ -558,13 +563,42 @@ class LiquidationState:
 
 
 # ------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------
 # 3.3 Footprint & Cumulative Volume Delta (CVD) Engine (Merge Level = 25.0)
 # ------------------------------------------------------------------------------
+class Rolling24hCVD:
+    """Exact-to-the-minute 24h rolling CVD ring buffer. O(1) add, O(1) read, 1440 slots."""
+    __slots__ = ("_vals", "_minute", "_total")
+    N = 1440  # 24h at 1-minute resolution
+
+    def __init__(self) -> None:
+        self._vals = [0.0] * self.N
+        self._minute = [-1] * self.N
+        self._total = 0.0
+
+    def add(self, ts_ms: int, signed_qty: float) -> None:
+        m = ts_ms // 60_000
+        i = m % self.N
+        if self._minute[i] != m:  # slot belongs to an expired minute
+            self._total -= self._vals[i]
+            self._vals[i], self._minute[i] = 0.0, m
+        self._vals[i] += signed_qty
+        self._total += signed_qty
+
+    def value(self, now_ms: Optional[int] = None) -> float:
+        """Expire stale slots against the wall clock."""
+        m = (now_ms if now_ms is not None else int(time.time() * 1000)) // 60_000
+        for i in range(self.N):
+            if self._minute[i] >= 0 and m - self._minute[i] >= self.N:
+                self._total -= self._vals[i]
+                self._vals[i], self._minute[i] = 0.0, -1
+        return self._total
+
+
 class VolumeAtPrice:
     """
-    High-Frequency Tick-by-Tick Footprint Engine with Configurable Merge Level (Default = $25.0 for BTC):
-    - Accumulates Ask Volume (Taker Buy), Bid Volume (Taker Sell), Net Delta, and Total Volume per $25 price level.
+    High-Frequency Tick-by-Tick Footprint Engine with Configurable Merge Level:
+    - O(1) incremental Point of Control (POC) tracking.
+    - Accumulates Ask Volume (Taker Buy), Bid Volume (Taker Sell), Net Delta, and Total Volume per price level.
     - Strictly resets at 15m candle boundaries (:00, :15, :30, :45).
     - Point of Control (POC) is decided dynamically based exclusively on the active 15m candle data.
     """
@@ -572,6 +606,8 @@ class VolumeAtPrice:
         self.merge_level = float(merge_level)
         self.bar_open_ms = 0
         self.levels: Dict[float, Dict[str, float]] = {}
+        self._poc_vol: float = 0.0
+        self._poc_px: Optional[float] = None
         self.last_poc: Optional[float] = None
         self.candle_buy_total: float = 0.0
         self.candle_sell_total: float = 0.0
@@ -580,34 +616,38 @@ class VolumeAtPrice:
         if bar_open_ms != self.bar_open_ms:
             self.bar_open_ms = bar_open_ms
             self.levels.clear()
+            self._poc_vol = 0.0
+            self._poc_px = None
             self.candle_buy_total = 0.0
             self.candle_sell_total = 0.0
 
         # Bin price to merge level (e.g. $5.0 increments for BTC: 78140, 78145, 78150...)
         bucket = round(price / self.merge_level) * self.merge_level
-        if bucket not in self.levels:
-            self.levels[bucket] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+        lv = self.levels.get(bucket)
+        if lv is None:
+            lv = self.levels[bucket] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
 
         # is_buyer_maker = False -> Buyer was taker (Aggressive Market Buy / Ask Side)
         # is_buyer_maker = True  -> Seller was taker (Aggressive Market Sell / Bid Side)
         if not is_buyer_maker:
-            self.levels[bucket]["buy"] += quantity
+            lv["buy"] += quantity
             self.candle_buy_total += quantity
         else:
-            self.levels[bucket]["sell"] += quantity
+            lv["sell"] += quantity
             self.candle_sell_total += quantity
 
-        self.levels[bucket]["total"] += quantity
-        self.levels[bucket]["delta"] = self.levels[bucket]["buy"] - self.levels[bucket]["sell"]
+        tot = lv["total"] = lv["total"] + quantity
+        lv["delta"] = lv["buy"] - lv["sell"]
 
-        # Live Point of Control (POC) calculated from active 15m candle only
-        self.last_poc = max(self.levels, key=lambda p: self.levels[p]["total"])
+        # O(1) Incremental Point of Control (POC)
+        if tot > self._poc_vol:
+            self._poc_vol = tot
+            self._poc_px = bucket
+            self.last_poc = bucket
 
     @property
     def poc(self) -> Optional[float]:
-        if self.levels:
-            return max(self.levels, key=lambda p: self.levels[p]["total"])
-        return self.last_poc
+        return self._poc_px if self._poc_px is not None else self.last_poc
 
     def get_ladder(self, current_price: float = 0.0, limit: int = 15) -> List[Dict[str, Any]]:
         """Returns sorted price ladder centered around current price (highest to lowest) with volume and POC flag."""
@@ -664,9 +704,12 @@ class VolumeAtPrice:
             return None, None
 
         sorted_prices = sorted(self.levels.keys())
-        poc_idx = sorted_prices.index(poc_px)
+        try:
+            poc_idx = sorted_prices.index(poc_px)
+        except ValueError:
+            poc_idx = len(sorted_prices) // 2
 
-        cur_v = self.levels[poc_px]["total"]
+        cur_v = self.levels[sorted_prices[poc_idx]]["total"]
         up_idx = poc_idx + 1
         down_idx = poc_idx - 1
 
@@ -682,8 +725,8 @@ class VolumeAtPrice:
             else:
                 break
 
-        val = sorted_prices[down_idx + 1]
-        vah = sorted_prices[up_idx - 1]
+        val = sorted_prices[max(0, down_idx + 1)]
+        vah = sorted_prices[min(len(sorted_prices) - 1, up_idx - 1)]
         return vah, val
 
 
@@ -703,8 +746,7 @@ class AggTradeState:
         self.max_trade_vol_btc = 0.0
         self.session_cvd = 0.0       # BTC net, reset at 00:00 UTC
         self.session_day = None      # UTC day integer for deterministic parity
-        self.cvd_24h = 0.0           # BTC 24-hour rolling window CVD
-        self._trade_history = deque(maxlen=100000)
+        self.rolling_24h_cvd = Rolling24hCVD()
         self.quality = DataQuality.PARTIAL
         self.profile = VolumeAtPrice(merge_level=get_merge_level(ACTIVE_SYMBOL))
         self.session_profile = VolumeAtPrice(merge_level=get_merge_level(ACTIVE_SYMBOL))
@@ -721,21 +763,32 @@ class AggTradeState:
             return
         self._seeded_from_kline = True
         try:
-            import urllib.request
-            import json
-            import time
-            
             now_ms = int(time.time() * 1000)
             candle_open_ms = (now_ms // 900000) * 900000
             today_start_ms = (now_ms // 86400000) * 86400000
             yesterday_start_ms = today_start_ms - 86400000
             
             m_lvl = get_merge_level(ACTIVE_SYMBOL)
-            # 1. Fetch yesterday's 15m klines to compute canonical prev_day_vah / prev_day_val
-            url_yest = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={yesterday_start_ms}&endTime={today_start_ms-1}&limit=96"
-            req_yest = urllib.request.Request(url_yest, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_yest, timeout=5) as resp:
-                yest_data = json.loads(resp.read().decode())
+            base = "https://fapi.binance.com/fapi/v1/klines"
+            
+            # Non-blocking concurrent fetch
+            url_yest = f"{base}?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={yesterday_start_ms}&endTime={today_start_ms-1}&limit=96"
+            url_today = f"{base}?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={today_start_ms}&endTime={candle_open_ms-1}&limit=96" if candle_open_ms > today_start_ms else None
+            url_1m = f"{base}?symbol={ACTIVE_SYMBOL}&interval=1m&startTime={candle_open_ms}&limit=15"
+            
+            tasks = [async_fetch(url_yest, weight=2, timeout=5.0)]
+            if url_today:
+                tasks.append(async_fetch(url_today, weight=2, timeout=5.0))
+            else:
+                tasks.append(asyncio.sleep(0, result=[]))
+            tasks.append(async_fetch(url_1m, weight=1, timeout=5.0))
+            
+            res = await asyncio.gather(*tasks, return_exceptions=True)
+            yest_data = res[0] if isinstance(res[0], list) else []
+            today_data = res[1] if isinstance(res[1], list) else []
+            min_data = res[2] if isinstance(res[2], list) else []
+            
+            async with self._lock:
                 if yest_data:
                     yest_prof = VolumeAtPrice(merge_level=m_lvl)
                     for item in yest_data:
@@ -762,104 +815,79 @@ class AggTradeState:
                             yest_prof.levels[b]["delta"] += (b_p - s_p)
                     self.prev_day_vah, self.prev_day_val = yest_prof.get_vah_val(0.70)
 
-            # 2. Fetch today's completed 15m klines to populate developing session profile
-            if candle_open_ms > today_start_ms:
-                url_today = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=15m&startTime={today_start_ms}&endTime={candle_open_ms-1}&limit=96"
-                req_today = urllib.request.Request(url_today, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req_today, timeout=5) as resp:
-                    today_data = json.loads(resp.read().decode())
-                    if today_data:
-                        async with self._lock:
-                            for item in today_data:
-                                h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
-                                buy_v = float(item[9])
-                                b_min = round(l_px / m_lvl) * m_lvl
-                                b_max = round(h_px / m_lvl) * m_lvl
-                                buckets = []
-                                curr = b_min
-                                while curr <= b_max:
-                                    buckets.append(curr)
-                                    curr += m_lvl
-                                if not buckets:
-                                    buckets = [b_min]
-                                b_p = buy_v / len(buckets)
-                                s_p = (tot_v - buy_v) / len(buckets)
-                                t_p = tot_v / len(buckets)
-                                for b in buckets:
-                                    if b not in self.session_profile.levels:
-                                        self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
-                                    self.session_profile.levels[b]["buy"] += b_p
-                                    self.session_profile.levels[b]["sell"] += s_p
-                                    self.session_profile.levels[b]["total"] += t_p
-                                    self.session_profile.levels[b]["delta"] += (b_p - s_p)
+                if today_data:
+                    self.session_profile.bar_open_ms = today_start_ms
+                    for item in today_data:
+                        h_px, l_px, tot_v = float(item[2]), float(item[3]), float(item[5])
+                        buy_v = float(item[9])
+                        b_min = round(l_px / m_lvl) * m_lvl
+                        b_max = round(h_px / m_lvl) * m_lvl
+                        buckets = []
+                        curr = b_min
+                        while curr <= b_max:
+                            buckets.append(curr)
+                            curr += m_lvl
+                        if not buckets:
+                            buckets = [b_min]
+                        b_p = buy_v / len(buckets)
+                        s_p = (tot_v - buy_v) / len(buckets)
+                        t_p = tot_v / len(buckets)
+                        for b in buckets:
+                            if b not in self.session_profile.levels:
+                                self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                            self.session_profile.levels[b]["buy"] += b_p
+                            self.session_profile.levels[b]["sell"] += s_p
+                            self.session_profile.levels[b]["total"] += t_p
+                            self.session_profile.levels[b]["delta"] += (b_p - s_p)
 
-            # 3. Fetch 1m klines since candle open to approximate current forming bar footprint & session profile
-            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={ACTIVE_SYMBOL}&interval=1m&startTime={candle_open_ms}&limit=15"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode())
-                if data:
+                if min_data and (self.current_candle_ts == 0 or self.current_candle_ts == candle_open_ms):
+                    self.current_candle_ts = candle_open_ms
+                    self.profile.bar_open_ms = candle_open_ms
                     total_buy = 0.0
                     total_sell = 0.0
-                    
-                    async with self._lock:
-                        if self.current_candle_ts == 0 or self.current_candle_ts == candle_open_ms:
-                            self.current_candle_ts = candle_open_ms
-                            self.profile.bar_open_ms = candle_open_ms
-                            
-                            for item in data:
-                                high_price = float(item[2])
-                                low_price = float(item[3])
-                                tot_vol = float(item[5])
-                                buy_vol = float(item[9])
-                                sell_vol = tot_vol - buy_vol
-                                
-                                total_buy += buy_vol
-                                total_sell += sell_vol
-                                
-                                b_min = round(low_price / self.profile.merge_level) * self.profile.merge_level
-                                b_max = round(high_price / self.profile.merge_level) * self.profile.merge_level
-                                
-                                buckets = []
-                                curr = b_min
-                                while curr <= b_max:
-                                    buckets.append(curr)
-                                    curr += self.profile.merge_level
-                                
-                                if not buckets:
-                                    buckets = [b_min]
-                                
-                                buy_per = buy_vol / len(buckets)
-                                sell_per = sell_vol / len(buckets)
-                                tot_per = tot_vol / len(buckets)
-                                
-                                for b in buckets:
-                                    if b not in self.profile.levels:
-                                        self.profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
-                                    self.profile.levels[b]["buy"] += buy_per
-                                    self.profile.levels[b]["sell"] += sell_per
-                                    self.profile.levels[b]["total"] += tot_per
-                                    self.profile.levels[b]["delta"] += (buy_per - sell_per)
-                                    
-                                    # Also seed into session_profile for the forming bar minutes exactly once
-                                    if b not in self.session_profile.levels:
-                                        self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
-                                    self.session_profile.levels[b]["buy"] += buy_per
-                                    self.session_profile.levels[b]["sell"] += sell_per
-                                    self.session_profile.levels[b]["total"] += tot_per
-                                    self.session_profile.levels[b]["delta"] += (buy_per - sell_per)
+                    for item in min_data:
+                        high_price = float(item[2])
+                        low_price = float(item[3])
+                        tot_vol = float(item[5])
+                        buy_vol = float(item[9])
+                        sell_vol = tot_vol - buy_vol
+                        total_buy += buy_vol
+                        total_sell += sell_vol
+                        b_min = round(low_price / self.profile.merge_level) * self.profile.merge_level
+                        b_max = round(high_price / self.profile.merge_level) * self.profile.merge_level
+                        buckets = []
+                        curr = b_min
+                        while curr <= b_max:
+                            buckets.append(curr)
+                            curr += self.profile.merge_level
+                        if not buckets:
+                            buckets = [b_min]
+                        buy_per = buy_vol / len(buckets)
+                        sell_per = sell_vol / len(buckets)
+                        tot_per = tot_vol / len(buckets)
+                        for b in buckets:
+                            if b not in self.profile.levels:
+                                self.profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                            self.profile.levels[b]["buy"] += buy_per
+                            self.profile.levels[b]["sell"] += sell_per
+                            self.profile.levels[b]["total"] += tot_per
+                            self.profile.levels[b]["delta"] += (buy_per - sell_per)
+                            if b not in self.session_profile.levels:
+                                self.session_profile.levels[b] = {"buy": 0.0, "sell": 0.0, "total": 0.0, "delta": 0.0}
+                            self.session_profile.levels[b]["buy"] += buy_per
+                            self.session_profile.levels[b]["sell"] += sell_per
+                            self.session_profile.levels[b]["total"] += tot_per
+                            self.session_profile.levels[b]["delta"] += (buy_per - sell_per)
 
-                            self.candle_buy_btc = total_buy
-                            self.candle_sell_btc = total_sell
-                            self.profile.candle_buy_total = total_buy
-                            self.profile.candle_sell_total = total_sell
-                            
-                            if self.profile.levels:
-                                self.profile.last_poc = max(self.profile.levels, key=lambda p: self.profile.levels[p]["total"])
-                            
-                            self.quality = DataQuality.PARTIAL
-        except Exception:
-            pass
+                    self.candle_buy_btc = total_buy
+                    self.candle_sell_btc = total_sell
+                    self.profile.candle_buy_total = total_buy
+                    self.profile.candle_sell_total = total_sell
+                    if self.profile.levels:
+                        self.profile.last_poc = max(self.profile.levels, key=lambda p: self.profile.levels[p]["total"])
+                    self.quality = DataQuality.PARTIAL
+        except Exception as e:
+            print(f"[KLINE SEED ERROR] {e}")
 
     async def apply(self, ts_ms: int, price_str: str, qty_str: str, is_buyer_maker: bool, agg_id=None) -> None:
         # Idempotency guard: discard already processed trades
@@ -884,6 +912,7 @@ class AggTradeState:
                     self.prev_day_vah, self.prev_day_val = self.session_profile.get_vah_val(0.70)
                 self.session_day = event_day
                 self.session_profile.levels.clear()
+                self.session_cvd = 0.0
 
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
@@ -911,21 +940,15 @@ class AggTradeState:
                 self.candle_sell_cnt += 1
 
             self.session_cvd += signed_qty
-            self.cvd_24h += signed_qty
-            self._trade_history.append((ts_ms, signed_qty))
-            self._prune_old_trades(ts_ms)
+            self.rolling_24h_cvd.add(ts_ms, signed_qty)
 
-    def _prune_old_trades(self, current_ts_ms: int) -> None:
-        cutoff = current_ts_ms - 24 * 3600 * 1000
-        while self._trade_history and self._trade_history[0][0] < cutoff:
-            _, old_qty = self._trade_history.popleft()
-            self.cvd_24h -= old_qty
+    @property
+    def cvd_24h(self) -> float:
+        return self.rolling_24h_cvd.value()
 
     @property
     def fp_delta(self) -> float:
-        tot_buy = sum(v["buy"] for v in self.profile.levels.values())
-        tot_sell = sum(v["sell"] for v in self.profile.levels.values())
-        return tot_buy - tot_sell
+        return self.profile.candle_buy_total - self.profile.candle_sell_total
 
     @property
     def snapshot(self) -> AggTradeSnapshot:
@@ -981,7 +1004,6 @@ class SpotAggTradeState:
             ts_ms = int(time.time() * 1000)
         cts = (ts_ms // 900000) * 900000
         qty = float(qty_str)
-        price = float(price_str)
 
         async with self._lock:
             if not self._first_trade_seen:
@@ -990,6 +1012,8 @@ class SpotAggTradeState:
             event_day = ts_ms // 86_400_000
             if self.session_day != event_day:
                 self.session_day = event_day
+                self.session_cvd = 0.0  # Reset at UTC midnight
+
             if self.current_candle_ts == 0:
                 self.current_candle_ts = cts
             elif cts != self.current_candle_ts:
@@ -2839,6 +2863,7 @@ async def bootstrap_matrix_symbol(sym: str, target_state: Optional[MatrixAssetSt
                     "oi_change_pct", "ls_ratio_global", "ls_ratio_top", "top_account_ratio", "funding_rate_pct",
                     "basis_usd", "prev_day_vah", "prev_day_val", "session_vah", "session_val", "long_liq_usd", "short_liq_usd"
                 ] if c in avail_cols]
+                # Read last row group(s) to guarantee at least 6000 historical bars for exact EMA-800 convergence
                 last_rg = max(0, pf.num_row_groups - 1)
                 table = pf.read_row_group(last_rg, columns=req_cols)
                 df_chk = table.to_pandas()
@@ -2847,13 +2872,13 @@ async def bootstrap_matrix_symbol(sym: str, target_state: Optional[MatrixAssetSt
                     checkpoint_close_ms = int(last_row.get("close_time_ms", last_row.get("open_time_ms", 0) + 899999))
                     st.active_bar_open_ms = int(last_row.get("open_time_ms", 0))
                     
-                    # Populating recent bars buffer for smooth Wilder RSI and EMA continuity
+                    # Populating recent bars buffer for smooth Wilder RSI and EMA-800 convergence (6000 bars)
                     if "close" in df_chk:
-                        st.recent_closes = df_chk["close"].iloc[-300:].astype(float).tolist()
+                        st.recent_closes = df_chk["close"].iloc[-6000:].astype(float).tolist()
                     if "high" in df_chk:
-                        st.recent_highs = df_chk["high"].iloc[-300:].astype(float).tolist()
+                        st.recent_highs = df_chk["high"].iloc[-6000:].astype(float).tolist()
                     if "low" in df_chk:
-                        st.recent_lows = df_chk["low"].iloc[-300:].astype(float).tolist()
+                        st.recent_lows = df_chk["low"].iloc[-6000:].astype(float).tolist()
 
                     st.price = float(last_row.get("close", 0.0))
                     st.spot_price = float(last_row.get("close", 0.0))

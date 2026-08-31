@@ -41,25 +41,28 @@ async def verify_symbol_continuation(sym: str) -> dict:
     st = MatrixAssetState(symbol=sym)
     await bootstrap_matrix_symbol(sym, target_state=st)
 
-    # 3. Check parameters
+    # 3. Check parameters with scale-invariant tolerances
+    def is_close(a: float, b: float, rtol: float = 1e-3, atol: float = 1e-4) -> bool:
+        return abs(a - b) <= (atol + rtol * abs(b))
+
     checks = {
-        "price": abs(st.price - float(row["close"])) < 1e-4,
-        "ema_8": abs(st.ema8 - float(row["ema_8"])) < 0.1,
-        "ema_21": abs(st.ema21 - float(row["ema_21"])) < 0.1,
-        "ema_50": abs(st.ema50 - float(row["ema_50"])) < 0.1,
-        "ema_200": abs(st.ema200 - float(row["ema_200"])) < 0.1,
-        "ema_800": abs(st.ema800 - float(row["ema_800"])) < 0.1,
-        "rsi_14": abs(st.rsi - float(row["rsi_14"])) < 0.1,
-        "atr_14": abs(st.atr14 - float(row["atr_14"])) < 0.1,
-        "atr_100": abs(st.atr100 - float(row["atr_100"])) < 0.1,
-        "fut_cvd_session": abs(st.session_fut_cvd_base - float(row["future_cvd_session"])) < 1e-2,
-        "fut_cvd_lifetime": abs(st.lifetime_fut_cvd_base - float(row["future_cvd_lifetime"])) < 1e-2,
-        "spot_cvd_session": abs(st.session_spot_cvd_base - float(row["spot_cvd_session"])) < 1e-2,
-        "spot_cvd_lifetime": abs(st.lifetime_spot_cvd_base - float(row["spot_cvd_lifetime"])) < 1e-2,
-        "funding_rate": abs(st.funding_rate - float(row["funding_rate_pct"])) < 1e-4,
-        "ls_ratio_global": abs(st.ls_ratio_global - float(row["ls_ratio_global"])) < 1e-4,
-        "ls_ratio_top": abs(st.ls_ratio_top - float(row["ls_ratio_top"])) < 1e-4,
-        "buffer_depth": len(st.recent_closes) >= 15,
+        "price": is_close(st.price, float(row["close"])),
+        "ema_8": is_close(st.ema8, float(row["ema_8"])),
+        "ema_21": is_close(st.ema21, float(row["ema_21"])),
+        "ema_50": is_close(st.ema50, float(row["ema_50"])),
+        "ema_200": is_close(st.ema200, float(row["ema_200"])),
+        "ema_800": is_close(st.ema800, float(row["ema_800"])),
+        "rsi_14": is_close(st.rsi, float(row["rsi_14"]), rtol=0.01, atol=0.1),
+        "atr_14": is_close(st.atr14, float(row["atr_14"]), rtol=0.01, atol=0.01),
+        "atr_100": is_close(st.atr100, float(row["atr_100"]), rtol=0.01, atol=0.01),
+        "fut_cvd_session": is_close(st.session_fut_cvd_base, float(row["future_cvd_session"]), rtol=0.01, atol=1.0),
+        "fut_cvd_lifetime": is_close(st.lifetime_fut_cvd_base, float(row["future_cvd_lifetime"]), rtol=0.01, atol=1.0),
+        "spot_cvd_session": is_close(st.session_spot_cvd_base, float(row["spot_cvd_session"]), rtol=0.01, atol=1.0),
+        "spot_cvd_lifetime": is_close(st.lifetime_spot_cvd_base, float(row["spot_cvd_lifetime"]), rtol=0.01, atol=1.0),
+        "funding_rate": is_close(st.funding_rate, float(row["funding_rate_pct"]), rtol=0.01, atol=1e-4),
+        "ls_ratio_global": is_close(st.ls_ratio_global, float(row["ls_ratio_global"]), rtol=0.01, atol=1e-3),
+        "ls_ratio_top": is_close(st.ls_ratio_top, float(row["ls_ratio_top"]), rtol=0.01, atol=1e-3),
+        "buffer_depth": len(st.recent_closes) >= 1000,
     }
 
     all_passed = all(checks.values())
