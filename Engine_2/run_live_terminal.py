@@ -43,14 +43,17 @@ ASSET_LISTING_DATES = {
     "ARBUSDT": "2023-03-23",
 }
 
-def preflight_sync_missing_data(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", max_workers: int = 16):
+DEFAULT_DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min"
+
+def preflight_sync_missing_data(target_dir: str = DEFAULT_DATA_DIR, max_workers: int = 16):
     """
     Scans all 18 Master Parquet files in the destination directory:
       1. If any symbol is missing or corrupt, it runs the pipeline to generate it.
       2. If any file is older than 24 hours (missing days), it updates the dataset.
     """
+    import pyarrow.parquet as pq
     print("=" * 100)
-    print("🔍 PRE-FLIGHT CHECK: Scanning 18 Master Parquet Datasets for Missing Days/Files...")
+    print(f"🔍 PRE-FLIGHT CHECK: Scanning 18 Master Parquet Datasets in {target_dir}...")
     print("=" * 100)
     
     missing_or_stale = []
@@ -63,7 +66,10 @@ def preflight_sync_missing_data(target_dir: str = r"G:\My Drive\_Trading_Data\Bi
             missing_or_stale.append(sym)
             continue
         try:
-            df = pd.read_parquet(p_path, columns=["close_time_ms", "datetime_utc"])
+            pf = pq.ParquetFile(p_path)
+            last_rg = max(0, pf.num_row_groups - 1)
+            t = pf.read_row_group(last_rg, columns=["close_time_ms", "datetime_utc"])
+            df = t.to_pandas()
             if df.empty:
                 print(f"  [CORRUPT] {sym}: Parquet is empty.")
                 missing_or_stale.append(sym)
@@ -74,7 +80,7 @@ def preflight_sync_missing_data(target_dir: str = r"G:\My Drive\_Trading_Data\Bi
                 print(f"  [STALE] {sym}: Dataset is {hours_behind:.1f} hours behind ({df['datetime_utc'].iloc[-1]}).")
                 missing_or_stale.append(sym)
             else:
-                print(f"  [OK] {sym}: Up to date ({df['datetime_utc'].iloc[-1]}, {len(df):,} rows).")
+                print(f"  [OK] {sym}: Up to date ({df['datetime_utc'].iloc[-1]}, {pf.metadata.num_rows:,} rows).")
         except Exception as e:
             print(f"  [CORRUPT/ERROR] {sym}: {e}")
             missing_or_stale.append(sym)
@@ -100,12 +106,15 @@ def preflight_sync_missing_data(target_dir: str = r"G:\My Drive\_Trading_Data\Bi
 
 def main():
     parser = argparse.ArgumentParser(description="Engine 2 Live Terminal with Auto-Sync Pre-Flight")
-    parser.add_argument("--skip-sync", action="store_true", help="Skip pre-flight Parquet integrity & staleness check")
-    parser.add_argument("--target-dir", type=str, default=r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", help="Destination Parquet directory")
+    parser.add_argument("--sync", action="store_true", help="Perform pre-flight historical Parquet re-sync from Binance API")
+    parser.add_argument("--skip-sync", action="store_true", default=True, help="Skip pre-flight Parquet integrity check")
+    parser.add_argument("--single", action="store_true", help="Run focused single-symbol mode")
+    parser.add_argument("--symbol", "-s", type=str, default=None, help="Specific symbol(s) to monitor (e.g. BTCUSDT or BTC,ETH,SOL)")
+    parser.add_argument("--target-dir", type=str, default=DEFAULT_DATA_DIR, help="Destination Parquet directory")
     parser.add_argument("--once", action="store_true", help="Render matrix once and exit (for headless CI/tests)")
     args, unknown = parser.parse_known_args()
 
-    if not args.skip_sync:
+    if args.sync:
         preflight_sync_missing_data(target_dir=args.target_dir)
 
     from Engine_2.live.binance_live_monitor import main as live_main

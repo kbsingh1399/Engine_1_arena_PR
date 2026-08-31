@@ -25,9 +25,13 @@ STRATEGY DIFFERENTIATION FROM S2:
 """
 
 import os
+import sys
 import glob
 import json
 import logging
+
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 import warnings
 import time
 from datetime import datetime

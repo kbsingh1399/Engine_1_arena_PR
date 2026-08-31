@@ -1,7 +1,7 @@
 {
   "symbol": "LINKUSDT",
   "timeframe": "15m",
-  "total_rows": 209743,
+  "total_rows": 210240,
   "columns": [
     "open_time_ms",
     "close_time_ms",
@@ -63,8 +63,8 @@
   ],
   "column_count": 57,
   "start_time_utc": "2020-09-01 00:00:00",
-  "end_time_utc": "2026-08-25 19:30:00",
-  "exported_at_utc": "2026-08-25T19:45:40.497737+00:00",
+  "end_time_utc": "2026-08-30 23:45:00",
+  "exported_at_utc": "2026-08-31T11:01:00.431764+00:00",
   "master_file": "LINKUSDT_15m_master_2020_2026.parquet",
-  "master_size_mb": 43.57
+  "master_size_mb": 43.65
 }

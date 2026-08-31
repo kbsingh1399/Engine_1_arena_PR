@@ -64,3 +64,5 @@ data_cache/
 coinglass_parity_engine/data_cache/
 temp_metrics.csv
 frame_*.txt
+Engine_2/.freebuff/
+gemini-web2api/
