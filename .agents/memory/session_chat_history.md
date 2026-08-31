@@ -36365,3 +36365,10 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - Analyzed Engine_2/strategy_engine.py role and dependencies.
 - Explained that each strategy (s1_liquidation_cascade.py, s2_cvd_momentum.py, etc.) is 100% standalone and self-contained with its own Numba fast simulator, LightGBM classifier, and walk-forward harness.
 - Outlined whether to keep or remove strategy_engine.py depending on preference for single-module vs modular workflow.
+
+
+---
+## Turn Summary (Results Removal & Clean Audit Push)
+- Removed all results_* directories, reports, and strategy_engine.py from Engine_2.
+- Pushed clean commit 02d911b to GitHub.
+- Prepared unbiased Opus 5 audit prompt referencing raw source files without pre-existing output bias.
