@@ -21,11 +21,11 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 STRATEGIES = [
-    ("S1_Liquidation", os.path.join(ROOT_DIR, "s1.py"), os.path.join(ROOT_DIR, "results_s1", "s1_status.json")),
-    ("S2_CVD_Momentum", os.path.join(ROOT_DIR, "s2.py"), os.path.join(ROOT_DIR, "results_s2", "s2_status.json")),
-    ("S3_Trend_Follow", os.path.join(ROOT_DIR, "s3.py"), os.path.join(ROOT_DIR, "results_s3", "s3_status.json")),
-    ("S8_Hybrid_Whale", os.path.join(ROOT_DIR, "s8_hybrid.py"), os.path.join(ROOT_DIR, "results_s8", "s8_status.json")),
-    ("S15_VWAP_Profile", os.path.join(ROOT_DIR, "s15_vwap_profile.py"), os.path.join(ROOT_DIR, "results_s15_vwap_profile", "s15_status.json"))
+    ("S1_Liquidation_Cascade", os.path.join(ROOT_DIR, "s1_liquidation_cascade.py"), os.path.join(ROOT_DIR, "results_s1", "s1_status.json")),
+    ("S2_CVD_Momentum", os.path.join(ROOT_DIR, "s2_cvd_momentum.py"), os.path.join(ROOT_DIR, "results_s2", "s2_status.json")),
+    ("S3_Macro_Trend_Follow", os.path.join(ROOT_DIR, "s3_macro_trend_follow.py"), os.path.join(ROOT_DIR, "results_s3", "s3_status.json")),
+    ("S8_Hybrid_Whale_CVD", os.path.join(ROOT_DIR, "s8_hybrid_whale_cvd.py"), os.path.join(ROOT_DIR, "results_s8", "s8_status.json")),
+    ("S15_VWAP_Profile_Conviction", os.path.join(ROOT_DIR, "s15_vwap_profile_conviction.py"), os.path.join(ROOT_DIR, "results_s15_vwap_profile", "s15_status.json"))
 ]
 
 def run_strategy(name, script_path):
