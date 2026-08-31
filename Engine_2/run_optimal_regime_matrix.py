@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX ($94 BASE RISK)
+ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX ($97 BASE RISK)
 ================================================================================
 """
 
@@ -42,8 +42,8 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 94.0
-MAX_HOUSE_RISK = 360.0
+BASE_RISK = 97.0
+MAX_HOUSE_RISK = 375.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
@@ -55,7 +55,7 @@ DRAWDOWN_LIMIT = 0.038
 def fast_portfolio_backtest_numba(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=94.0, max_house_risk=360.0, min_defense_risk=18.0,
+    fee_rate=0.0009, base_risk=97.0, max_house_risk=375.0, min_defense_risk=18.0,
     dd_limit=0.038
 ):
     n = len(entry_times)
