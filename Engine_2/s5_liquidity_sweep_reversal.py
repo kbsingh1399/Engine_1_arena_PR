@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S5 - LIQUIDITY SWEEP REVERSAL (5.5R RUNNER GEOMETRY)
+ENGINE 2: S5 - LIQUIDITY SWEEP REVERSAL (36-PERIOD SESSION SWEEP)
 ================================================================================
 """
 
@@ -37,8 +37,8 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 88.0
-MAX_HOUSE_RISK = 350.0
+BASE_RISK = 92.0
+MAX_HOUSE_RISK = 360.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
@@ -157,11 +157,11 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
     return results
 
 def s5_signal_predicate(df):
-    roll_low = df['low'].shift(1).rolling(48, min_periods=1).min()
-    roll_high = df['high'].shift(1).rolling(48, min_periods=1).max()
+    roll_low = df['low'].shift(1).rolling(36, min_periods=1).min()
+    roll_high = df['high'].shift(1).rolling(36, min_periods=1).max()
     
-    long_sweep = (df['low'] < roll_low) & (df['close'] > roll_low) & (df['vol_ratio'] > 1.2)
-    short_sweep = (df['high'] > roll_high) & (df['close'] < roll_high) & (df['vol_ratio'] > 1.2)
+    long_sweep = (df['low'] < roll_low) & (df['close'] > roll_low) & (df['vol_ratio'] > 1.15)
+    short_sweep = (df['high'] > roll_high) & (df['close'] < roll_high) & (df['vol_ratio'] > 1.15)
     return long_sweep, short_sweep
 
 def load_s5_trades(feature_cols):
