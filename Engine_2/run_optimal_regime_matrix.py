@@ -301,17 +301,12 @@ def evaluate_champion_regime_matrix():
                     sorted_indices = np.argsort(-probs_oos)
                     valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= p_th]
                     if len(valid_indices) < 5:
-                        selected_indices = sorted_indices[:min(len(sorted_indices), 5)]
+                        candidate_indices = sorted_indices[:min(len(sorted_indices), 5)]
                     else:
-                        selected_indices = valid_indices[:min(len(valid_indices), max_t)]
+                        candidate_indices = valid_indices[:min(len(valid_indices), max_t)]
                         
-                    selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
-                    
-                    oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
-                    oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
-                    oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
-                    top_indices = sorted(valid_indices[:max_t], key=lambda idx: df_oos_strat['entry_time'].iloc[idx])
-                    selected_indices = np.array(top_indices)
+                    top_indices = sorted(candidate_indices, key=lambda idx: df_oos_strat['entry_time'].iloc[idx])
+                    selected_indices = np.array(top_indices, dtype=np.int64)
                     
                     oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
                     oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
@@ -320,6 +315,8 @@ def evaluate_champion_regime_matrix():
                     oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
                     oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
                     sub_pr = probs_oos[selected_indices]
+
+
 
                     
                     roi, dd, wr, tr = fast_portfolio_backtest_numba(
