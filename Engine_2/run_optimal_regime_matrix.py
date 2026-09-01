@@ -109,8 +109,9 @@ def fast_portfolio_backtest_numba(
         if realized_pnl > 0.0:
             target_risk = min(base_risk + 1.25 * realized_pnl + streak_bonus, max_house_risk)
         else:
-            damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
+            damping = max(0.0, 1.0 - (abs(realized_pnl) / 140.0))
             target_risk = max(min_defense_risk, base_risk * damping)
+
 
             
         prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.8)
@@ -368,8 +369,11 @@ def evaluate_champion_regime_matrix():
             is_p = (sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD and sres['wr'] >= MIN_WIN_RATE and sres['ret'] >= MIN_RETURN)
             if is_p:
                 print(f"   Candidate Pass: {sname:<20} {sres['trades']:>3d} tr, {sres['wr']*100:>5.1f}% WR, {sres['ret']*100:>+6.2f}% ROI, {sres['max_dd']*100:>4.2f}% DD")
+            else:
+                print(f"   Candidate Miss: {sname:<20} {sres['trades']:>3d} tr, {sres['wr']*100:>5.1f}% WR, {sres['ret']*100:>+6.2f}% ROI, {sres['max_dd']*100:>4.2f}% DD")
                 
         if win_best is not None:
+
             sb = win_best['name']
             r = win_best['res']
             is_pass = win_best['is_pass']

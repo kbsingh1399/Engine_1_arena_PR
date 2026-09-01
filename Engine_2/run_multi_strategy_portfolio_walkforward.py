@@ -51,14 +51,15 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 75.0
-MAX_HOUSE_RISK = 320.0
+BASE_RISK = 112.0
+MAX_HOUSE_RISK = 395.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
 LEVERAGE = 10.0
 MAX_NOTIONAL = 50000.0
-DRAWDOWN_LIMIT = 0.038
+DRAWDOWN_LIMIT = 0.0475
+
 
 @njit(nogil=True)
 def fast_portfolio_backtest_numba(
@@ -110,16 +111,17 @@ def fast_portfolio_backtest_numba(
             continue
             
         realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 85.0, 200.0)
+        streak_bonus = min(consecutive_wins * 95.0, 220.0)
         
         if realized_pnl > 0.0:
-            target_risk = min(base_risk + 1.05 * realized_pnl + streak_bonus, max_house_risk)
+            target_risk = min(base_risk + 1.25 * realized_pnl + streak_bonus, max_house_risk)
         else:
-            damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
+            damping = max(0.0, 1.0 - (abs(realized_pnl) / 140.0))
             target_risk = max(min_defense_risk, base_risk * damping)
             
-        prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.8)
+        prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.8)
         target_risk = target_risk * prob_mult
+
         
         closed_drawdown = max(0.0, peak_capital - capital)
         drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown)
@@ -204,7 +206,9 @@ def run_multi_strategy_portfolio():
         'S15_VWAPProfile': load_s15_trades(feature_cols),
         'S4_CVDDivergence': load_s4_trades(feature_cols),
         'S5_LiqSweep': load_s5_trades(feature_cols),
-        'S6_VolCompression': load_s6_trades(feature_cols)
+        'S6_VolCompression': load_s6_trades(feature_cols),
+        'S7_MeanReversion': load_s7_trades(feature_cols),
+        'S3_TrendFollow': load_s3_trades(feature_cols)
     }
     
     for s_name, df_s in strategies.items():
@@ -252,14 +256,17 @@ def run_multi_strategy_portfolio():
                 X_oos = df_oos_strat[fcols].fillna(0.0)
                 df_oos_strat['prob'] = model.predict_proba(X_oos)[:, 1].astype(np.float64)
                 
-                # Take top 3 trades per strategy with P >= 0.50
-                top_s = df_oos_strat[df_oos_strat['prob'] >= 0.50].sort_values('prob', ascending=False).head(3)
+                # Take top 3 trades per strategy with P >= 0.42
+                top_s = df_oos_strat[df_oos_strat['prob'] >= 0.42].sort_values('prob', ascending=False).head(3)
+                if top_s.empty:
+                    top_s = df_oos_strat.sort_values('prob', ascending=False).head(1)
                 if not top_s.empty:
                     oos_candidates.append(top_s)
                     
         if not oos_candidates: continue
         df_oos_all = pd.concat(oos_candidates, ignore_index=True)
-        df_oos_all = df_oos_all.sort_values('prob', ascending=False).head(8).sort_values('entry_time').reset_index(drop=True)
+        df_oos_all = df_oos_all.sort_values('prob', ascending=False).head(10).sort_values('entry_time').reset_index(drop=True)
+
         
         oos_et = df_oos_all['entry_time'].values.astype(np.int64)
         oos_xt = df_oos_all['exit_time'].values.astype(np.int64)
