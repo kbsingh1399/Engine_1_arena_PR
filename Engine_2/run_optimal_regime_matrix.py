@@ -348,24 +348,26 @@ def evaluate_champion_regime_matrix():
 
         win_best = None
         for sname, sres in strat_results.items():
-            if sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD:
-                if win_best is None or win_best['res']['trades'] < MIN_TRADES or sres['ret'] > win_best['res']['ret']:
-                    win_best = {'name': sname, 'res': sres}
-            elif win_best is None:
-                win_best = {'name': sname, 'res': sres}
-            elif win_best['res']['trades'] < MIN_TRADES and sres['trades'] > win_best['res']['trades']:
-                win_best = {'name': sname, 'res': sres}
+            is_pass = (sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD and sres['wr'] >= MIN_WIN_RATE and sres['ret'] >= MIN_RETURN)
+            if is_pass:
+                if win_best is None or not win_best['is_pass'] or sres['ret'] > win_best['res']['ret']:
+                    win_best = {'name': sname, 'res': sres, 'is_pass': True}
+            elif win_best is None or (not win_best['is_pass'] and sres['ret'] > win_best['res']['ret'] and sres['max_dd'] <= MAX_DD):
+                win_best = {'name': sname, 'res': sres, 'is_pass': False}
+            elif not win_best['is_pass'] and win_best['res']['trades'] < MIN_TRADES and sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD:
+                win_best = {'name': sname, 'res': sres, 'is_pass': False}
                 
         if win_best is not None:
             sb = win_best['name']
             r = win_best['res']
-            is_pass = (r['ret'] >= MIN_RETURN) and (r['max_dd'] <= MAX_DD) and (r['wr'] >= MIN_WIN_RATE) and (r['trades'] >= MIN_TRADES)
+            is_pass = win_best['is_pass']
             status_str = "[PASS]" if is_pass else "[FAIL]"
             print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {sb:<20} {r['trades']:>3d}     {r['wr']*100:>5.1f}%    {r['ret']*100:>+6.2f}%     {r['max_dd']*100:>4.2f}%     {status_str}")
             matrix_results[w_idx] = {'strategy': sb, 'roi': r['ret'], 'dd': r['max_dd'], 'wr': r['wr'], 'tr': r['trades'], 'passed': is_pass}
         else:
             print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'None':<20}   0       0.0%     +0.00%     0.00%     [FAIL]")
             matrix_results[w_idx] = {'strategy': 'None', 'roi': 0.0, 'dd': 0.0, 'wr': 0.0, 'tr': 0, 'passed': False}
+
 
             
     passed_count = sum(1 for r in matrix_results.values() if r['passed'])
