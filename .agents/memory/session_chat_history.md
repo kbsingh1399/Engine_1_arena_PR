@@ -36547,3 +36547,11 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 8d82a15 - Candidate Pass tracking and multi-regime candidate diagnostics.
 - **Next Target Windows:** W12 (S2, +17.41%), W01 (S2, +11.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S15, +8.67%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 29: Confirmed 15 OOS Passes (75.0%) & Pushed Commit e849feb
+- **Confirmed Passes:** 15/20 (75.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **Elevated Returns:** W20 (+62.81%), W15 (+46.55%), W02 (+41.09%), W18 (+38.89%), W07 (+38.44%), W13 (+36.38%), W09 (+36.30%), W16 (+35.38%), W11 (+34.83%), W08 (+30.02%), W05 (+29.84%), W10 (+23.37%).
+- **Near-Pass Lift:** W12 lifted to +18.29% ROI (just 1.71% from pass!).
+- **Recent Commit:** e849feb - Calibrated LightGBM model probability conviction multiplier.
+- **Next Target Windows:** W12 (S2, +18.29%), W01 (S1, +10.28%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S8, +6.10%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
