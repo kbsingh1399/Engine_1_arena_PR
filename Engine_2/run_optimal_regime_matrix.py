@@ -104,25 +104,31 @@ def fast_portfolio_backtest_numba(
             continue
             
         realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 95.0, 220.0)
+        current_roi = realized_pnl / initial_capital
         
-        if realized_pnl > 0.0:
+        # ---------------- GLM 5.3 Lock-In Phase ----------------
+        if current_roi >= 0.225:
+            if trades_executed >= 5:
+                continue
+            else:
+                target_risk = min_defense_risk * 0.2
+        elif realized_pnl > 0.0:
+            streak_bonus = min(consecutive_wins * 95.0, 220.0)
             target_risk = min(base_risk + 1.25 * realized_pnl + streak_bonus, max_house_risk)
         else:
             damping = max(0.0, 1.0 - (abs(realized_pnl) / 140.0))
             target_risk = max(min_defense_risk, base_risk * damping)
 
-
-            
         prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.8)
         target_risk = target_risk * prob_mult
 
-
-        
         closed_drawdown = max(0.0, peak_capital - capital)
         drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown)
-        cur_risk = min(target_risk, drawdown_budget / 1.15)
-        if cur_risk < min_defense_risk:
+        if drawdown_budget <= 0.0 or target_risk <= 0.0:
+            continue
+            
+        cur_risk = min(target_risk, drawdown_budget / 1.25)
+        if cur_risk < min_defense_risk and current_roi < 0.225:
             cur_risk = min_defense_risk
             
         stop_dist = max(2.0 * atrs[i], entry_prices[i] * 0.0065)

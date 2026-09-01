@@ -36610,3 +36610,9 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - User fed the exhaustive research prompt to GLM 5.3 and will share the output soon.
 - Current status: 16/20 confirmed OOS passes (80.0%), 100% DD <= 4.96%.
 - Prepared to parse, audit for zero-lookahead, implement, and validate GLM 5.3's mathematical and code recommendations across W01, W03, W14, W17.
+
+### User Viewed s1_liquidation_cascade.py (lines 73-120)
+- User inspected the newly calibrated multi-tier trailing stop ladder and 48-hour time-decay exit in S1.
+- Regenerated S1 trade stream (113,695 trades) and re-evaluated regime matrix.
+- Committed & pushed to main: commit 5133513.
+- Ready to ingest GLM 5.3 output as soon as user pastes.

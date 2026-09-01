@@ -88,21 +88,18 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if highs[j] > best_price:
                 best_price = highs[j]
                 gain = best_price - entry_price
-                if gain >= 5.5 * stop_dist:
-                    exit_price = entry_price + 5.5 * stop_dist
+                if gain >= 3.2 * stop_dist:
+                    exit_price = entry_price + 3.2 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 4.2 * stop_dist:
-                    new_stop = entry_price + 3.5 * stop_dist
+                elif gain >= 2.6 * stop_dist:
+                    new_stop = entry_price + 2.2 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 3.0 * stop_dist:
-                    new_stop = entry_price + 2.4 * stop_dist
+                elif gain >= 2.0 * stop_dist:
+                    new_stop = entry_price + 1.5 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.2 * stop_dist:
-                    new_stop = entry_price + 1.6 * stop_dist
-                    if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 1.25 * stop_dist:
-                    new_stop = entry_price + 0.40 * stop_dist
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price + 0.60 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -118,22 +115,20 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if lows[j] < best_price:
                 best_price = lows[j]
                 gain = entry_price - best_price
-                if gain >= 5.5 * stop_dist:
-                    exit_price = entry_price - 5.5 * stop_dist
+                if gain >= 3.2 * stop_dist:
+                    exit_price = entry_price - 3.2 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 4.2 * stop_dist:
-                    new_stop = entry_price - 3.5 * stop_dist
+                elif gain >= 2.6 * stop_dist:
+                    new_stop = entry_price - 2.2 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 3.0 * stop_dist:
-                    new_stop = entry_price - 2.4 * stop_dist
+                elif gain >= 2.0 * stop_dist:
+                    new_stop = entry_price - 1.5 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.2 * stop_dist:
-                    new_stop = entry_price - 1.6 * stop_dist
+                elif gain >= 1.2 * stop_dist:
+                    new_stop = entry_price - 0.60 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 1.25 * stop_dist:
-                    new_stop = entry_price - 0.40 * stop_dist
-                    if new_stop < cur_stop: cur_stop = new_stop
+
 
                     
     return exit_price, exit_offset
