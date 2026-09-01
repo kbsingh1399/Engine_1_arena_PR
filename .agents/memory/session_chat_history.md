@@ -36451,3 +36451,10 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 9c3f049 - Calibrated S1 Liquidation Cascade 0.80 quantile filter and convective compounding.
 - **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W19 (S1, +15.36%), W14 (S8, +11.50%), W03 (S5, +10.93%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
+- **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **Strategy Breakthrough:** S4 (CVD Divergence Squeeze) achieved +39.55% ROI, 83.3% WR, 2.38% Max DD in W07.
+- **Recent Commit:** 0462854 - Chronological trade index sorting and robust Numba portfolio backtesting.
+- **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W14 (S8, +11.50%), W03 (S5, +10.93%), W08 (S3, +7.44%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
