@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S6 - VOLATILITY COMPRESSION BREAKOUT (5.5R RUNNER GEOMETRY)
+ENGINE 2: S6 - VOLATILITY COMPRESSION BREAKOUT (VERIFIED 5.5R GEOMETRY)
 ================================================================================
 """
 
@@ -37,8 +37,8 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 88.0
-MAX_HOUSE_RISK = 350.0
+BASE_RISK = 97.0
+MAX_HOUSE_RISK = 375.0
 MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
