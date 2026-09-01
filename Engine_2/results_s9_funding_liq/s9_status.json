@@ -1,0 +1,24 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 26.02,
+        "max_dd_pct": 4.4,
+        "archetype": "F6_DeepOversold",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 2,
+        "test_start": "2021-06-15",
+        "test_end": "2021-07-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 4.26,
+        "max_dd_pct": 9.57,
+        "archetype": "F5_FearComposite",
+        "status": "\u274c FAIL"
+    }
+]

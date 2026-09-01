@@ -1,0 +1,8 @@
+{
+    "strategy": "S4_CVD_divergence_between_spot_and_futures_markets",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:07:03.524089"
+}

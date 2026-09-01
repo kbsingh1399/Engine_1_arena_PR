@@ -1,0 +1,13 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 6,
+        "win_rate_pct": 16.67,
+        "roi_pct": -4.44,
+        "max_dd_pct": 4.46,
+        "archetype": "OF4_LiqPressure",
+        "status": "\u274c FAIL"
+    }
+]

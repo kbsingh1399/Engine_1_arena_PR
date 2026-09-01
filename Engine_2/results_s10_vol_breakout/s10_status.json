@@ -1,0 +1,13 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 7,
+        "win_rate_pct": 28.57,
+        "roi_pct": -3.89,
+        "max_dd_pct": 4.49,
+        "archetype": "V8_VolumeSpike",
+        "status": "\u274c FAIL"
+    }
+]

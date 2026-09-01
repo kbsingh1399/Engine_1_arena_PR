@@ -1,0 +1,13 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 6,
+        "win_rate_pct": 66.67,
+        "roi_pct": 8.11,
+        "max_dd_pct": 3.82,
+        "archetype": "A2_DeepSqueeze",
+        "status": "\u274c FAIL"
+    }
+]

@@ -1,0 +1,8 @@
+{
+    "strategy": "S5_Liquidity_sweep_and_absorption_patterns",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:09:30.182432"
+}

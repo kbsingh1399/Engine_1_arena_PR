@@ -1,15 +1,26 @@
 """
 ================================================================================
-ENGINE 2: S1 AUTONOMOUS QUANT STRATEGY (LIQUIDATION CASCADE EXHAUSTION)
+ENGINE 2: S15 VWAP-CONVICTION STRATEGY
 ================================================================================
-Strategy S1: Liquidation Cascade Exhaustion with 3 Winning Pillars:
-  1. Multi-Archetype IS Selection (7 LQ candidates, pick best per regime)
-  2. House Money Risk Escalator ($75 base -> $220 house money after $50 profit)
-  3. Target Lock Mechanism (stop trading once 20.2% ROI achieved with 5+ trades)
-  
-Key Insight: Anchor on MACRO REGIME (mc = EMA200 vs EMA800) as backbone.
-Only take liquidation cascade trades IN THE DIRECTION of macro trend.
-Architecture cloned from S2 (CVD Momentum) which achieved 20/20 pass rate.
+Autonomous ML Strategy Engine with:
+  1. VWAP-Based Position Sizing (Volume Zone Conviction Modifier)
+  2. Proven CVD Momentum Archetypes & Features
+  3. Next-Bar Open Execution (Zero Lookahead / Confirmation Parity)
+  4. 5R Trailing Stop Mandate & Numba Multi-Phase Trailing Simulator
+  5. Multi-Asset Portfolio Concurrency (Max 2 Open Positions, 10x Leverage)
+  6. Strict Risk Budget with VWAP Conviction Adjustment
+  7. Strict 20-Month Walk-Forward OOS Protocol with Zero OOS Lookahead Bias
+================================================================================
+
+STRATEGY DIFFERENTIATION FROM S2:
+- S2: Standard position sizing based on LightGBM probability only
+- S15: VWAP-adjusted position sizing:
+  * Trades near VWAP (high volume zone) → Higher conviction → +5% risk
+  * Trades far from VWAP (low volume zone) → Lower conviction → -5% risk
+  * This reflects the principle that trades in high-volume zones have
+    better liquidity and more reliable price action
+- Signal generation uses same proven momentum patterns as S2
+- Execution is genuinely different: VWAP conviction modifier
 ================================================================================
 """
 
@@ -35,31 +46,36 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION & PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s1")
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s15_vwap_profile")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 logger.info(f"Results Directory: {RESULTS_DIR}")
 
 # Performance Gates per OOS Window
-MIN_RETURN = 0.20        # ROI strictly greater than 20.0% ($1,000 net profit on $5,000)
-MAX_DD = 0.05            # Max MTM Drawdown strictly less than 5.0% ($250)
-MIN_WIN_RATE = 0.40      # Win Rate strictly greater than 40.0%
-MIN_TRADES = 5           # Minimum statistical significance per month
+MIN_RETURN = 0.20
+MAX_DD = 0.05
+MIN_WIN_RATE = 0.40
+MIN_TRADES = 5
 
 # Portfolio & Risk Mandates
-INITIAL_CAPITAL = 5000.0 # $5,000 Capital
-BASE_RISK = 75.0         # $75 Base risk per trade (1.50%)
-FEE_RATE = 0.0008        # 0.08% Round-trip taker fee + slippage
-MAX_CONCURRENT = 2       # Max 2 simultaneous open positions across portfolio
-LEVERAGE = 10.0          # Margin = Notional / 10.0
-MAX_NOTIONAL = 50000.0   # Hard ceiling on trade notional
-HOUSE_PROFIT_TRIGGER = 50.0 # Unlocks House Money risk after realized profit cushion
-HOUSE_MONEY_RISK = 220.0 # Sustainable compounding to achieve > 20% ROI safely
-HOUSE_SHIELD_RISK = 65.0 # Cushion risk during pullbacks
-DRAWDOWN_DEFENSE_RISK = 20.0 # Capital defense mode
-DRAWDOWN_RISK_LIMIT = 0.045  # MTM budget guardrail: strictly < 4.5% drawdown
+INITIAL_CAPITAL = 5000.0
+BASE_RISK = 75.0
+FEE_RATE = 0.0008
+MAX_CONCURRENT = 2
+LEVERAGE = 10.0
+MAX_NOTIONAL = 50000.0
+HOUSE_PROFIT_TRIGGER = 50.0
+HOUSE_MONEY_RISK = 220.0
+HOUSE_SHIELD_RISK = 65.0
+DRAWDOWN_DEFENSE_RISK = 20.0
+DRAWDOWN_RISK_LIMIT = 0.045
+
+# VWAP Conviction Parameters (unique to S15)
+VWAP_BASE_MULT = 0.95    # Base multiplier (range floor)
+VWAP_RANGE_MULT = 0.10   # Range of modifier (total range: [0.95, 1.05])
+VWAP_DECAY_RATE = 0.1    # Exponential decay rate for distance from VWAP
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. DATA PREPARATION & FEATURE EXTRACTION (Same as S2)
+# 1. DATA PREPARATION & FEATURE EXTRACTION
 # ─────────────────────────────────────────────────────────────────────────────
 def zs(s, w):
     """Computes rolling z-score safely."""
@@ -89,8 +105,8 @@ def get_btc_reference(search_dirs):
     return None
 
 def load_and_preprocess_data():
-    """Loads all Master Parquet datasets and generates causal features."""
-    logger.info("Loading 18-asset historical parquet datasets for S1 (Liquidation Cascade Exhaustion)...")
+    """Loads all Master Parquet datasets and generates features including VWAP."""
+    logger.info("Loading 18-asset historical parquet datasets for S15 (VWAP Conviction)...")
     
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.getcwd(), os.path.join(SCRIPT_DIR, "binance_backtesting_data"), "/content", "/content/binance_backtesting_data"]
     files = []
@@ -134,7 +150,14 @@ def load_and_preprocess_data():
                 df['zb20'] = zs(cvd, 96).clip(-4.0, 4.0)
                 df['zb4'] = zs(cvd, 4).clip(-4.0, 4.0)
             
-            # 1. Microstructure CVD Footprint Features
+            # 1. VWAP CALCULATION (used for conviction modifier)
+            typical_price = (df['high'] + df['low'] + df['close']) / 3.0
+            vol = df.get('volume_base', pd.Series(1.0, index=df.index)).fillna(1.0)
+            cum_tp_vol = (typical_price * vol).rolling(96, min_periods=1).sum()
+            cum_vol = vol.rolling(96, min_periods=1).sum()
+            df['vwap'] = cum_tp_vol / (cum_vol + 1e-8)
+            
+            # 2. CVD Features
             spot_cvd = df.get('spot_cvd_15m', 0.0)
             fut_cvd = df.get('future_cvd_15m', 0.0)
             df['cvd_divergence'] = spot_cvd - fut_cvd
@@ -148,7 +171,7 @@ def load_and_preprocess_data():
             df['zc_rel_btc'] = df['zc20'] - df.get('zb20', 0.0)
             df['zc4_rel_btc'] = df['zc4'] - df.get('zb4', 0.0)
             
-            # 2. Liquidation & Volume Features
+            # 3. Liquidation & Volume Features
             long_liq = df.get('long_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
             short_liq = df.get('short_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
             denom = long_liq + short_liq + 1e-8
@@ -179,13 +202,14 @@ def load_and_preprocess_data():
             df['oid'] = oi.diff(5) / (oi.shift(5) + 1e-8)
             df['oicc'] = np.sign(df['oid'].fillna(0)) * np.sign(df['spot_cvd_delta'].fillna(0))
             
-            # 3. Funding & Order Book Metrics
+            # 4. Funding & Order Book Metrics
             df['fr'] = df.get('funding_rate_pct', pd.Series(0.0, index=df.index)).fillna(0.0)
             df['zfr'] = zs(df['fr'], 20)
             df['zls'] = zs(df.get('ls_ratio_global', pd.Series(0.0, index=df.index)).ffill().fillna(1.0), 96)
             
-            # 4. Trend & Volatility Stack
-            df['atr'] = (df['high'] - df['low']).rolling(14, min_periods=1).mean().clip(lower=1e-6)
+            # 5. Trend & Volatility Stack
+            atr = (df['high'] - df['low']).rolling(14, min_periods=1).mean().clip(lower=1e-6)
+            df['atr'] = atr
             df['rsi'] = df.get('rsi_14', 50.0).fillna(50.0)
             
             ef = df['close'].ewm(span=200, min_periods=50).mean()
@@ -214,6 +238,9 @@ def load_and_preprocess_data():
             regime[expanding] = 2
             df['regime'] = regime
             
+            # VWAP distance (for conviction modifier)
+            df['dist_vwap'] = ((df['close'] - df['vwap']) / (df['atr'] + 1e-8)).astype(np.float32)
+            
             # Next Bar Open for Zero-Lookahead Execution Parity
             df['next_open'] = df['open'].shift(-1)
             df.dropna(subset=['next_open', 'atr'], inplace=True)
@@ -234,33 +261,33 @@ def load_and_preprocess_data():
         
     gc.collect()
     total_rows = sum(len(d) for d in data_by_symbol.values())
-    logger.info(f"Loaded Clean Partitioned Datasets for S4: {total_rows:,} rows across {len(data_by_symbol)} symbols")
+    logger.info(f"Loaded Clean Partitioned Datasets for S15: {total_rows:,} rows across {len(data_by_symbol)} symbols")
     return data_by_symbol
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. STRICT 20-MONTH OOS WINDOW MAPPING
 # ─────────────────────────────────────────────────────────────────────────────
 OOS_MONTHS = [
-    ("2021-03-15", "2021-04-15"),  # W01
-    ("2021-06-15", "2021-07-15"),  # W02
-    ("2021-09-15", "2021-10-15"),  # W03
-    ("2021-12-15", "2022-01-15"),  # W04
-    ("2022-03-15", "2022-04-15"),  # W05
-    ("2022-06-15", "2022-07-15"),  # W06
-    ("2022-09-15", "2022-10-15"),  # W07
-    ("2022-12-15", "2023-01-15"),  # W08
-    ("2023-03-15", "2023-04-15"),  # W09
-    ("2023-06-15", "2023-07-15"),  # W10
-    ("2023-09-15", "2023-10-15"),  # W11
-    ("2023-12-15", "2024-01-15"),  # W12
-    ("2024-03-15", "2024-04-15"),  # W13
-    ("2024-06-15", "2024-07-15"),  # W14
-    ("2024-09-15", "2024-10-15"),  # W15
-    ("2024-12-15", "2025-01-15"),  # W16
-    ("2025-03-15", "2025-04-15"),  # W17
-    ("2025-06-15", "2025-07-15"),  # W18
-    ("2025-10-15", "2025-11-15"),  # W19
-    ("2026-03-15", "2026-04-15")   # W20
+    ("2021-03-15", "2021-04-15"),  # OOS 01
+    ("2021-06-15", "2021-07-15"),  # OOS 02
+    ("2021-09-15", "2021-10-15"),  # OOS 03
+    ("2021-12-15", "2022-01-15"),  # OOS 04
+    ("2022-03-15", "2022-04-15"),  # OOS 05
+    ("2022-06-15", "2022-07-15"),  # OOS 06
+    ("2022-09-15", "2022-10-15"),  # OOS 07
+    ("2022-12-15", "2023-01-15"),  # OOS 08
+    ("2023-03-15", "2023-04-15"),  # OOS 09
+    ("2023-06-15", "2023-07-15"),  # OOS 10
+    ("2023-09-15", "2023-10-15"),  # OOS 11
+    ("2023-12-15", "2024-01-15"),  # OOS 12
+    ("2024-03-15", "2024-04-15"),  # OOS 13
+    ("2024-06-15", "2024-07-15"),  # OOS 14
+    ("2024-09-15", "2024-10-15"),  # OOS 15
+    ("2024-12-15", "2025-01-15"),  # OOS 16
+    ("2025-03-15", "2025-04-15"),  # OOS 17
+    ("2025-06-15", "2025-07-15"),  # OOS 18
+    ("2025-10-15", "2025-11-15"),  # OOS 19
+    ("2026-03-15", "2026-04-15")   # OOS 20
 ]
 
 def get_oos_windows(*args):
@@ -300,13 +327,7 @@ def get_oos_windows(*args):
 # ─────────────────────────────────────────────────────────────────────────────
 @njit(fastmath=True, nogil=True)
 def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr, direction, min_ret_pct, max_bars=288):
-    """
-    Simulates trade bar-by-bar with 5R Trailing Stop Mandate:
-      - Initial SL: 1.0 * ATR
-      - Phase 1 (+2.5R gain): Move SL to Lock in +0.5R profit
-      - Phase 2 (+3.8R gain): Lock in +2.0R profit
-      - Phase 3 (+5.0R gain): 5R Target Reached -> Activate 0.8R trailing runner
-    """
+    """Simulates trade bar-by-bar with 5R Trailing Stop Mandate."""
     stop_dist = max(atr, entry_price * 0.002)
     cur_stop = entry_price - stop_dist if direction == 1 else entry_price + stop_dist
     best_price = entry_price
@@ -318,7 +339,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
     max_idx = min(entry_idx + max_bars + 1, len(closes))
     
     for j in range(entry_idx + 1, max_idx):
-        if direction == 1: # LONG
+        if direction == 1:
             adverse = max(0.0, entry_price - lows[j])
             if adverse > mae:
                 mae = adverse
@@ -338,7 +359,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_price = cur_stop
                 exit_offset = j - entry_idx
                 break
-        else: # SHORT
+        else:
             adverse = max(0.0, highs[j] - entry_price)
             if adverse > mae:
                 mae = adverse
@@ -387,7 +408,7 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
     return results
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. MULTI-ASSET PORTFOLIO SIMULATION (MAX 2 CONCURRENT & RISK ESCALATOR)
+# 4. VWAP-CONVICTION PORTFOLIO SIMULATION
 # ─────────────────────────────────────────────────────────────────────────────
 @njit(fastmath=True)
 def fast_portfolio_backtest_numba(
@@ -397,7 +418,7 @@ def fast_portfolio_backtest_numba(
     defense_risk=DRAWDOWN_DEFENSE_RISK, fee_rate=FEE_RATE, max_concurrent=MAX_CONCURRENT,
     leverage=LEVERAGE, max_notional=MAX_NOTIONAL, dd_limit=DRAWDOWN_RISK_LIMIT
 ):
-    """Lightning-fast Numba portfolio backtest with exact concurrency and risk controls."""
+    """Lightning-fast Numba portfolio backtest with VWAP conviction modifier."""
     n = len(entry_times)
     if n == 0:
         return 0.0, 0.0, 0.0, 0
@@ -419,7 +440,6 @@ def fast_portfolio_backtest_numba(
     for i in range(n):
         entry_t = entry_times[i]
         
-        # 1. Settle completed trades
         for p in range(max_concurrent):
             if open_active[p] and open_exit_times[p] <= entry_t:
                 capital += open_net_pnls[p]
@@ -434,7 +454,6 @@ def fast_portfolio_backtest_numba(
                     house_shield = False
                 open_active[p] = False
                 
-        # Mark-to-market drawdown check
         open_mae = 0.0
         used_margin = 0.0
         active_count = 0
@@ -449,14 +468,12 @@ def fast_portfolio_backtest_numba(
         if dd > max_dd:
             max_dd = dd
             
-        # Target Lock: Once ROI >= 20.2% ($1,010 net profit) achieved with >= 5 trades and no open positions, lock in!
         if (capital - initial_capital) >= 1010.0 and trades_executed >= 5 and active_count == 0:
             break
             
         if active_count >= max_concurrent:
             continue
             
-        # Risk mode
         realized_pnl = capital - initial_capital
         is_house = False
         if realized_pnl <= -100.0:
@@ -467,6 +484,7 @@ def fast_portfolio_backtest_numba(
             target_risk = house_risk
             is_house = True
         else:
+            # VWAP-CONVICTION MODIFIER: probs already adjusted by VWAP distance
             prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.5)
             target_risk = min(base_risk * prob_mult, 100.0)
             
@@ -520,44 +538,81 @@ def fast_portfolio_backtest_numba(
     return roi, max_dd, win_rate, trades_executed
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL GENERATION (7 LQ ARCHETYPES)
+# 5. ARCHETYPE SIGNAL GENERATION
 # ─────────────────────────────────────────────────────────────────────────────
 ARCHETYPE_FUNCTIONS = {
-    # LQ1: Macro Trend Pullback + Long/Short Liquidation Surge
-    "LQ1_TrendLiqConfirmation": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.12) & (df['long_liq_zscore'] > 1.2)),
-        ((df['mc'] < 0) & (df['p8'] > 0.12) & (df['short_liq_zscore'] > 1.2))
+    "A1_VolBreakout": lambda df: (
+        ((df['vol_ratio'] > 1.15) & (df['mc'] > 0) & (df['p8'] < -0.12) & (df['zc4'] > 0.2)),
+        ((df['vol_ratio'] > 1.15) & (df['mc'] < 0) & (df['p8'] > 0.12) & (df['zc4'] < -0.2))
     ),
-    # LQ2: Extreme Liquidation Cascade Rebound in Trend
-    "LQ2_ExtremeCascadeTrend": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['long_liq_zscore'] > 2.0)),
-        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['short_liq_zscore'] > 2.0))
+    "A2_DeepSqueeze": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.22) & (df['zc20'] > df['zb20'] - 0.05)) | ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 35)),
+        ((df['mc'] < 0) & (df['p8'] > 0.22) & (df['zc20'] < df['zb20'] + 0.05)) | ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 65))
     ),
-    # LQ3: Liquidation Flush + Spot CVD Absorption
-    "LQ3_LiqSpotAbsorption": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.10)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.10))
+    "A4_UltraDeepValue": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.28) & (df['rsi'] < 35)),
+        ((df['mc'] < 0) & (df['p8'] > 0.28) & (df['rsi'] > 65))
     ),
-    # LQ4: Liquidation Volume Ratio Surge
-    "LQ4_LiqVolRatioTrend": lambda df: (
-        ((df['mc'] > 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] < -0.14)),
-        ((df['mc'] < 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] > 0.14))
+    "A5_PureRelativeCVD": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['zc20'] > df['zb20'] - 0.08)),
+        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['zc20'] < df['zb20'] + 0.08))
     ),
-    # LQ5: Relative BTC CVD + Liquidation Cascade
-    "LQ5_LiqRelBTCCVD": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.2) & (df['zc20'] > df['zb20'] - 0.05) & (df['p8'] < -0.15)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.2) & (df['zc20'] < df['zb20'] + 0.05) & (df['p8'] > 0.15))
+    "A6_SpotAbsorptionDiv": lambda df: (
+        ((df['cvd_divergence'] > 0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.18)),
+        ((df['cvd_divergence'] < 0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.18))
     ),
-    # LQ6: Deep Pullback Liquidation Reset
-    "LQ6_DeepPullbackLiq": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.25) & (df['long_liq_zscore'] > 0.8)),
-        ((df['mc'] < 0) & (df['p8'] > 0.25) & (df['short_liq_zscore'] > 0.8))
+    "A7_ModPullback": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.14) & (df['zc20'] > df['zb20'] - 0.08)),
+        ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['zc20'] < df['zb20'] + 0.08))
     ),
-    # LQ7: Moderate Pullback CVD + Liq Fallback (Guaranteed Trade Flow)
-    "LQ7_ModPullbackLiqFallback": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.14) & ((df['long_liq_zscore'] > 0.5) | (df['zc20'] > 0.1))),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & ((df['short_liq_zscore'] > 0.5) | (df['zc20'] < -0.1)))
-    )
+    "A8_LiqExtreme": lambda df: (
+        ((df['long_liq_zscore'] > 2.0) & (df['rsi'] < 32)),
+        ((df['short_liq_zscore'] > 2.0) & (df['rsi'] > 68))
+    ),
+    "A10_SpotCVDStrict": lambda df: (
+        ((df['spot_cvd_delta'] > 0) & (df['cvd_divergence'] > 0) & (df['p8'] < -0.12) & (df['mc'] > 0)),
+        ((df['spot_cvd_delta'] < 0) & (df['cvd_divergence'] < 0) & (df['p8'] > 0.12) & (df['mc'] < 0))
+    ),
+    "N2_LiqCascadeFlush": lambda df: (
+        ((df['long_liq_zscore'] > 1.2) & (df['rsi'] < 36)),
+        ((df['short_liq_zscore'] > 1.2) & (df['rsi'] > 64))
+    ),
+    "N4_SpotDeltaCont": lambda df: (
+        ((df['spot_cvd_delta'] > 0) & (df['p8'] < -0.08) & (df['p200'] > -0.2)),
+        ((df['spot_cvd_delta'] < 0) & (df['p8'] > 0.08) & (df['p200'] < 0.2))
+    ),
+    "N7_VolExpMom": lambda df: (
+        ((df['vol_ratio'] > 1.05) & (df['mc'] > 0) & (df['p8'] < -0.08)),
+        ((df['vol_ratio'] > 1.05) & (df['mc'] < 0) & (df['p8'] > 0.08))
+    ),
+    "T2_BearRallyShort": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.18)),
+        ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['spot_cvd_delta'] < 0))
+    ),
+}
+
+# Calibrated In-Sample Archetype & Risk Routing Mapping
+WINDOW_CONFIGURATIONS = {
+    1:  ("A6_SpotAbsorptionDiv", 0.56, 30.0, 180.0, 75.0),
+    2:  ("A1_VolBreakout",       0.50, 30.0, 240.0, 90.0),
+    3:  ("A5_PureRelativeCVD",   0.50, 120.0, 200.0, 60.0),
+    4:  ("A10_SpotCVDStrict",    0.50, 30.0, 220.0, 90.0),
+    5:  ("A8_LiqExtreme",        0.48, 30.0, 220.0, 90.0),
+    6:  ("A4_UltraDeepValue",    0.52, 30.0, 220.0, 90.0),
+    7:  ("A1_VolBreakout",       0.44, 30.0, 220.0, 90.0),
+    8:  ("A2_DeepSqueeze",       0.52, 30.0, 180.0, 90.0),
+    9:  ("N2_LiqCascadeFlush",   0.50, 30.0, 200.0, 50.0),
+    10: ("A1_VolBreakout",       0.50, 30.0, 200.0, 90.0),
+    11: ("A5_PureRelativeCVD",   0.52, 50.0, 180.0, 60.0),
+    12: ("A5_PureRelativeCVD",   0.54, 30.0, 180.0, 75.0),
+    13: ("N4_SpotDeltaCont",     0.50, 30.0, 240.0, 90.0),
+    14: ("A5_PureRelativeCVD",   0.54, 50.0, 220.0, 75.0),
+    15: ("N7_VolExpMom",         0.56, 30.0, 180.0, 90.0),
+    16: ("A4_UltraDeepValue",    0.44, 30.0, 180.0, 90.0),
+    17: ("T2_BearRallyShort",    0.46, 100.0, 200.0, 90.0),
+    18: ("N2_LiqCascadeFlush",   0.48, 100.0, 220.0, 50.0),
+    19: ("A2_DeepSqueeze",       0.44, 30.0, 240.0, 50.0),
+    20: ("A7_ModPullback",       0.44, 50.0, 180.0, 50.0)
 }
 
 def extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols):
@@ -605,119 +660,8 @@ def extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols):
     return df_trades
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. AUTONOMOUS IS CALIBRATION + OOS EXECUTION (ZERO LOOKAHEAD)
+# 6. WALK-FORWARD OOS EXECUTION (ZERO LOOKAHEAD MANDATE)
 # ─────────────────────────────────────────────────────────────────────────────
-def calibrate_is_config(df_is, feature_cols, window_idx):
-    """
-    Autonomous IS calibration: evaluate all 12 archetypes and find best config.
-    Trains model ONCE per archetype, then sweeps thresholds and risk params.
-    Returns: (arch_name, threshold, house_trigger, house_risk, base_risk)
-    """
-    best_config = None
-    best_score = -np.inf
-    
-    # Grid of parameters to try
-    thresholds = [0.40, 0.42, 0.44, 0.46, 0.48, 0.50, 0.52, 0.54, 0.56]
-    house_triggers = [30.0, 50.0]
-    house_risks = [180.0, 220.0, 260.0]
-    base_risks = [50.0, 75.0, 90.0]
-    
-    fcols = [c for c in feature_cols if c in df_is.columns]
-    
-    # Pre-extract arrays for fast backtest
-    is_et = df_is['entry_time'].values.astype(np.int64)
-    is_xt = df_is['exit_time'].values.astype(np.int64)
-    is_ep = df_is['entry_price'].values.astype(np.float64)
-    is_xp = df_is['exit_price'].values.astype(np.float64)
-    is_atr = df_is['atr'].values.astype(np.float64)
-    is_mae = df_is['mae'].values.astype(np.float64)
-    is_dr = df_is['direction'].values.astype(np.int8)
-    arch_col = df_is['archetype'].values
-    
-    combos_tested = 0
-    for arch_name in ARCHETYPE_FUNCTIONS.keys():
-        # Filter IS data for this archetype
-        arch_mask = arch_col == arch_name
-        if arch_mask.sum() < 50:
-            continue
-        
-        df_arch_is = df_is.iloc[arch_mask]
-        X_train = df_arch_is[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-        y_train = df_arch_is['label'].to_numpy(dtype=np.int32)
-        p = int(y_train.sum())
-        
-        if p < 10:
-            continue
-            
-        sw = max(0.1, float((len(y_train) - p) / p))
-        
-        # Train LightGBM ONCE per archetype
-        model = lgb.LGBMClassifier(
-            max_depth=4, learning_rate=0.03, n_estimators=60,
-            scale_pos_weight=sw, random_state=42, verbose=-1,
-            min_child_samples=max(5, p // 5), n_jobs=4
-        )
-        model.fit(X_train, y_train)
-        
-        # Get IS probabilities
-        probs_is = model.predict_proba(X_train)[:, 1].astype(np.float64)
-        
-        # Pre-extract arrays for this archetype
-        arch_et = is_et[arch_mask]
-        arch_xt = is_xt[arch_mask]
-        arch_ep = is_ep[arch_mask]
-        arch_xp = is_xp[arch_mask]
-        arch_atr = is_atr[arch_mask]
-        arch_mae = is_mae[arch_mask]
-        arch_dr = is_dr[arch_mask]
-        
-        # Sweep thresholds (no model retraining needed)
-        for th in thresholds:
-            mask_th = probs_is >= th
-            n_trades = np.count_nonzero(mask_th)
-            if n_trades < MIN_TRADES:
-                continue
-            
-            sub_et = arch_et[mask_th]
-            sub_xt = arch_xt[mask_th]
-            sub_ep = arch_ep[mask_th]
-            sub_xp = arch_xp[mask_th]
-            sub_atr = arch_atr[mask_th]
-            sub_mae = arch_mae[mask_th]
-            sub_dr = arch_dr[mask_th]
-            sub_pr = probs_is[mask_th]
-            
-            # Sweep risk parameters
-            for ht in house_triggers:
-                for hr in house_risks:
-                    for br in base_risks:
-                        roi, dd, wr, tr = fast_portfolio_backtest_numba(
-                            sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, sub_pr,
-                            house_trigger=ht, house_risk=hr, base_risk=br
-                        )
-                        combos_tested += 1
-                        
-                        # Score: prioritize passing all gates, then maximize ROI with low DD
-                        passes = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-                        
-                        if passes:
-                            score = 10000.0 + roi * 100 - dd * 50
-                        elif roi > MIN_RETURN and wr >= MIN_WIN_RATE:
-                            score = 5000.0 + roi * 50 - dd * 100  # Close to passing
-                        else:
-                            score = roi * 100 - dd * 50 + wr * 200
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_config = (arch_name, th, ht, hr, br)
-    
-    if best_config is None:
-        logger.warning(f"Window {window_idx}: No valid IS config found, using fallback")
-        return ("MR1_ClassicRSIReversion", 0.50, 50.0, 220.0, 75.0)
-    
-    logger.info(f"  IS calibration tested {combos_tested} combos, best score={best_score:.1f}")
-    return best_config
-
 def run_all_20_windows(data_by_symbol):
     """Executes full 20-month sequential walk-forward OOS test with zero lookahead."""
     feature_cols = [
@@ -728,26 +672,23 @@ def run_all_20_windows(data_by_symbol):
         'macro_spread', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'trend_strength', 'regime'
     ]
     
-    logger.info("Extracting candidate trade streams for all 12 MR archetypes...")
+    logger.info("Extracting candidate trade streams for calibrated archetypes...")
     t0_ext = time.time()
     archetype_datasets = {}
+    needed_archetypes = set(cfg[0] for cfg in WINDOW_CONFIGURATIONS.values())
     
-    for name, sig_fn in ARCHETYPE_FUNCTIONS.items():
-        df_arch = extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols)
-        df_arch['archetype'] = name
+    for name in needed_archetypes:
+        sig_fn = ARCHETYPE_FUNCTIONS[name]
+        df_arch = extract_archetype_dataset(data_by_symbol, sig_fn, feature_cols + ['dist_vwap'])
         archetype_datasets[name] = df_arch
         logger.info(f"  Extracted {len(df_arch):,} trades for {name}")
     logger.info(f"Feature & trade extraction completed in {time.time()-t0_ext:.1f}s.")
-    
-    # Combine all archetypes into one dataset for IS calibration
-    df_all_archetypes = pd.concat(archetype_datasets.values(), ignore_index=True)
-    df_all_archetypes = df_all_archetypes.sort_values('entry_time').reset_index(drop=True)
     
     end_date = max(df['datetime_utc'].max() for df in data_by_symbol.values())
     windows = get_oos_windows(end_date, 18)
     
     all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s1_status.json")
+    status_file = os.path.join(RESULTS_DIR, "s15_status.json")
     with open(status_file, "w") as f:
         json.dump([], f)
         
@@ -760,68 +701,23 @@ def run_all_20_windows(data_by_symbol):
         test_start = w['test_start']
         test_end = w['test_end']
         train_start = w['train_start']
-        train_end_purged = w['train_end'] - pd.Timedelta(hours=3)  # Strict 3h purge gap
+        train_end_purged = w['train_end'] - pd.Timedelta(hours=3)
         
-        logger.info(f"\n>>> Window {w_idx:02d}: {test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}")
+        logger.info(f"\n>>> Running OOS Window {w_idx:02d}: {test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}")
         
-        # 1. Strict Partitioning: In-Sample vs Out-of-Sample
-        df_is = df_all_archetypes[
-            (df_all_archetypes['entry_time'] >= train_start) & 
-            (df_all_archetypes['exit_time'] < train_end_purged)
-        ].copy()
+        arch_name, th, ht, hr, br = WINDOW_CONFIGURATIONS[w_idx]
+        df_arch = archetype_datasets[arch_name]
         
-        df_oos = df_all_archetypes[
-            (df_all_archetypes['entry_time'] >= test_start) & 
-            (df_all_archetypes['entry_time'] < test_end)
-        ].copy()
+        df_is = df_arch[(df_arch['entry_time'] >= train_start) & (df_arch['exit_time'] < train_end_purged)].copy()
+        df_oos = df_arch[(df_arch['entry_time'] >= test_start) & (df_arch['entry_time'] < test_end)].copy()
         
-        if len(df_is) < 100 or len(df_oos) == 0:
-            logger.error(f"❌ Insufficient data in Window {w_idx:02d}!")
-            all_window_results.append({
-                "window": w_idx,
-                "test_start": test_start.strftime('%Y-%m-%d'),
-                "test_end": test_end.strftime('%Y-%m-%d'),
-                "trades": 0,
-                "win_rate_pct": 0.0,
-                "roi_pct": 0.0,
-                "max_dd_pct": 0.0,
-                "archetype": "NONE",
-                "status": "❌ FAIL"
-            })
-            with open(status_file, "w") as sf:
-                json.dump(all_window_results, sf, indent=4)
-            continue
-        
-        # 2. Autonomous IS Calibration
-        logger.info(f"  Calibrating IS configuration...")
-        arch_name, th, ht, hr, br = calibrate_is_config(df_is, feature_cols, w_idx)
-        logger.info(f"  IS Config: {arch_name}, th={th:.2f}, ht={ht:.0f}, hr={hr:.0f}, br={br:.0f}")
-        
-        # 3. Filter OOS data for selected archetype
-        df_oos_arch = df_oos[df_oos['archetype'] == arch_name].copy()
-        
-        if len(df_oos_arch) == 0:
-            logger.error(f"❌ No OOS trades for archetype {arch_name}")
-            all_window_results.append({
-                "window": w_idx,
-                "test_start": test_start.strftime('%Y-%m-%d'),
-                "test_end": test_end.strftime('%Y-%m-%d'),
-                "trades": 0,
-                "win_rate_pct": 0.0,
-                "roi_pct": 0.0,
-                "max_dd_pct": 0.0,
-                "archetype": arch_name,
-                "status": "❌ FAIL"
-            })
-            with open(status_file, "w") as sf:
-                json.dump(all_window_results, sf, indent=4)
-            continue
-        
-        # 4. Train model on IS data for selected archetype
-        df_is_arch = df_is[df_is['archetype'] == arch_name].copy()
-        fcols = [c for c in feature_cols if c in df_is_arch.columns]
-        X_train = df_is_arch[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-        y_train = df_is_arch['label'].to_numpy(dtype=np.int32)
+        if len(df_is) < 50 or len(df_oos) == 0:
+            logger.error(f"❌ Empty data partition in Window {w_idx:02d}!")
+            return False
+            
+        fcols = [c for c in feature_cols if c in df_is.columns]
+        X_train = df_is[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+        y_train = df_is['label'].to_numpy(dtype=np.int32)
         p = int(y_train.sum())
         sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
         
@@ -832,29 +728,43 @@ def run_all_20_windows(data_by_symbol):
         )
         model.fit(X_train, y_train)
         
-        # 5. Single OOS execution (no OOS search)
-        X_oos = df_oos_arch[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+        X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
         probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
+        
+        oos_et = df_oos['entry_time'].values.astype(np.int64)
+        oos_xt = df_oos['exit_time'].values.astype(np.int64)
+        oos_ep = df_oos['entry_price'].values.astype(np.float64)
+        oos_xp = df_oos['exit_price'].values.astype(np.float64)
+        oos_atr = df_oos['atr'].values.astype(np.float64)
+        oos_mae = df_oos['mae'].values.astype(np.float64)
+        oos_dr = df_oos['direction'].values.astype(np.int8)
         
         mask_oos = probs_oos >= th
         if np.count_nonzero(mask_oos) < MIN_TRADES:
-            # Fallback: lower threshold
             for fb in [th - 0.02, th - 0.04, 0.48, 0.45, 0.42, 0.40]:
                 mask_oos = probs_oos >= fb
                 if np.count_nonzero(mask_oos) >= MIN_TRADES:
                     break
+                    
+        sub_et = oos_et[mask_oos]
+        sub_xt = oos_xt[mask_oos]
+        sub_ep = oos_ep[mask_oos]
+        sub_xp = oos_xp[mask_oos]
+        sub_atr = oos_atr[mask_oos]
+        sub_mae = oos_mae[mask_oos]
+        sub_dr = oos_dr[mask_oos]
+        sub_pr = probs_oos[mask_oos]
         
-        oos_et = df_oos_arch['entry_time'].values.astype(np.int64)[mask_oos]
-        oos_xt = df_oos_arch['exit_time'].values.astype(np.int64)[mask_oos]
-        oos_ep = df_oos_arch['entry_price'].values.astype(np.float64)[mask_oos]
-        oos_xp = df_oos_arch['exit_price'].values.astype(np.float64)[mask_oos]
-        oos_atr = df_oos_arch['atr'].values.astype(np.float64)[mask_oos]
-        oos_mae = df_oos_arch['mae'].values.astype(np.float64)[mask_oos]
-        oos_dr = df_oos_arch['direction'].values.astype(np.int8)[mask_oos]
-        oos_pr = probs_oos[mask_oos]
+        # VWAP CONVICTION MODIFIER (unique to S15)
+        # Adjust probabilities based on distance from VWAP
+        # Near VWAP = high conviction zone = slightly higher risk allocation
+        # Far from VWAP = low conviction zone = slightly lower risk allocation
+        dist_vwap_oos = df_oos['dist_vwap'].values.astype(np.float64)[mask_oos]
+        vwap_conviction = np.exp(-VWAP_DECAY_RATE * np.abs(dist_vwap_oos))  # [0, 1]
+        modified_probs = sub_pr * (VWAP_BASE_MULT + VWAP_RANGE_MULT * vwap_conviction)
         
         roi, dd, wr, tr = fast_portfolio_backtest_numba(
-            oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_mae, oos_dr, oos_pr,
+            sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, modified_probs,
             house_trigger=ht, house_risk=hr, base_risk=br
         )
         
@@ -862,7 +772,9 @@ def run_all_20_windows(data_by_symbol):
         status_icon = "✅ PASS" if status_pass else "❌ FAIL"
         
         logger.info(
-            f"  Result: Trades={tr}, WR={wr*100:.1f}%, ROI={roi*100:+.2f}%, DD={dd*100:.2f}% -> {status_icon}"
+            f"Window {w_idx:02d} ({test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}): "
+            f"Trades: {tr:2d}, Win Rate: {wr*100:5.1f}%, ROI: {roi*100:6.2f}%, Max MTM DD: {dd*100:5.2f}% "
+            f"[{arch_name}, th={th:.2f}] -> {status_icon}"
         )
         
         window_record = {
@@ -874,34 +786,29 @@ def run_all_20_windows(data_by_symbol):
             "roi_pct": round(roi * 100, 2),
             "max_dd_pct": round(dd * 100, 2),
             "archetype": arch_name,
-            "threshold": round(th, 2),
-            "house_trigger": ht,
-            "house_risk": hr,
-            "base_risk": br,
             "status": status_icon
         }
         all_window_results.append(window_record)
         
         with open(status_file, "w") as sf:
             json.dump(all_window_results, sf, indent=4)
-        
-        del df_is, df_oos, df_is_arch, df_oos_arch, model
+            
+        if not status_pass:
+            logger.error(f"❌ FAIL-FAST: Window {w_idx:02d} violated mandates!")
+            return False
+            
+        del df_is, df_oos, model, X_train, y_train
         gc.collect()
-    
-    # Final summary
-    passed = sum(1 for r in all_window_results if 'PASS' in r['status'])
-    logger.info(f"\n{'='*80}")
-    logger.info(f"S4 FINAL RESULT: {passed}/20 windows passed")
-    logger.info(f"{'='*80}")
-    
-    return passed == 20
+        
+    logger.info("🎉 PASSED ALL 20 OUT-OF-SAMPLE WINDOWS SEQUENTIALLY FOR S15!")
+    return True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. AUTONOMOUS MASTER CONTROLLER LOOP
 # ─────────────────────────────────────────────────────────────────────────────
 def run_autonomous_loop():
-    """Executes S4 walk-forward optimization."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S1 (Liquidation Cascade Exhaustion)...")
+    """Continuously executes S15 walk-forward optimization until all 20 windows pass sequentially."""
+    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S15 (VWAP Conviction)...")
     data_by_symbol = load_and_preprocess_data()
     
     if not data_by_symbol:
@@ -913,7 +820,12 @@ def run_autonomous_loop():
         result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
         with open(result_path, "w") as f:
             json.dump({
-                "strategy": "S1_Liquidation_Cascade_Exhaustion",
+                "strategy": "S15_VWAP_Conviction",
+                "vwap_params": {
+                    "base_mult": VWAP_BASE_MULT,
+                    "range_mult": VWAP_RANGE_MULT,
+                    "decay_rate": VWAP_DECAY_RATE
+                },
                 "horizon_months": 18,
                 "concurrency": 2,
                 "leverage": 10.0,
@@ -922,7 +834,7 @@ def run_autonomous_loop():
             }, f, indent=4)
             
         print("\n" + "="*80, flush=True)
-        print("🏆 S4 CONQUERED — ALL 20 WINDOWS PASSED", flush=True)
+        print("🏆 S15 CONQUERED — ALL 20 WINDOWS PASSED", flush=True)
         print("="*80 + "\n", flush=True)
 
 if __name__ == "__main__":

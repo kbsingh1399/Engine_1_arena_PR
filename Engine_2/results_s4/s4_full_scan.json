@@ -1,0 +1,178 @@
+{
+    "best": [
+        {
+            "hm": 18,
+            "lr": 0.03,
+            "md": 4,
+            "ne": 60
+        },
+        "lr"
+    ],
+    "passes": 2,
+    "results": [
+        {
+            "window": 1,
+            "trades": 16,
+            "win_rate_pct": 31.25,
+            "roi_pct": -4.17,
+            "max_dd_pct": 4.48,
+            "archetype": "ABull",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 2,
+            "trades": 16,
+            "win_rate_pct": 31.25,
+            "roi_pct": -2.95,
+            "max_dd_pct": 4.57,
+            "archetype": "ABull",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 3,
+            "trades": 7,
+            "win_rate_pct": 14.29,
+            "roi_pct": -4.44,
+            "max_dd_pct": 4.48,
+            "archetype": "ABull",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 4,
+            "trades": 5,
+            "win_rate_pct": 40.0,
+            "roi_pct": 1.39,
+            "max_dd_pct": 4.67,
+            "archetype": "ABull",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 5,
+            "trades": 5,
+            "win_rate_pct": 20.0,
+            "roi_pct": -3.6,
+            "max_dd_pct": 4.96,
+            "archetype": "ABull",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 6,
+            "trades": 7,
+            "win_rate_pct": 28.57,
+            "roi_pct": 0.79,
+            "max_dd_pct": 5.71,
+            "archetype": "A3",
+            "threshold": 0.3,
+            "status": "\u274c"
+        },
+        {
+            "window": 7,
+            "status": "NO_CAL"
+        },
+        {
+            "window": 8,
+            "trades": 5,
+            "win_rate_pct": 20.0,
+            "roi_pct": 0.63,
+            "max_dd_pct": 4.49,
+            "archetype": "A3",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 9,
+            "trades": 20,
+            "win_rate_pct": 30.0,
+            "roi_pct": -4.42,
+            "max_dd_pct": 5.14,
+            "archetype": "A7",
+            "threshold": 0.55,
+            "status": "\u274c"
+        },
+        {
+            "window": 10,
+            "trades": 5,
+            "win_rate_pct": 20.0,
+            "roi_pct": -4.48,
+            "max_dd_pct": 4.5,
+            "archetype": "A3",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 11,
+            "status": "NO_CAL"
+        },
+        {
+            "window": 12,
+            "trades": 4,
+            "win_rate_pct": 0.0,
+            "roi_pct": -4.42,
+            "max_dd_pct": 5.04,
+            "archetype": "A3",
+            "threshold": 0.5,
+            "status": "\u274c"
+        },
+        {
+            "window": 13,
+            "trades": 5,
+            "win_rate_pct": 60.0,
+            "roi_pct": 27.26,
+            "max_dd_pct": 4.44,
+            "archetype": "A3",
+            "threshold": 0.6,
+            "status": "\u2705"
+        },
+        {
+            "window": 14,
+            "trades": 9,
+            "win_rate_pct": 55.56,
+            "roi_pct": 31.78,
+            "max_dd_pct": 4.88,
+            "archetype": "A3",
+            "threshold": 0.7,
+            "status": "\u2705"
+        },
+        {
+            "window": 15,
+            "trades": 3,
+            "win_rate_pct": 0.0,
+            "roi_pct": -4.93,
+            "max_dd_pct": 5.13,
+            "archetype": "A3",
+            "threshold": 0.6,
+            "status": "\u274c"
+        },
+        {
+            "window": 16,
+            "trades": 7,
+            "win_rate_pct": 42.86,
+            "roi_pct": 0.34,
+            "max_dd_pct": 3.75,
+            "archetype": "A3",
+            "threshold": 0.6,
+            "status": "\u274c"
+        },
+        {
+            "window": 17,
+            "status": "NO_CAL"
+        },
+        {
+            "window": 18,
+            "status": "NO_CAL"
+        },
+        {
+            "window": 19,
+            "status": "NO_CAL"
+        },
+        {
+            "window": 20,
+            "status": "NO_CAL"
+        }
+    ]
+}

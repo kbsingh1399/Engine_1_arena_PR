@@ -1,0 +1,8 @@
+{
+    "strategy": "S6_Volatility_compression_and_expansion_cycles",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:11:44.858184"
+}

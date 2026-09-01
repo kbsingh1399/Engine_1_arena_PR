@@ -1,14 +1,13 @@
 """
 ================================================================================
-ENGINE 2: S1 AUTONOMOUS QUANT STRATEGY (LIQUIDATION CASCADE EXHAUSTION)
+ENGINE 2: S8 AUTONOMOUS QUANT STRATEGY (WHALE VS RETAIL DIVERGENCE)
 ================================================================================
-Strategy S1: Liquidation Cascade Exhaustion with 3 Winning Pillars:
-  1. Multi-Archetype IS Selection (7 LQ candidates, pick best per regime)
+Strategy S8: Whale vs Retail Positioning Divergence with 3 Winning Pillars:
+  1. Multi-Archetype IS Selection (4 WH candidates, pick best per regime)
   2. House Money Risk Escalator ($75 base -> $220 house money after $50 profit)
   3. Target Lock Mechanism (stop trading once 20.2% ROI achieved with 5+ trades)
   
-Key Insight: Anchor on MACRO REGIME (mc = EMA200 vs EMA800) as backbone.
-Only take liquidation cascade trades IN THE DIRECTION of macro trend.
+Key Insight: Retail positioning is consistently wrong at turning points.
 Architecture cloned from S2 (CVD Momentum) which achieved 20/20 pass rate.
 ================================================================================
 """
@@ -35,7 +34,7 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION & PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s1")
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s8")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 logger.info(f"Results Directory: {RESULTS_DIR}")
 
@@ -90,7 +89,7 @@ def get_btc_reference(search_dirs):
 
 def load_and_preprocess_data():
     """Loads all Master Parquet datasets and generates causal features."""
-    logger.info("Loading 18-asset historical parquet datasets for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Loading 18-asset historical parquet datasets for S8 (Whale vs Retail Divergence)...")
     
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.getcwd(), os.path.join(SCRIPT_DIR, "binance_backtesting_data"), "/content", "/content/binance_backtesting_data"]
     files = []
@@ -520,43 +519,28 @@ def fast_portfolio_backtest_numba(
     return roi, max_dd, win_rate, trades_executed
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL GENERATION (7 LQ ARCHETYPES)
+# 5. MULTI-ARCHETYPE SIGNAL GENERATION (12 MR ARCHETYPES)
 # ─────────────────────────────────────────────────────────────────────────────
 ARCHETYPE_FUNCTIONS = {
-    # LQ1: Macro Trend Pullback + Long/Short Liquidation Surge
-    "LQ1_TrendLiqConfirmation": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.12) & (df['long_liq_zscore'] > 1.2)),
-        ((df['mc'] < 0) & (df['p8'] > 0.12) & (df['short_liq_zscore'] > 1.2))
+    # WH1: Whale Long Accumulation vs Retail Short Crowd
+    "WH1_WhaleRetailDivergence": lambda df: (
+        ((df['ls_ratio_top'] > 1.25) & (df['ls_ratio_global'] < 0.95) & (df['mc'] >= 0) & (df['p8'] < -0.10)),
+        ((df['ls_ratio_top'] < 0.75) & (df['ls_ratio_global'] > 1.05) & (df['mc'] <= 0) & (df['p8'] > 0.10))
     ),
-    # LQ2: Extreme Liquidation Cascade Rebound in Trend
-    "LQ2_ExtremeCascadeTrend": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['long_liq_zscore'] > 2.0)),
-        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['short_liq_zscore'] > 2.0))
+    # WH2: Whale Index Surge with Spot CVD Concurrence
+    "WH2_WhaleIndexSurge": lambda df: (
+        ((df['whale_index'] > 55) & (df['spot_cvd_delta'] > 0) & (df['mc'] > 0)),
+        ((df['whale_index'] < 45) & (df['spot_cvd_delta'] < 0) & (df['mc'] < 0))
     ),
-    # LQ3: Liquidation Flush + Spot CVD Absorption
-    "LQ3_LiqSpotAbsorption": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.10)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.10))
+    # WH3: Order Book Depth Imbalance Absorption
+    "WH3_DepthImbalanceAbsorption": lambda df: (
+        ((df['bid_depth_usd'] > df['ask_depth_usd'] * 1.3) & (df['p8'] < -0.15) & (df['mc'] > 0)),
+        ((df['ask_depth_usd'] > df['bid_depth_usd'] * 1.3) & (df['p8'] > 0.15) & (df['mc'] < 0))
     ),
-    # LQ4: Liquidation Volume Ratio Surge
-    "LQ4_LiqVolRatioTrend": lambda df: (
-        ((df['mc'] > 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] < -0.14)),
-        ((df['mc'] < 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] > 0.14))
-    ),
-    # LQ5: Relative BTC CVD + Liquidation Cascade
-    "LQ5_LiqRelBTCCVD": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.2) & (df['zc20'] > df['zb20'] - 0.05) & (df['p8'] < -0.15)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.2) & (df['zc20'] < df['zb20'] + 0.05) & (df['p8'] > 0.15))
-    ),
-    # LQ6: Deep Pullback Liquidation Reset
-    "LQ6_DeepPullbackLiq": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.25) & (df['long_liq_zscore'] > 0.8)),
-        ((df['mc'] < 0) & (df['p8'] > 0.25) & (df['short_liq_zscore'] > 0.8))
-    ),
-    # LQ7: Moderate Pullback CVD + Liq Fallback (Guaranteed Trade Flow)
-    "LQ7_ModPullbackLiqFallback": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.14) & ((df['long_liq_zscore'] > 0.5) | (df['zc20'] > 0.1))),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & ((df['short_liq_zscore'] > 0.5) | (df['zc20'] < -0.1)))
+    # WH4: Top Trader Squeeze Confirmation
+    "WH4_TopTraderSqueeze": lambda df: (
+        ((df['ls_ratio_top'] > 1.35) & (df['zc20'] > 0.15) & (df['mc'] > 0)),
+        ((df['ls_ratio_top'] < 0.65) & (df['zc20'] < -0.15) & (df['mc'] < 0))
     )
 }
 
@@ -747,7 +731,7 @@ def run_all_20_windows(data_by_symbol):
     windows = get_oos_windows(end_date, 18)
     
     all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s1_status.json")
+    status_file = os.path.join(RESULTS_DIR, "s8_status.json")
     with open(status_file, "w") as f:
         json.dump([], f)
         
@@ -901,7 +885,7 @@ def run_all_20_windows(data_by_symbol):
 # ─────────────────────────────────────────────────────────────────────────────
 def run_autonomous_loop():
     """Executes S4 walk-forward optimization."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S8 (Whale vs Retail Divergence)...")
     data_by_symbol = load_and_preprocess_data()
     
     if not data_by_symbol:
@@ -913,7 +897,7 @@ def run_autonomous_loop():
         result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
         with open(result_path, "w") as f:
             json.dump({
-                "strategy": "S1_Liquidation_Cascade_Exhaustion",
+                "strategy": "S8_Whale_Retail_Divergence",
                 "horizon_months": 18,
                 "concurrency": 2,
                 "leverage": 10.0,

@@ -1,0 +1,314 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 5,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.47,
+        "max_dd_pct": 7.98,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 173,
+            "4.0": 82,
+            "3.0": 4
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 2,
+        "test_start": "2021-06-15",
+        "test_end": "2021-07-15",
+        "trades": 10,
+        "win_rate_pct": 40.0,
+        "roi_pct": -3.11,
+        "max_dd_pct": 4.49,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 71,
+            "4.0": 12,
+            "3.0": 9
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 3,
+        "test_start": "2021-09-15",
+        "test_end": "2021-10-15",
+        "trades": 6,
+        "win_rate_pct": 16.67,
+        "roi_pct": -4.49,
+        "max_dd_pct": 4.61,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 86,
+            "4.0": 19,
+            "3.0": 6
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 4,
+        "test_start": "2021-12-15",
+        "test_end": "2022-01-15",
+        "trades": 7,
+        "win_rate_pct": 28.57,
+        "roi_pct": -4.46,
+        "max_dd_pct": 4.46,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 26,
+            "4.0": 3,
+            "3.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 5,
+        "test_start": "2022-03-15",
+        "test_end": "2022-04-15",
+        "trades": 4,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.46,
+        "max_dd_pct": 4.46,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 20,
+            "4.0": 3,
+            "3.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 6,
+        "test_start": "2022-06-15",
+        "test_end": "2022-07-15",
+        "trades": 9,
+        "win_rate_pct": 22.22,
+        "roi_pct": -4.4,
+        "max_dd_pct": 4.58,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 54,
+            "4.0": 14,
+            "3.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 7,
+        "test_start": "2022-09-15",
+        "test_end": "2022-10-15",
+        "trades": 4,
+        "win_rate_pct": 50.0,
+        "roi_pct": -1.32,
+        "max_dd_pct": 4.5,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 73
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 8,
+        "test_start": "2022-12-15",
+        "test_end": "2023-01-15",
+        "trades": 11,
+        "win_rate_pct": 18.18,
+        "roi_pct": -4.49,
+        "max_dd_pct": 4.78,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 69,
+            "3.0": 1,
+            "4.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 9,
+        "test_start": "2023-03-15",
+        "test_end": "2023-04-15",
+        "trades": 7,
+        "win_rate_pct": 28.57,
+        "roi_pct": -4.5,
+        "max_dd_pct": 4.5,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 37,
+            "4.0": 2
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 10,
+        "test_start": "2023-06-15",
+        "test_end": "2023-07-15",
+        "trades": 12,
+        "win_rate_pct": 41.67,
+        "roi_pct": -3.76,
+        "max_dd_pct": 4.47,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 25,
+            "4.0": 4,
+            "3.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 11,
+        "test_start": "2023-09-15",
+        "test_end": "2023-10-15",
+        "trades": 5,
+        "win_rate_pct": 40.0,
+        "roi_pct": -2.74,
+        "max_dd_pct": 4.5,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 27,
+            "4.0": 2,
+            "3.0": 1
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 12,
+        "test_start": "2023-12-15",
+        "test_end": "2024-01-15",
+        "trades": 4,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.48,
+        "max_dd_pct": 4.48,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 36,
+            "4.0": 25
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 13,
+        "test_start": "2024-03-15",
+        "test_end": "2024-04-15",
+        "trades": 3,
+        "win_rate_pct": 33.33,
+        "roi_pct": 3.57,
+        "max_dd_pct": 10.85,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 94,
+            "4.0": 40,
+            "3.0": 11
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 14,
+        "test_start": "2024-06-15",
+        "test_end": "2024-07-15",
+        "trades": 3,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.51,
+        "max_dd_pct": 4.51,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 122,
+            "4.0": 21,
+            "3.0": 2
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 15,
+        "test_start": "2024-09-15",
+        "test_end": "2024-10-15",
+        "trades": 6,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.44,
+        "max_dd_pct": 4.58,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 41,
+            "4.0": 17
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 16,
+        "test_start": "2024-12-15",
+        "test_end": "2025-01-15",
+        "trades": 4,
+        "win_rate_pct": 50.0,
+        "roi_pct": 14.47,
+        "max_dd_pct": 4.47,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 40,
+            "4.0": 5
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 17,
+        "test_start": "2025-03-15",
+        "test_end": "2025-04-15",
+        "trades": 10,
+        "win_rate_pct": 40.0,
+        "roi_pct": -2.75,
+        "max_dd_pct": 4.7,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 17,
+            "4.0": 9,
+            "3.0": 2
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 18,
+        "test_start": "2025-06-15",
+        "test_end": "2025-07-15",
+        "trades": 13,
+        "win_rate_pct": 38.46,
+        "roi_pct": -4.49,
+        "max_dd_pct": 4.49,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 51,
+            "4.0": 3,
+            "3.0": 2
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 19,
+        "test_start": "2025-10-15",
+        "test_end": "2025-11-15",
+        "trades": 26,
+        "win_rate_pct": 38.46,
+        "roi_pct": -4.38,
+        "max_dd_pct": 4.51,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 45
+        },
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 20,
+        "test_start": "2026-03-15",
+        "test_end": "2026-04-15",
+        "trades": 4,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.53,
+        "max_dd_pct": 4.81,
+        "threshold": 0.5,
+        "regime_breakdown": {
+            "1.0": 6,
+            "3.0": 3,
+            "4.0": 2
+        },
+        "status": "\u274c FAIL"
+    }
+]

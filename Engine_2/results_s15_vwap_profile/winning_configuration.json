@@ -1,0 +1,13 @@
+{
+    "strategy": "S15_VWAP_Conviction",
+    "vwap_params": {
+        "base_mult": 0.95,
+        "range_mult": 0.1,
+        "decay_rate": 0.1
+    },
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:18:43.215372"
+}

@@ -1,14 +1,13 @@
 """
 ================================================================================
-ENGINE 2: S1 AUTONOMOUS QUANT STRATEGY (LIQUIDATION CASCADE EXHAUSTION)
+ENGINE 2: S8 AUTONOMOUS QUANT STRATEGY (WHALE VS RETAIL DIVERGENCE)
 ================================================================================
-Strategy S1: Liquidation Cascade Exhaustion with 3 Winning Pillars:
-  1. Multi-Archetype IS Selection (7 LQ candidates, pick best per regime)
+Strategy S8: Whale vs Retail Positioning Divergence with 3 Winning Pillars:
+  1. Multi-Archetype IS Selection (4 WH candidates, pick best per regime)
   2. House Money Risk Escalator ($75 base -> $220 house money after $50 profit)
   3. Target Lock Mechanism (stop trading once 20.2% ROI achieved with 5+ trades)
   
-Key Insight: Anchor on MACRO REGIME (mc = EMA200 vs EMA800) as backbone.
-Only take liquidation cascade trades IN THE DIRECTION of macro trend.
+Key Insight: Retail positioning is consistently wrong at turning points.
 Architecture cloned from S2 (CVD Momentum) which achieved 20/20 pass rate.
 ================================================================================
 """
@@ -27,6 +26,12 @@ import numpy as np
 from numba import njit
 import gc
 import lightgbm as lgb
+import xgboost as xgb
+import catboost as cb
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+import optuna
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,7 +40,7 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION & PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s1")
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s8_ensemble")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 logger.info(f"Results Directory: {RESULTS_DIR}")
 
@@ -90,7 +95,7 @@ def get_btc_reference(search_dirs):
 
 def load_and_preprocess_data():
     """Loads all Master Parquet datasets and generates causal features."""
-    logger.info("Loading 18-asset historical parquet datasets for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Loading 18-asset historical parquet datasets for S8 (Whale vs Retail Divergence)...")
     
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.getcwd(), os.path.join(SCRIPT_DIR, "binance_backtesting_data"), "/content", "/content/binance_backtesting_data"]
     files = []
@@ -520,43 +525,28 @@ def fast_portfolio_backtest_numba(
     return roi, max_dd, win_rate, trades_executed
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL GENERATION (7 LQ ARCHETYPES)
+# 5. MULTI-ARCHETYPE SIGNAL GENERATION (12 MR ARCHETYPES)
 # ─────────────────────────────────────────────────────────────────────────────
 ARCHETYPE_FUNCTIONS = {
-    # LQ1: Macro Trend Pullback + Long/Short Liquidation Surge
-    "LQ1_TrendLiqConfirmation": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.12) & (df['long_liq_zscore'] > 1.2)),
-        ((df['mc'] < 0) & (df['p8'] > 0.12) & (df['short_liq_zscore'] > 1.2))
+    # WH1: Whale Long Accumulation vs Retail Short Crowd
+    "WH1_WhaleRetailDivergence": lambda df: (
+        ((df['ls_ratio_top'] > 1.25) & (df['ls_ratio_global'] < 0.95) & (df['mc'] >= 0) & (df['p8'] < -0.10)),
+        ((df['ls_ratio_top'] < 0.75) & (df['ls_ratio_global'] > 1.05) & (df['mc'] <= 0) & (df['p8'] > 0.10))
     ),
-    # LQ2: Extreme Liquidation Cascade Rebound in Trend
-    "LQ2_ExtremeCascadeTrend": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['long_liq_zscore'] > 2.0)),
-        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['short_liq_zscore'] > 2.0))
+    # WH2: Whale Index Surge with Spot CVD Concurrence
+    "WH2_WhaleIndexSurge": lambda df: (
+        ((df['whale_index'] > 55) & (df['spot_cvd_delta'] > 0) & (df['mc'] > 0)),
+        ((df['whale_index'] < 45) & (df['spot_cvd_delta'] < 0) & (df['mc'] < 0))
     ),
-    # LQ3: Liquidation Flush + Spot CVD Absorption
-    "LQ3_LiqSpotAbsorption": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.10)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.10))
+    # WH3: Order Book Depth Imbalance Absorption
+    "WH3_DepthImbalanceAbsorption": lambda df: (
+        ((df['bid_depth_usd'] > df['ask_depth_usd'] * 1.3) & (df['p8'] < -0.15) & (df['mc'] > 0)),
+        ((df['ask_depth_usd'] > df['bid_depth_usd'] * 1.3) & (df['p8'] > 0.15) & (df['mc'] < 0))
     ),
-    # LQ4: Liquidation Volume Ratio Surge
-    "LQ4_LiqVolRatioTrend": lambda df: (
-        ((df['mc'] > 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] < -0.14)),
-        ((df['mc'] < 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] > 0.14))
-    ),
-    # LQ5: Relative BTC CVD + Liquidation Cascade
-    "LQ5_LiqRelBTCCVD": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.2) & (df['zc20'] > df['zb20'] - 0.05) & (df['p8'] < -0.15)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.2) & (df['zc20'] < df['zb20'] + 0.05) & (df['p8'] > 0.15))
-    ),
-    # LQ6: Deep Pullback Liquidation Reset
-    "LQ6_DeepPullbackLiq": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.25) & (df['long_liq_zscore'] > 0.8)),
-        ((df['mc'] < 0) & (df['p8'] > 0.25) & (df['short_liq_zscore'] > 0.8))
-    ),
-    # LQ7: Moderate Pullback CVD + Liq Fallback (Guaranteed Trade Flow)
-    "LQ7_ModPullbackLiqFallback": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.14) & ((df['long_liq_zscore'] > 0.5) | (df['zc20'] > 0.1))),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & ((df['short_liq_zscore'] > 0.5) | (df['zc20'] < -0.1)))
+    # WH4: Top Trader Squeeze Confirmation
+    "WH4_TopTraderSqueeze": lambda df: (
+        ((df['ls_ratio_top'] > 1.35) & (df['zc20'] > 0.15) & (df['mc'] > 0)),
+        ((df['ls_ratio_top'] < 0.65) & (df['zc20'] < -0.15) & (df['mc'] < 0))
     )
 }
 
@@ -718,6 +708,145 @@ def calibrate_is_config(df_is, feature_cols, window_idx):
     logger.info(f"  IS calibration tested {combos_tested} combos, best score={best_score:.1f}")
     return best_config
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. ENSEMBLE MODEL TRAINING WITH OPTUNA HYPERPARAMETER OPTIMIZATION
+# ─────────────────────────────────────────────────────────────────────────────
+def train_ensemble_with_optuna(X_train, y_train, n_trials=20):
+    """
+    Train ensemble of 4 models with Optuna-tuned hyperparameters:
+    - LightGBM
+    - XGBoost
+    - CatBoost
+    - Logistic Regression
+    
+    Uses StratifiedKFold cross-validation on IS data for tuning.
+    Returns list of trained models and their weights.
+    """
+    p = int(y_train.sum())
+    n = len(y_train)
+    sw = max(0.1, float((n - p) / p)) if p > 0 else 1.0
+    
+    # Optuna objective: find best LightGBM hyperparameters
+    def objective(trial):
+        params = {
+            'max_depth': trial.suggest_int('max_depth', 3, 6),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.08, log=True),
+            'n_estimators': trial.suggest_int('n_estimators', 40, 120, step=20),
+            'min_child_samples': trial.suggest_int('min_child_samples', 5, 30),
+            'num_leaves': trial.suggest_int('num_leaves', 15, 63),
+            'reg_alpha': trial.suggest_float('reg_alpha', 1e-3, 10.0, log=True),
+            'reg_lambda': trial.suggest_float('reg_lambda', 1e-3, 10.0, log=True),
+        }
+        
+        skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+        scores = []
+        for train_idx, val_idx in skf.split(X_train, y_train):
+            X_tr, X_val = X_train[train_idx], X_train[val_idx]
+            y_tr, y_val = y_train[train_idx], y_train[val_idx]
+            
+            model = lgb.LGBMClassifier(
+                scale_pos_weight=sw, random_state=42, verbose=-1, n_jobs=4, **params
+            )
+            model.fit(X_tr, y_tr)
+            probs = model.predict_proba(X_val)[:, 1]
+            
+            # Score: AUC-like metric
+            from sklearn.metrics import roc_auc_score
+            try:
+                score = roc_auc_score(y_val, probs)
+            except:
+                score = 0.5
+            scores.append(score)
+        
+        return np.mean(scores)
+    
+    # Run Optuna
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=42))
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+    
+    best_params = study.best_params
+    logger.info(f"  Optuna best AUC: {study.best_value:.4f}, params: {best_params}")
+    
+    # Train LightGBM with best params
+    lgb_model = lgb.LGBMClassifier(
+        scale_pos_weight=sw, random_state=42, verbose=-1, n_jobs=4, **best_params
+    )
+    lgb_model.fit(X_train, y_train)
+    
+    # Train XGBoost
+    xgb_model = xgb.XGBClassifier(
+        max_depth=best_params['max_depth'],
+        learning_rate=best_params['learning_rate'],
+        n_estimators=best_params['n_estimators'],
+        min_child_weight=best_params['min_child_samples'],
+        reg_alpha=best_params['reg_alpha'],
+        reg_lambda=best_params['reg_lambda'],
+        scale_pos_weight=sw,
+        random_state=42, verbosity=0, n_jobs=4, eval_metric='auc',
+        use_label_encoder=False
+    )
+    xgb_model.fit(X_train, y_train)
+    
+    # Train CatBoost
+    cb_model = cb.CatBoostClassifier(
+        depth=min(best_params['max_depth'], 6),
+        learning_rate=best_params['learning_rate'],
+        iterations=best_params['n_estimators'],
+        l2_leaf_reg=best_params['reg_lambda'],
+        auto_class_weights='Balanced',
+        random_seed=42, verbose=0, thread_count=4
+    )
+    cb_model.fit(X_train, y_train)
+    
+    # Train Logistic Regression (simple baseline)
+    lr_model = LogisticRegression(
+        C=1.0, class_weight='balanced', max_iter=500, random_state=42, n_jobs=4
+    )
+    # Scale features for LR
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    lr_model.fit(X_train_scaled, y_train)
+    
+    # Evaluate each model on IS to get weights
+    models = [lgb_model, xgb_model, cb_model, lr_model]
+    model_names = ['LightGBM', 'XGBoost', 'CatBoost', 'LogisticRegression']
+    
+    probs_list = []
+    aucs = []
+    for i, (model, name) in enumerate(zip(models, model_names)):
+        if name == 'LogisticRegression':
+            probs = model.predict_proba(X_train_scaled)[:, 1]
+        else:
+            probs = model.predict_proba(X_train)[:, 1]
+        probs_list.append(probs)
+        try:
+            from sklearn.metrics import roc_auc_score
+            auc = roc_auc_score(y_train, probs)
+        except:
+            auc = 0.5
+        aucs.append(auc)
+        logger.info(f"  {name}: IS AUC = {auc:.4f}")
+    
+    # Weight models by their AUC (softmax-like weighting)
+    auc_arr = np.array(aucs)
+    auc_exp = np.exp(10 * (auc_arr - auc_arr.max()))  # Temperature scaling
+    weights = auc_exp / auc_exp.sum()
+    
+    return models, weights, scaler, model_names
+
+def ensemble_predict_proba(models, weights, scaler, X, model_names):
+    """Get ensemble probability using weighted soft voting."""
+    probs = np.zeros(len(X))
+    for model, weight, name in zip(models, weights, model_names):
+        if name == 'LogisticRegression':
+            X_scaled = scaler.transform(X)
+            p = model.predict_proba(X_scaled)[:, 1]
+        else:
+            p = model.predict_proba(X)[:, 1]
+        probs += weight * p
+    return probs
+
 def run_all_20_windows(data_by_symbol):
     """Executes full 20-month sequential walk-forward OOS test with zero lookahead."""
     feature_cols = [
@@ -747,7 +876,7 @@ def run_all_20_windows(data_by_symbol):
     windows = get_oos_windows(end_date, 18)
     
     all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s1_status.json")
+    status_file = os.path.join(RESULTS_DIR, "s8_ensemble_status.json")
     with open(status_file, "w") as f:
         json.dump([], f)
         
@@ -817,24 +946,18 @@ def run_all_20_windows(data_by_symbol):
                 json.dump(all_window_results, sf, indent=4)
             continue
         
-        # 4. Train model on IS data for selected archetype
+        # 4. Train ENSEMBLE on IS data for selected archetype (with Optuna tuning)
         df_is_arch = df_is[df_is['archetype'] == arch_name].copy()
         fcols = [c for c in feature_cols if c in df_is_arch.columns]
         X_train = df_is_arch[fcols].fillna(0.0).to_numpy(dtype=np.float32)
         y_train = df_is_arch['label'].to_numpy(dtype=np.int32)
-        p = int(y_train.sum())
-        sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
         
-        model = lgb.LGBMClassifier(
-            max_depth=4, learning_rate=0.03, n_estimators=60,
-            scale_pos_weight=sw, random_state=42, verbose=-1,
-            min_child_samples=15, n_jobs=4
-        )
-        model.fit(X_train, y_train)
+        logger.info(f"  Training ensemble with Optuna (IS: {len(X_train)} samples, {int(y_train.sum())} positives)...")
+        models, weights, scaler, model_names = train_ensemble_with_optuna(X_train, y_train, n_trials=20)
         
-        # 5. Single OOS execution (no OOS search)
+        # 5. Ensemble OOS predictions (soft voting)
         X_oos = df_oos_arch[fcols].fillna(0.0).to_numpy(dtype=np.float32)
-        probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
+        probs_oos = ensemble_predict_proba(models, weights, scaler, X_oos, model_names).astype(np.float64)
         
         mask_oos = probs_oos >= th
         if np.count_nonzero(mask_oos) < MIN_TRADES:
@@ -885,7 +1008,7 @@ def run_all_20_windows(data_by_symbol):
         with open(status_file, "w") as sf:
             json.dump(all_window_results, sf, indent=4)
         
-        del df_is, df_oos, df_is_arch, df_oos_arch, model
+        del df_is, df_oos, df_is_arch, df_oos_arch
         gc.collect()
     
     # Final summary
@@ -901,7 +1024,7 @@ def run_all_20_windows(data_by_symbol):
 # ─────────────────────────────────────────────────────────────────────────────
 def run_autonomous_loop():
     """Executes S4 walk-forward optimization."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S8 (Whale vs Retail Divergence)...")
     data_by_symbol = load_and_preprocess_data()
     
     if not data_by_symbol:
@@ -913,7 +1036,7 @@ def run_autonomous_loop():
         result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
         with open(result_path, "w") as f:
             json.dump({
-                "strategy": "S1_Liquidation_Cascade_Exhaustion",
+                "strategy": "S8_Ensemble_Whale_Retail",
                 "horizon_months": 18,
                 "concurrency": 2,
                 "leverage": 10.0,

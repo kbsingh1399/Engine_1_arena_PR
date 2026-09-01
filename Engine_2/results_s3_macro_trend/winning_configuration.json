@@ -1,0 +1,8 @@
+{
+    "strategy": "S3_Macro_regime_detection_using_multi-timeframe_EMAs",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:04:47.355832"
+}

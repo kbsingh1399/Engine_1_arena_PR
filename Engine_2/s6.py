@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION & PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s1")
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s6")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 logger.info(f"Results Directory: {RESULTS_DIR}")
 
@@ -90,7 +90,7 @@ def get_btc_reference(search_dirs):
 
 def load_and_preprocess_data():
     """Loads all Master Parquet datasets and generates causal features."""
-    logger.info("Loading 18-asset historical parquet datasets for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Loading 18-asset historical parquet datasets for S6 (OI CVD Coherence)...")
     
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.getcwd(), os.path.join(SCRIPT_DIR, "binance_backtesting_data"), "/content", "/content/binance_backtesting_data"]
     files = []
@@ -520,43 +520,28 @@ def fast_portfolio_backtest_numba(
     return roi, max_dd, win_rate, trades_executed
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. MULTI-ARCHETYPE SIGNAL GENERATION (7 LQ ARCHETYPES)
+# 5. MULTI-ARCHETYPE SIGNAL GENERATION (4 OI ARCHETYPES)
 # ─────────────────────────────────────────────────────────────────────────────
 ARCHETYPE_FUNCTIONS = {
-    # LQ1: Macro Trend Pullback + Long/Short Liquidation Surge
-    "LQ1_TrendLiqConfirmation": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.12) & (df['long_liq_zscore'] > 1.2)),
-        ((df['mc'] < 0) & (df['p8'] > 0.12) & (df['short_liq_zscore'] > 1.2))
+    # OI1: Macro Trend + OI/CVD Directional Coherence
+    "OI1_MacroOICoherence": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.12) & (df['oicc'] > 0.2)),
+        ((df['mc'] < 0) & (df['p8'] > 0.12) & (df['oicc'] < -0.2))
     ),
-    # LQ2: Extreme Liquidation Cascade Rebound in Trend
-    "LQ2_ExtremeCascadeTrend": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.20) & (df['long_liq_zscore'] > 2.0)),
-        ((df['mc'] < 0) & (df['p8'] > 0.20) & (df['short_liq_zscore'] > 2.0))
+    # OI2: Aggressive OI Expansion in Macro Trend
+    "OI2_AggressiveOIExpansion": lambda df: (
+        ((df['mc'] > 0) & (df['oid'] > 0.03) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.10)),
+        ((df['mc'] < 0) & (df['oid'] > 0.03) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.10))
     ),
-    # LQ3: Liquidation Flush + Spot CVD Absorption
-    "LQ3_LiqSpotAbsorption": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.10)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.0) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.10))
+    # OI3: OI Flush Deleveraging Recovery
+    "OI3_OIFlushRecovery": lambda df: (
+        ((df['mc'] > 0) & (df['oi_flush'] < -0.02) & (df['spot_cvd_delta'] > 0) & (df['p8'] < -0.15)),
+        ((df['mc'] < 0) & (df['oi_flush'] < -0.02) & (df['spot_cvd_delta'] < 0) & (df['p8'] > 0.15))
     ),
-    # LQ4: Liquidation Volume Ratio Surge
-    "LQ4_LiqVolRatioTrend": lambda df: (
-        ((df['mc'] > 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] < -0.14)),
-        ((df['mc'] < 0) & (df['liq_vol_ratio'] > 0.15) & (df['p8'] > 0.14))
-    ),
-    # LQ5: Relative BTC CVD + Liquidation Cascade
-    "LQ5_LiqRelBTCCVD": lambda df: (
-        ((df['mc'] > 0) & (df['long_liq_zscore'] > 1.2) & (df['zc20'] > df['zb20'] - 0.05) & (df['p8'] < -0.15)),
-        ((df['mc'] < 0) & (df['short_liq_zscore'] > 1.2) & (df['zc20'] < df['zb20'] + 0.05) & (df['p8'] > 0.15))
-    ),
-    # LQ6: Deep Pullback Liquidation Reset
-    "LQ6_DeepPullbackLiq": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.25) & (df['long_liq_zscore'] > 0.8)),
-        ((df['mc'] < 0) & (df['p8'] > 0.25) & (df['short_liq_zscore'] > 0.8))
-    ),
-    # LQ7: Moderate Pullback CVD + Liq Fallback (Guaranteed Trade Flow)
-    "LQ7_ModPullbackLiqFallback": lambda df: (
-        ((df['mc'] > 0) & (df['p8'] < -0.14) & ((df['long_liq_zscore'] > 0.5) | (df['zc20'] > 0.1))),
-        ((df['mc'] < 0) & (df['p8'] > 0.14) & ((df['short_liq_zscore'] > 0.5) | (df['zc20'] < -0.1)))
+    # OI4: Pure Macro Pullback + OI Coherence Fallback
+    "OI4_MacroPullbackOIFallback": lambda df: (
+        ((df['mc'] > 0) & (df['p8'] < -0.18) & ((df['oicc'] > 0) | (df['zc20'] > 0.0))),
+        ((df['mc'] < 0) & (df['p8'] > 0.18) & ((df['oicc'] < 0) | (df['zc20'] < 0.0)))
     )
 }
 
@@ -747,7 +732,7 @@ def run_all_20_windows(data_by_symbol):
     windows = get_oos_windows(end_date, 18)
     
     all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s1_status.json")
+    status_file = os.path.join(RESULTS_DIR, "s6_status.json")
     with open(status_file, "w") as f:
         json.dump([], f)
         
@@ -901,7 +886,7 @@ def run_all_20_windows(data_by_symbol):
 # ─────────────────────────────────────────────────────────────────────────────
 def run_autonomous_loop():
     """Executes S4 walk-forward optimization."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S1 (Liquidation Cascade Exhaustion)...")
+    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S6 (OI CVD Coherence)...")
     data_by_symbol = load_and_preprocess_data()
     
     if not data_by_symbol:
@@ -913,7 +898,7 @@ def run_autonomous_loop():
         result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
         with open(result_path, "w") as f:
             json.dump({
-                "strategy": "S1_Liquidation_Cascade_Exhaustion",
+                "strategy": "S6_OI_CVD_Coherence",
                 "horizon_months": 18,
                 "concurrency": 2,
                 "leverage": 10.0,

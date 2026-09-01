@@ -1,0 +1,8 @@
+{
+    "strategy": "S8_Hybrid_CVD_Momentum_Whale",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-08-31T22:16:21.718118"
+}

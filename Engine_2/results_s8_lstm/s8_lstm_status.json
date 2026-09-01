@@ -1,0 +1,26 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 7,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.44,
+        "max_dd_pct": 4.63,
+        "lstm_auc": 0.5386,
+        "threshold": 0.5,
+        "status": "\u274c FAIL"
+    },
+    {
+        "window": 2,
+        "test_start": "2021-06-15",
+        "test_end": "2021-07-15",
+        "trades": 3,
+        "win_rate_pct": 0.0,
+        "roi_pct": -4.46,
+        "max_dd_pct": 5.09,
+        "lstm_auc": 0.5133,
+        "threshold": 0.5,
+        "status": "\u274c FAIL"
+    }
+]
