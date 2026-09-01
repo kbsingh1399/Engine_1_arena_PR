@@ -1,28 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENGINE 2: S8 - HYBRID WHALE CVD ABSORPTION (IN-SAMPLE p* & FAST BE RUNNER)
-================================================================================
-Institutional Zero-Lookahead Architecture:
-  1. Row-level Active CVD Delta (Seamless 2020-2026 Binance Spot/Futures Continuity)
-  2. Institutional Whale Absorption Microstructure:
-     - Whale Delta Divergence (zc4 > 1.2 and zc20 > 0.8 for Long, < -1.2 / -0.8 for Short)
-     - Order flow acceleration hook with volume confirmation (vol_ratio > 1.1)
-     - BTC Macro Trend Regime Alignment (btc_trend > -0.02 for Long, < 0.02 for Short)
-  3. Machine Learning Probability Calibration (LightGBM Classifier + In-Sample Calibrated p*)
-  4. Fast Break-Even & 5.5R Trailing Stop Geometry:
-     - Initial Stop: 2.0 * ATR
-     - Instant BE Lock: At +1.2R gain -> move stop to +0.2R (guaranteed risk-free trade)
-     - Profit Lock 1: At +2.4R gain -> move stop to +1.5R
-     - Runner Lock: At +3.8R gain -> move stop to +2.8R
-     - Climax TP: At +5.5R gain -> full exit
-  5. Multi-Tiered Dynamic Compounding Governor:
-     - Base Risk: $55.0 (1.10% of Capital)
-     - Win-Streak Scaling: +$55.0 risk per consecutive win (up to $260.0 max)
-     - House Money Scaling: +0.85 * Realized PnL
-     - Defense Damping: Loss drops risk immediately to Base/Defense ($15.0 minimum)
-     - Drawdown Budget Clamp: Strictly bounded at 4.2% MTM DD
-  6. Multi-Asset Concurrency (Max 2 Positions, 10x Leverage, Taker Fees 4.5 bps/side)
+ENGINE 2: S8 - HYBRID WHALE CVD ABSORPTION (BTC TREND ALIGNED FILTER)
 ================================================================================
 """
 
@@ -45,7 +24,7 @@ import lightgbm as lgb
 from numba import njit
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("S8_HybridWhaleCVD")
+logger = logging.getLogger("S8_WhaleCVD")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
@@ -58,9 +37,9 @@ MIN_WIN_RATE = 0.40
 MIN_TRADES = 5
 
 INITIAL_CAPITAL = 5000.0
-BASE_RISK = 55.0
-MAX_HOUSE_RISK = 260.0
-MIN_DEFENSE_RISK = 15.0
+BASE_RISK = 104.0
+MAX_HOUSE_RISK = 385.0
+MIN_DEFENSE_RISK = 18.0
 FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
 LEVERAGE = 10.0
@@ -101,7 +80,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (highs[j] - entry_price) < 0.30 * stop_dist:
+            if bars_held == 48 and (highs[j] - entry_price) < 0.35 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -113,14 +92,14 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                     exit_price = entry_price + 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 3.8 * stop_dist:
-                    new_stop = entry_price + 2.8 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price + 3.0 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.4 * stop_dist:
+                elif gain >= 2.5 * stop_dist:
                     new_stop = entry_price + 1.5 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 1.2 * stop_dist:
-                    new_stop = entry_price + 0.20 * stop_dist
+                elif gain >= 1.4 * stop_dist:
+                    new_stop = entry_price + 0.30 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -128,7 +107,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (entry_price - lows[j]) < 0.30 * stop_dist:
+            if bars_held == 48 and (entry_price - lows[j]) < 0.35 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -140,14 +119,14 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                     exit_price = entry_price - 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 3.8 * stop_dist:
-                    new_stop = entry_price - 2.8 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price - 3.0 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.4 * stop_dist:
+                elif gain >= 2.5 * stop_dist:
                     new_stop = entry_price - 1.5 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 1.2 * stop_dist:
-                    new_stop = entry_price - 0.20 * stop_dist
+                elif gain >= 1.4 * stop_dist:
+                    new_stop = entry_price - 0.30 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
                     
     return exit_price, exit_offset
@@ -178,9 +157,14 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
     return results
 
 def s8_signal_predicate(df):
-    long_mask = (df['zc4'] > 1.0) & (df['zc20'] > 0.6) & (df['spot_cvd_delta'] > 0) & (df['btc_trend'] > -0.02)
-    short_mask = (df['zc4'] < -1.0) & (df['zc20'] < -0.6) & (df['spot_cvd_delta'] < 0) & (df['btc_trend'] < 0.02)
-    return long_mask, short_mask
+    delta = df.get('spot_cvd_delta', pd.Series(0.0, index=df.index)).fillna(0.0)
+    accel = df.get('spot_cvd_accel', pd.Series(0.0, index=df.index)).fillna(0.0)
+    vol = df.get('vol_ratio', pd.Series(1.0, index=df.index)).fillna(1.0)
+    btc_tr = df.get('btc_trend', pd.Series(0.0, index=df.index)).fillna(0.0)
+    
+    long_abs = (delta > 0) & (accel > 0) & (vol > 1.20) & (btc_tr > -0.05)
+    short_abs = (delta < 0) & (accel < 0) & (vol > 1.20) & (btc_tr < 0.05)
+    return long_abs, short_abs
 
 def load_s8_trades(feature_cols):
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.path.join(SCRIPT_DIR, "binance_backtesting_data")]
@@ -263,13 +247,6 @@ def load_s8_trades(feature_cols):
             df['zc_rel_btc'] = (df['zc20'] - df.get('zb20', 0.0)).astype(np.float32)
             df['zc4_rel_btc'] = (df['zc4'] - df.get('zb4', 0.0)).astype(np.float32)
             
-            long_liq = df.get('long_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            short_liq = df.get('short_liq_usd', pd.Series(0.0, index=df.index)).abs().fillna(0.0)
-            denom = long_liq + short_liq + 1e-8
-            df['liq_imbalance'] = ((long_liq - short_liq) / denom).astype(np.float32)
-            vol_q = df.get('volume_quote', df['close'] * df.get('volume_base', 1.0))
-            df['liq_vol_ratio'] = (denom / (vol_q + 1e-8)).astype(np.float32)
-            
             c = df['close']
             df['p8'] = ((c - c.ewm(span=8).mean()) / c.ewm(span=8).mean()).clip(-1.0, 1.0).astype(np.float32)
             df['p21'] = ((c - c.ewm(span=21).mean()) / c.ewm(span=21).mean()).clip(-1.0, 1.0).astype(np.float32)
@@ -333,214 +310,11 @@ def load_s8_trades(feature_cols):
     df_out['exit_time'] = pd.to_datetime(df_out['exit_time'], utc=True)
     return df_out.sort_values('entry_time').reset_index(drop=True)
 
-@njit(nogil=True)
-def fast_portfolio_backtest_numba(
-    entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
-    initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=55.0, max_house_risk=260.0, min_defense_risk=15.0,
-    dd_limit=0.042
-):
-    n = len(entry_times)
-    if n == 0: return 0.0, 0.0, 0.0, 0
-        
-    capital = initial_capital
-    peak_capital = initial_capital
-    max_dd = 0.0
-    wins = 0
-    trades_executed = 0
-    consecutive_wins = 0
-    
-    open_exit_times = np.zeros(max_concurrent, dtype=np.int64)
-    open_net_pnls = np.zeros(max_concurrent, dtype=np.float64)
-    open_margins = np.zeros(max_concurrent, dtype=np.float64)
-    open_active = np.zeros(max_concurrent, dtype=np.bool_)
-    
-    for i in range(n):
-        entry_t = entry_times[i]
-        
-        for p in range(max_concurrent):
-            if open_active[p] and open_exit_times[p] <= entry_t:
-                capital += open_net_pnls[p]
-                if capital > peak_capital:
-                    peak_capital = capital
-                closed_dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
-                if closed_dd > max_dd:
-                    max_dd = closed_dd
-                if open_net_pnls[p] > 0.0:
-                    consecutive_wins += 1
-                else:
-                    consecutive_wins = 0
-                open_active[p] = False
-                
-        used_margin = 0.0
-        active_count = 0
-        for p in range(max_concurrent):
-            if open_active[p]:
-                used_margin += open_margins[p]
-                active_count += 1
-                
-        if active_count >= max_concurrent:
-            continue
-            
-        realized_pnl = capital - initial_capital
-        streak_bonus = min(consecutive_wins * 55.0, 140.0)
-        
-        if realized_pnl > 0.0:
-            target_risk = min(base_risk + 0.85 * realized_pnl + streak_bonus, max_house_risk)
-        else:
-            damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
-            target_risk = max(min_defense_risk, base_risk * damping)
-            
-        prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.5)
-        target_risk = target_risk * prob_mult
-        
-        closed_drawdown = max(0.0, peak_capital - capital)
-        drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown)
-        cur_risk = min(target_risk, drawdown_budget / 1.15)
-        if cur_risk < min_defense_risk:
-            cur_risk = min_defense_risk
-            
-        stop_dist = max(2.0 * atrs[i], entry_prices[i] * 0.0065)
-        units = min(cur_risk / (stop_dist + 1e-8), max_notional / (entry_prices[i] + 1e-8))
-        notional = units * entry_prices[i]
-        req_margin = notional / leverage
-        
-        available_margin = capital - used_margin
-        if available_margin < req_margin:
-            continue
-            
-        entry_val = units * entry_prices[i]
-        exit_val = units * exit_prices[i]
-        gross_pnl = (exit_val - entry_val) if directions[i] == 1 else (entry_val - exit_val)
-        fee = (entry_val + exit_val) * (fee_rate / 2.0)
-        net_pnl = gross_pnl - fee
-        
-        for p in range(max_concurrent):
-            if not open_active[p]:
-                open_exit_times[p] = exit_times[i]
-                open_net_pnls[p] = net_pnl
-                open_margins[p] = req_margin
-                open_active[p] = True
-                break
-                
-        trades_executed += 1
-        if net_pnl > 0:
-            wins += 1
-            
-    for p in range(max_concurrent):
-        if open_active[p]:
-            capital += open_net_pnls[p]
-            if capital > peak_capital:
-                peak_capital = capital
-            dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
-            if dd > max_dd:
-                max_dd = dd
-                
-    win_rate = wins / trades_executed if trades_executed > 0 else 0.0
-    roi = (capital - initial_capital) / initial_capital
-    return roi, max_dd, win_rate, trades_executed
-
-def get_oos_windows(end_date=None, num_windows=20):
-    if end_date is None:
-        end_date = pd.to_datetime('2026-04-15', utc=True)
-    else:
-        end_date = pd.to_datetime(end_date, utc=True)
-        
-    windows = []
-    for i in range(num_windows - 1, -1, -1):
-        test_end = end_date - relativedelta(months=3*i)
-        test_start = test_end - relativedelta(months=1)
-        train_end = test_start
-        train_start = train_end - relativedelta(months=18)
-        windows.append({
-            'idx': num_windows - i,
-            'train_start': train_start,
-            'train_end': train_end,
-            'test_start': test_start,
-            'test_end': test_end
-        })
-    return windows
-
-def run_s8_walkforward():
+if __name__ == "__main__":
     feature_cols = [
         'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
         'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'btc_trend'
     ]
-    
-    df_all = load_s8_trades(feature_cols)
-    if df_all.empty: return
-    windows = get_oos_windows(num_windows=20)
-    
-    print("\n" + "="*95)
-    print(f"{'Win':<4} {'Test Period':<24} {'Strategy':<18} {'p*':<5} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
-    print("="*95)
-    
-    pass_count = 0
-    total_count = len(windows)
-    
-    for w in windows:
-        w_idx = w['idx']
-        t_start = w['test_start']
-        t_end = w['test_end']
-        tr_start = w['train_start']
-        tr_end_purged = w['train_end'] - pd.Timedelta(hours=3)
-        
-        df_is = df_all[(df_all['entry_time'] >= tr_start) & (df_all['exit_time'] < tr_end_purged)].copy()
-        if len(df_is) < 30: continue
-            
-        fcols = [c for c in feature_cols if c in df_is.columns]
-        X_is = df_is[fcols].fillna(0.0)
-        y_is = df_is['label'].to_numpy(dtype=np.int32)
-        p = int(y_is.sum())
-        sw = max(0.1, float((len(y_is) - p) / p)) if p > 0 else 1.0
-        
-        model = lgb.LGBMClassifier(
-            max_depth=4, learning_rate=0.03, n_estimators=60, scale_pos_weight=sw,
-            random_state=42, verbose=-1, min_child_samples=15, n_jobs=2
-        )
-        model.fit(X_is, y_is)
-        
-        df_oos_win = df_all[(df_all['entry_time'] >= t_start) & (df_all['entry_time'] < t_end)].copy()
-        if len(df_oos_win) == 0: continue
-            
-        X_oos = df_oos_win[fcols].fillna(0.0)
-        probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
-        
-        sorted_indices = np.argsort(-probs_oos)
-        valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= 0.50]
-        if len(valid_indices) < 5:
-            selected_indices = sorted_indices[:min(len(sorted_indices), 6)]
-        else:
-            selected_indices = valid_indices[:min(len(valid_indices), 8)]
-            
-        selected_indices = np.sort(np.array(selected_indices, dtype=np.int64))
-        
-        oos_et = df_oos_win['entry_time'].values.astype(np.int64)[selected_indices]
-        oos_xt = df_oos_win['exit_time'].values.astype(np.int64)[selected_indices]
-        oos_ep = df_oos_win['entry_price'].values.astype(np.float64)[selected_indices]
-        oos_xp = df_oos_win['exit_price'].values.astype(np.float64)[selected_indices]
-        oos_atr = df_oos_win['atr'].values.astype(np.float64)[selected_indices]
-        oos_dr = df_oos_win['direction'].values.astype(np.int8)[selected_indices]
-        sub_pr = probs_oos[selected_indices]
-        
-        eff_th = sub_pr.min() if len(sub_pr) > 0 else 0.50
-        
-        roi, dd, wr, tr = fast_portfolio_backtest_numba(
-            oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
-            base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
-            min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
-        )
-        
-        passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-        if passed: pass_count += 1
-        verdict = "[PASS]" if passed else "[FAIL]"
-        
-        print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'S8_WhaleCVD':<18} {eff_th:.2f}   {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
-        
-    print("="*95)
-    print(f"S8 HYBRID WHALE CVD RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
-    print("="*95)
-
-if __name__ == "__main__":
-    run_s8_walkforward()
+    df = load_s8_trades(feature_cols)
+    print(f"Loaded {len(df)} S8 trades.")

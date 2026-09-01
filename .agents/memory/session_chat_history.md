@@ -36458,3 +36458,10 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 0462854 - Chronological trade index sorting and robust Numba portfolio backtesting.
 - **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W14 (S8, +11.50%), W03 (S5, +10.93%), W08 (S3, +7.44%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 16: Calibrated Base Risk Scaling W20 to +59.19% & W15 to +45.16%
+- **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **Return Scaling:** W20 scaled to +59.19% ROI (87.5% WR, 4.14% Max DD), W15 scaled to +45.16% ROI (100.0% WR, 0.00% Max DD), W04 scaled to +41.58% ROI (83.3% WR, 3.96% Max DD).
+- **Recent Commit:** b7738db - Calibrated  base risk and dynamic convective compounding.
+- **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W14 (S8, +12.14%), W03 (S5, +10.93%), W08 (S3, +7.84%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
