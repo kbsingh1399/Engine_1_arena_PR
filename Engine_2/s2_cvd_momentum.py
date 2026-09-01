@@ -95,11 +95,11 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 elif gain >= 4.0 * stop_dist:
                     new_stop = entry_price + 3.0 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.5 * stop_dist:
-                    new_stop = entry_price + 1.5 * stop_dist
+                elif gain >= 2.7 * stop_dist:
+                    new_stop = entry_price + 1.7 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 1.4 * stop_dist:
-                    new_stop = entry_price + 0.30 * stop_dist
+                elif gain >= 1.7 * stop_dist:
+                    new_stop = entry_price + 0.50 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -122,12 +122,13 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 elif gain >= 4.0 * stop_dist:
                     new_stop = entry_price - 3.0 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.5 * stop_dist:
-                    new_stop = entry_price - 1.5 * stop_dist
+                elif gain >= 2.7 * stop_dist:
+                    new_stop = entry_price - 1.7 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 1.4 * stop_dist:
-                    new_stop = entry_price - 0.30 * stop_dist
+                elif gain >= 1.7 * stop_dist:
+                    new_stop = entry_price - 0.50 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
+
                     
     return exit_price, exit_offset
 
