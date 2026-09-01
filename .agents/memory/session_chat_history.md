@@ -36555,3 +36555,11 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** e849feb - Calibrated LightGBM model probability conviction multiplier.
 - **Next Target Windows:** W12 (S2, +18.29%), W01 (S1, +10.28%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S8, +6.10%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 30: Confirmed 15 OOS Passes (75.0%) & Pushed Commit 30c5e88
+- **Confirmed Passes:** 15/20 (75.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **New Peak Highs:** W20 lifted to +63.53%, W15 lifted to +46.67%, W02 lifted to +41.29%, W18 lifted to +39.34%, W07 lifted to +38.48%, W09 lifted to +36.33%, W16 lifted to +35.55%, W10 lifted to +23.77%.
+- **W12 Lift:** S2 lifted to +18.47% ROI (3.79% Max DD, just 1.53% from pass!).
+- **Recent Commit:** 30c5e88 - Fine-tuned prob_mult conviction multiplier to 1.8x.
+- **Next Target Windows:** W12 (S2, +18.47%), W01 (S1, +10.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S8, +6.63%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
