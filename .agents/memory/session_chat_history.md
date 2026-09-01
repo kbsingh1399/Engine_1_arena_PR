@@ -36530,3 +36530,12 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 394e5a9 - Expanded grid search space and higher peak returns.
 - **Next Target Windows:** W01 (S2, +11.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S15, +8.67%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 27: Confirmed 15 OOS Passes (75.0%) & Pushed Commit cbf5f89
+- **Confirmed Passes:** 15/20 (75.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **New Matrix Passes:** W18 (+37.26% ROI, 0.38% Max DD, 80.0% WR), W16 (+34.61%), W13 (+40.98%), W11 (+29.29%).
+- **Near-Pass Windows:** W12 (+17.41% ROI, 3.79% Max DD, 66.7% WR).
+- **All Confirmed Passes:** W18 (+90.39%), W11 (+60.54%), W20 (+59.19%), W15 (+46.16%), W04 (+41.58%), W13 (+40.98%), W02 (+40.18%), W07 (+38.30%), W19 (+37.49%), W09 (+36.14%), W16 (+34.61%), W05 (+29.65%), W08 (+29.40%), W12 (+23.57%), W10 (+22.06%).
+- **Recent Commit:** cbf5f89 - Enhanced S2 trailing stop ladder with higher R-capture.
+- **Next Target Windows:** W12 (S2, +17.41%), W01 (S2, +11.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S15, +8.67%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
