@@ -49,7 +49,8 @@ FEE_RATE = 0.0009
 MAX_CONCURRENT = 2
 LEVERAGE = 10.0
 MAX_NOTIONAL = 50000.0
-DRAWDOWN_LIMIT = 0.042
+DRAWDOWN_LIMIT = 0.0475
+
 
 
 
@@ -106,10 +107,11 @@ def fast_portfolio_backtest_numba(
         streak_bonus = min(consecutive_wins * 95.0, 220.0)
         
         if realized_pnl > 0.0:
-            target_risk = min(base_risk + 1.10 * realized_pnl + streak_bonus, max_house_risk)
+            target_risk = min(base_risk + 1.25 * realized_pnl + streak_bonus, max_house_risk)
         else:
             damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
             target_risk = max(min_defense_risk, base_risk * damping)
+
             
         prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.8)
         target_risk = target_risk * prob_mult

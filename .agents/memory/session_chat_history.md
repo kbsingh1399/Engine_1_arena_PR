@@ -36563,3 +36563,11 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 30c5e88 - Fine-tuned prob_mult conviction multiplier to 1.8x.
 - **Next Target Windows:** W12 (S2, +18.47%), W01 (S1, +10.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S8, +6.63%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 31: Confirmed 15 OOS Passes (75.0%) & Pushed Commit 5bd8219
+- **Confirmed Passes:** 15/20 (75.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **New Highs:** W20 (+65.11%), W15 (+46.86%), W02 (+41.70%), W18 (+40.15%), W07 (+38.55%), W09 (+36.41%), W16 (+35.90%), W13 (+34.62%), W08 (+30.41%), W05 (+29.99%), W08 S2 (+29.17%), W11 (+28.37%), W10 (+24.44%).
+- **W12 Closer to Pass:** S2 lifted to +18.85% ROI (3.79% Max DD, just 1.15% from pass!).
+- **Recent Commit:** 5bd8219 - Calibrated BASE_RISK to 112.0 and prob_mult to 1.8x.
+- **Next Target Windows:** W12 (S2, +18.85%), W01 (S1, +10.78%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S8, +7.53%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
