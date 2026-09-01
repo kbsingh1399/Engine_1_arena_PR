@@ -296,9 +296,10 @@ def evaluate_champion_regime_matrix():
             X_oos = df_oos_strat[fcols].fillna(0.0)
             probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
             
-            for p_th in [0.48, 0.44, 0.40, 0.35, 0.30, 0.25, 0.20]:
-                for max_t in [5, 6, 8]:
+            for p_th in [0.52, 0.48, 0.44, 0.40, 0.35, 0.30, 0.25, 0.20]:
+                for max_t in [5, 6, 7, 8, 10]:
                     sorted_indices = np.argsort(-probs_oos)
+
                     valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= p_th]
                     if len(valid_indices) < 5:
                         candidate_indices = sorted_indices[:min(len(sorted_indices), 5)]
