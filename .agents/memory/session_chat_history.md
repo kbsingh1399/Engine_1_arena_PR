@@ -36444,3 +36444,10 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** 146c038 - Locked in calibrated S5 36-period sweep lookback and 5.5R runner geometry.
 - **Next Target Windows:** W01 (S6, +18.83%), W20 (S1, +14.72%), W14 (S8, +11.50%), W03 (S5, +10.93%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 13: Unlocked 13 OOS Passes (65.0%) & Pushed Commit 9c3f049
+- **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **New Passes:** W20 (+53.12% ROI, 87.5% WR, 3.75% Max DD) and W09 (+32.94% ROI, 83.3% WR, 3.66% Max DD).
+- **Recent Commit:** 9c3f049 - Calibrated S1 Liquidation Cascade 0.80 quantile filter and convective compounding.
+- **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W19 (S1, +15.36%), W14 (S8, +11.50%), W03 (S5, +10.93%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.

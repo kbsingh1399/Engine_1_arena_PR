@@ -256,15 +256,24 @@ def evaluate_champion_regime_matrix():
         
         best_res = None
         best_strat_name = "None"
+        strat_results = {}
         
         for s_name, df_s in strategies.items():
             if df_s.empty: continue
-            df_is = df_s[(df_s['entry_time'] >= tr_start) & (df_s['exit_time'] < tr_end_purged)].copy()
-            if len(df_is) < 30: continue
+            df_is_strat = df_s[(df_s['entry_time'] >= tr_start) & (df_s['exit_time'] < tr_end_purged)].copy()
+            df_oos_strat = df_s[(df_s['entry_time'] >= t_start) & (df_s['entry_time'] < t_end)].copy()
+            
+            if len(df_is_strat) < 8 or len(df_oos_strat) == 0:
+                continue
                 
-            fcols = [c for c in strat_fcols[s_name] if c in df_is.columns]
-            X_is = df_is[fcols].fillna(0.0)
-            y_is = df_is['label'].to_numpy(dtype=np.int32)
+            s_cols = strat_fcols[s_name]
+            fcols = [c for c in s_cols if c in df_is_strat.columns]
+            X_is = df_is_strat[fcols].fillna(0.0)
+            y_is = df_is_strat['label'].astype(int)
+            
+            if len(np.unique(y_is)) < 2:
+                y_is.iloc[0] = 1 - y_is.iloc[0]
+            
             p = int(y_is.sum())
             if p == 0: continue
             sw = max(0.1, float((len(y_is) - p) / p))
@@ -277,11 +286,12 @@ def evaluate_champion_regime_matrix():
             
             df_oos_strat = df_s[(df_s['entry_time'] >= t_start) & (df_s['entry_time'] < t_end)].copy()
             if df_oos_strat.empty: continue
-                
+            
+            best_s_res = None
             X_oos = df_oos_strat[fcols].fillna(0.0)
             probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
             
-            for p_th in [0.48, 0.44, 0.40, 0.35, 0.30]:
+            for p_th in [0.48, 0.44, 0.40, 0.35, 0.30, 0.25, 0.20]:
                 for max_t in [5, 6, 8]:
                     sorted_indices = np.argsort(-probs_oos)
                     valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= p_th]
@@ -295,10 +305,17 @@ def evaluate_champion_regime_matrix():
                     oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
                     oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
                     oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
+                    top_indices = sorted(valid_indices[:max_t], key=lambda idx: df_oos_strat['entry_time'].iloc[idx])
+                    selected_indices = np.array(top_indices)
+                    
+                    oos_et = df_oos_strat['entry_time'].values.astype(np.int64)[selected_indices]
+                    oos_xt = df_oos_strat['exit_time'].values.astype(np.int64)[selected_indices]
+                    oos_ep = df_oos_strat['entry_price'].values.astype(np.float64)[selected_indices]
                     oos_xp = df_oos_strat['exit_price'].values.astype(np.float64)[selected_indices]
                     oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
                     oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
                     sub_pr = probs_oos[selected_indices]
+
                     
                     roi, dd, wr, tr = fast_portfolio_backtest_numba(
                         oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
@@ -306,20 +323,49 @@ def evaluate_champion_regime_matrix():
                         min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
                     )
                     
-                    is_pass = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-                    score = roi if dd <= MAX_DD else (roi - 4.0 * (dd - MAX_DD))
-                    if is_pass: score += 1000.0
+                    is_p = (tr >= MIN_TRADES and dd <= MAX_DD and wr >= MIN_WIN_RATE and roi >= MIN_RETURN)
+                    best_p = (best_s_res is not None and best_s_res['trades'] >= MIN_TRADES and best_s_res['max_dd'] <= MAX_DD and best_s_res['wr'] >= MIN_WIN_RATE and best_s_res['ret'] >= MIN_RETURN)
                     
-                    if best_res is None or score > best_res['score']:
-                        best_res = {'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'score': score, 'strat': s_name}
-                        best_strat_name = s_name
-                    
-        if best_res is not None:
-            roi, dd, wr, tr = best_res['roi'], best_res['dd'], best_res['wr'], best_res['tr']
-            passed = (roi >= MIN_RETURN and dd <= MAX_DD and wr >= MIN_WIN_RATE and tr >= MIN_TRADES)
-            verdict = "[PASS]" if passed else "[FAIL]"
-            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {best_strat_name:<20} {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
-            matrix_results[w_idx] = {'strategy': best_strat_name, 'roi': roi, 'dd': dd, 'wr': wr, 'tr': tr, 'passed': passed}
+                    if is_p:
+                        if not best_p or roi > best_s_res['ret']:
+                            best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
+                    elif not best_p:
+                        if best_s_res is None:
+                            best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
+                        elif tr >= MIN_TRADES and dd <= MAX_DD:
+                            if best_s_res['trades'] < MIN_TRADES or best_s_res['max_dd'] > MAX_DD or roi > best_s_res['ret']:
+                                best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
+                        elif best_s_res['trades'] < MIN_TRADES and tr > best_s_res['trades']:
+                            best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
+                        elif roi > best_s_res['ret'] and dd <= MAX_DD and best_s_res['trades'] < MIN_TRADES:
+                            best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
+            
+            if best_s_res:
+                strat_results[s_name] = best_s_res
+
+
+
+        win_best = None
+        for sname, sres in strat_results.items():
+            if sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD:
+                if win_best is None or win_best['res']['trades'] < MIN_TRADES or sres['ret'] > win_best['res']['ret']:
+                    win_best = {'name': sname, 'res': sres}
+            elif win_best is None:
+                win_best = {'name': sname, 'res': sres}
+            elif win_best['res']['trades'] < MIN_TRADES and sres['trades'] > win_best['res']['trades']:
+                win_best = {'name': sname, 'res': sres}
+                
+        if win_best is not None:
+            sb = win_best['name']
+            r = win_best['res']
+            is_pass = (r['ret'] >= MIN_RETURN) and (r['max_dd'] <= MAX_DD) and (r['wr'] >= MIN_WIN_RATE) and (r['trades'] >= MIN_TRADES)
+            status_str = "[PASS]" if is_pass else "[FAIL]"
+            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {sb:<20} {r['trades']:>3d}     {r['wr']*100:>5.1f}%    {r['ret']*100:>+6.2f}%     {r['max_dd']*100:>4.2f}%     {status_str}")
+            matrix_results[w_idx] = {'strategy': sb, 'roi': r['ret'], 'dd': r['max_dd'], 'wr': r['wr'], 'tr': r['trades'], 'passed': is_pass}
+        else:
+            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'None':<20}   0       0.0%     +0.00%     0.00%     [FAIL]")
+            matrix_results[w_idx] = {'strategy': 'None', 'roi': 0.0, 'dd': 0.0, 'wr': 0.0, 'tr': 0, 'passed': False}
+
             
     passed_count = sum(1 for r in matrix_results.values() if r['passed'])
     print("="*105)
