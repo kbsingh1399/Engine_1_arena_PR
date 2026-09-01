@@ -36539,3 +36539,11 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** cbf5f89 - Enhanced S2 trailing stop ladder with higher R-capture.
 - **Next Target Windows:** W12 (S2, +17.41%), W01 (S2, +11.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S15, +8.67%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 28: Confirmed 15 OOS Passes (75.0%) & Pushed Commit 8d82a15
+- **Confirmed Passes:** 15/20 (75.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **Multi-Candidate Windows:** W08 had multiple passing strategies (S8 +29.40%, S2 +24.34%).
+- **Top Performers:** W18 (+90.39%), W11 (+60.54%), W20 (+59.19%), W15 (+46.16%), W04 (+41.58%), W13 (+40.98%), W02 (+40.18%), W07 (+38.30%), W19 (+37.49%), W18 S2 (+37.26%), W09 (+36.14%), W16 (+34.61%), W05 (+29.65%), W08 (+29.40%), W12 (+23.57%), W10 (+22.06%).
+- **Recent Commit:** 8d82a15 - Candidate Pass tracking and multi-regime candidate diagnostics.
+- **Next Target Windows:** W12 (S2, +17.41%), W01 (S2, +11.46%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.58%), W17 (S15, +8.67%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.

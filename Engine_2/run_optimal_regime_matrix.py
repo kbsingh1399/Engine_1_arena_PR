@@ -110,8 +110,9 @@ def fast_portfolio_backtest_numba(
             damping = max(0.0, 1.0 - (abs(realized_pnl) / 190.0))
             target_risk = max(min_defense_risk, base_risk * damping)
             
-        prob_mult = 1.0 + max(0.0, (probs[i] - 0.50) * 1.8)
+        prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.5)
         target_risk = target_risk * prob_mult
+
         
         closed_drawdown = max(0.0, peak_capital - capital)
         drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown)
