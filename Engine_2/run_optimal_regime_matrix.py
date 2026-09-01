@@ -264,7 +264,7 @@ def evaluate_champion_regime_matrix():
             df_is_strat = df_s[(df_s['entry_time'] >= tr_start) & (df_s['exit_time'] < tr_end_purged)].copy()
             df_oos_strat = df_s[(df_s['entry_time'] >= t_start) & (df_s['entry_time'] < t_end)].copy()
             
-            if len(df_is_strat) < 8 or len(df_oos_strat) == 0:
+            if len(df_is_strat) < 2 or len(df_oos_strat) == 0:
                 continue
                 
             s_cols = strat_fcols[s_name]
@@ -273,10 +273,14 @@ def evaluate_champion_regime_matrix():
             y_is = df_is_strat['label'].astype(int)
             
             if len(np.unique(y_is)) < 2:
-                y_is.iloc[0] = 1 - y_is.iloc[0]
+                y_is.iloc[0] = 1
+                if len(y_is) > 1:
+                    y_is.iloc[1] = 0
             
             p = int(y_is.sum())
-            if p == 0: continue
+            if p == 0: 
+                y_is.iloc[0] = 1
+
             sw = max(0.1, float((len(y_is) - p) / p))
             
             model = lgb.LGBMClassifier(

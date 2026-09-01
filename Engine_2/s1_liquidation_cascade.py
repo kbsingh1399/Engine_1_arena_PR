@@ -128,6 +128,8 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 elif gain >= 1.4 * stop_dist:
                     new_stop = entry_price - 0.30 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
+
+
                     
     return exit_price, exit_offset
 
