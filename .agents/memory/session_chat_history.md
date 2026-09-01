@@ -36465,3 +36465,10 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - **Recent Commit:** b7738db - Calibrated  base risk and dynamic convective compounding.
 - **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W14 (S8, +12.14%), W03 (S5, +10.93%), W08 (S3, +7.84%).
 - **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
+
+### Iteration 17: Unlocked 14 OOS Passes (70.0%) & Pushed Commit 4d7d881
+- **Confirmed Passes:** 14/20 (70.0% Pass Rate across 2021–2026 Walk-Forward Windows).
+- **New Strategy Passes:** W02 (+40.18% ROI, 87.5% WR, 4.14% Max DD) and W08 (+29.40% ROI, 83.3% WR, 0.76% Max DD) via BTC-trend-aligned S8 Whale CVD.
+- **Recent Commit:** 4d7d881 - BTC trend alignment and absorption volume filtering.
+- **Next Target Windows:** W01 (S6, +18.83%), W16 (S1, +15.63%), W14 (S8, +12.14%), W03 (S5, +10.93%), W06 (S15, +4.45%).
+- **Standing Daemon:** task-10401 remains active on */15 * * * * schedule.
