@@ -111,6 +111,8 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
+
+
                 
             if lows[j] < best_price:
                 best_price = lows[j]
