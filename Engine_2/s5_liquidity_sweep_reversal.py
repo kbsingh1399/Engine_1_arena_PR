@@ -88,18 +88,18 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if highs[j] > best_price:
                 best_price = highs[j]
                 gain = best_price - entry_price
-                if gain >= 3.2 * stop_dist:
-                    exit_price = entry_price + 3.2 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price + 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.6 * stop_dist:
-                    new_stop = entry_price + 2.2 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price + 3.0 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 2.0 * stop_dist:
+                elif gain >= 2.5 * stop_dist:
                     new_stop = entry_price + 1.5 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
-                elif gain >= 1.2 * stop_dist:
-                    new_stop = entry_price + 0.60 * stop_dist
+                elif gain >= 1.4 * stop_dist:
+                    new_stop = entry_price + 0.30 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -115,21 +115,19 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
             if lows[j] < best_price:
                 best_price = lows[j]
                 gain = entry_price - best_price
-                if gain >= 3.2 * stop_dist:
-                    exit_price = entry_price - 3.2 * stop_dist
+                if gain >= 5.5 * stop_dist:
+                    exit_price = entry_price - 5.5 * stop_dist
                     exit_offset = bars_held
                     break
-                elif gain >= 2.6 * stop_dist:
-                    new_stop = entry_price - 2.2 * stop_dist
+                elif gain >= 4.0 * stop_dist:
+                    new_stop = entry_price - 3.0 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 2.0 * stop_dist:
+                elif gain >= 2.5 * stop_dist:
                     new_stop = entry_price - 1.5 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-                elif gain >= 1.2 * stop_dist:
-                    new_stop = entry_price - 0.60 * stop_dist
+                elif gain >= 1.4 * stop_dist:
+                    new_stop = entry_price - 0.30 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
-
-
                     
     return exit_price, exit_offset
 
@@ -166,7 +164,25 @@ def s5_signal_predicate(df):
     short_sweep = (df['high'] > roll_high) & (df['close'] < roll_high) & (df['vol_ratio'] > 1.15)
     return long_sweep, short_sweep
 
-def load_s5_trades(feature_cols):
+CACHE_DIR = os.path.join(SCRIPT_DIR, "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+CACHE_FILE = os.path.join(CACHE_DIR, "s5_trades_cache.parquet")
+
+def load_s5_trades(feature_cols, force_recompute=False):
+    if not force_recompute and os.path.exists(CACHE_FILE):
+        try:
+            logger.info(f"Loading S5 trades from cache: {CACHE_FILE}")
+            df_cache = pd.read_parquet(CACHE_FILE)
+            df_cache['entry_time'] = pd.to_datetime(df_cache['entry_time'], utc=True)
+            df_cache['exit_time'] = pd.to_datetime(df_cache['exit_time'], utc=True)
+            return df_cache
+        except Exception as e:
+            logger.warning(f"Cache read error: {e}, recomputing...")
+
+    if os.path.exists(CACHE_FILE):
+        try: os.remove(CACHE_FILE)
+        except: pass
+
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.path.join(SCRIPT_DIR, "binance_backtesting_data")]
     files = []
     for d in search_dirs:
@@ -308,7 +324,13 @@ def load_s5_trades(feature_cols):
     df_out = pd.DataFrame(trades_list)
     df_out['entry_time'] = pd.to_datetime(df_out['entry_time'], utc=True)
     df_out['exit_time'] = pd.to_datetime(df_out['exit_time'], utc=True)
-    return df_out.sort_values('entry_time').reset_index(drop=True)
+    df_out = df_out.sort_values('entry_time').reset_index(drop=True)
+    try:
+        df_out.to_parquet(CACHE_FILE, index=False)
+        logger.info(f"Cached {len(df_out)} S5 trades to {CACHE_FILE}")
+    except Exception as e:
+        logger.warning(f"Failed to cache S5 trades: {e}")
+    return df_out
 
 if __name__ == "__main__":
     feature_cols = [

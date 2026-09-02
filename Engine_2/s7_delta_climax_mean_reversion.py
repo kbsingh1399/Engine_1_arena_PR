@@ -155,7 +155,25 @@ def s7_signal_predicate(df):
     short_mask = (df['zc4'] > 1.4) & (df['rsi'] > 68.0) & (df['vol_ratio'] > 1.2)
     return long_mask, short_mask
 
-def load_s7_trades(feature_cols):
+CACHE_DIR = os.path.join(SCRIPT_DIR, "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+CACHE_FILE = os.path.join(CACHE_DIR, "s7_trades_cache.parquet")
+
+def load_s7_trades(feature_cols, force_recompute=False):
+    if not force_recompute and os.path.exists(CACHE_FILE):
+        try:
+            logger.info(f"Loading S7 trades from cache: {CACHE_FILE}")
+            df_cache = pd.read_parquet(CACHE_FILE)
+            df_cache['entry_time'] = pd.to_datetime(df_cache['entry_time'], utc=True)
+            df_cache['exit_time'] = pd.to_datetime(df_cache['exit_time'], utc=True)
+            return df_cache
+        except Exception as e:
+            logger.warning(f"Cache read error: {e}, recomputing...")
+
+    if os.path.exists(CACHE_FILE):
+        try: os.remove(CACHE_FILE)
+        except: pass
+
     search_dirs = [DATA_DIR, SCRIPT_DIR, os.path.join(SCRIPT_DIR, "binance_backtesting_data")]
     files = []
     for d in search_dirs:
@@ -297,7 +315,13 @@ def load_s7_trades(feature_cols):
     df_out = pd.DataFrame(trades_list)
     df_out['entry_time'] = pd.to_datetime(df_out['entry_time'], utc=True)
     df_out['exit_time'] = pd.to_datetime(df_out['exit_time'], utc=True)
-    return df_out.sort_values('entry_time').reset_index(drop=True)
+    df_out = df_out.sort_values('entry_time').reset_index(drop=True)
+    try:
+        df_out.to_parquet(CACHE_FILE, index=False)
+        logger.info(f"Cached {len(df_out)} S7 trades to {CACHE_FILE}")
+    except Exception as e:
+        logger.warning(f"Failed to cache S7 trades: {e}")
+    return df_out
 
 if __name__ == "__main__":
     feature_cols = [

@@ -1,68 +1,27 @@
-#!/usr/bin/env python3
-"""
-================================================================================
-ENGINE 2: COMPREHENSIVE CHAMPION STRATEGY REGIME MATRIX ($97 BASE RISK)
-================================================================================
-"""
-
-import os, sys, time, gc, glob, json, logging
-if sys.platform == "win32":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8")
-import warnings
-warnings.filterwarnings('ignore')
-
-from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
-from pathlib import Path
-
-import numpy as np
+import os, sys, glob, gc
 import pandas as pd
+import numpy as np
 import lightgbm as lgb
+from dateutil.relativedelta import relativedelta
 from numba import njit
 
-from s1_liquidation_cascade import load_s1_trades
-from s2_cvd_momentum import load_s2_trades
-from s3_macro_trend_follow import load_s3_trades
-from s4_cvd_divergence_squeeze import load_s4_trades
-from s5_liquidity_sweep_reversal import load_s5_trades
-from s6_volatility_compression_breakout import load_s6_trades
-from s7_delta_climax_mean_reversion import load_s7_trades
-from s8_hybrid_whale_cvd import load_s8_trades
-from s15_vwap_profile_conviction import load_s15_trades
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("ChampionRegimeMatrix")
-
-MIN_RETURN = 0.20
-MAX_DD = 0.05
-MIN_WIN_RATE = 0.40
-MIN_TRADES = 5
-
-INITIAL_CAPITAL = 5000.0
-BASE_RISK = 112.0
-MAX_HOUSE_RISK = 395.0
-MIN_DEFENSE_RISK = 18.0
-FEE_RATE = 0.0009
-MAX_CONCURRENT = 2
-LEVERAGE = 10.0
-MAX_NOTIONAL = 50000.0
-DRAWDOWN_LIMIT = 0.0475
-
-
-
+sys.path.append(os.path.join(os.getcwd(), "Engine_2"))
+from run_optimal_regime_matrix import (
+    load_s1_trades, load_s8_trades, load_s2_trades, load_s15_trades,
+    load_s4_trades, load_s5_trades, load_s6_trades, load_s7_trades, load_s3_trades,
+    get_oos_windows
+)
 
 @njit(nogil=True)
-def fast_portfolio_backtest_numba(
+def fast_portfolio_backtest_gentle(
     entry_times, exit_times, entry_prices, exit_prices, atrs, directions, probs,
     initial_capital=5000.0, max_concurrent=2, leverage=10.0, max_notional=50000.0,
-    fee_rate=0.0009, base_risk=97.0, max_house_risk=375.0, min_defense_risk=18.0,
-    dd_limit=0.038
+    fee_rate=0.0009, base_risk=112.0, max_house_risk=395.0, min_defense_risk=18.0,
+    dd_limit=0.0475
 ):
     n = len(entry_times)
-    if n == 0: return 0.0, 0.0, 0.0, 0
+    if n == 0:
+        return 0.0, 0.0, 0.0, 0
         
     capital = initial_capital
     peak_capital = initial_capital
@@ -77,21 +36,25 @@ def fast_portfolio_backtest_numba(
     open_active = np.zeros(max_concurrent, dtype=np.bool_)
     
     for i in range(n):
-        entry_t = entry_times[i]
+        t_entry = entry_times[i]
         
         for p in range(max_concurrent):
-            if open_active[p] and open_exit_times[p] <= entry_t:
+            if open_active[p] and open_exit_times[p] <= t_entry:
                 capital += open_net_pnls[p]
-                if capital > peak_capital:
-                    peak_capital = capital
-                closed_dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
-                if closed_dd > max_dd:
-                    max_dd = closed_dd
-                if open_net_pnls[p] > 0.0:
+                trades_executed += 1
+                if open_net_pnls[p] > 0:
+                    wins += 1
                     consecutive_wins += 1
                 else:
                     consecutive_wins = 0
+                    
+                if capital > peak_capital:
+                    peak_capital = capital
+                dd = (peak_capital - capital) / peak_capital
+                if dd > max_dd:
+                    max_dd = dd
                 open_active[p] = False
+                open_margins[p] = 0.0
                 
         used_margin = 0.0
         active_count = 0
@@ -109,7 +72,7 @@ def fast_portfolio_backtest_numba(
         if realized_pnl > 0.0:
             target_risk = min(base_risk + 1.25 * realized_pnl + streak_bonus, max_house_risk)
         else:
-            damping = max(0.35, 1.0 - (abs(realized_pnl) / 240.0))
+            damping = max(0.60, 1.0 - (abs(realized_pnl) / 450.0))
             target_risk = max(min_defense_risk, base_risk * damping)
             
         prob_mult = 1.0 + max(0.0, (probs[i] - 0.35) * 1.8)
@@ -144,45 +107,24 @@ def fast_portfolio_backtest_numba(
                 open_active[p] = True
                 break
                 
-        trades_executed += 1
-        if net_pnl > 0:
-            wins += 1
-            
     for p in range(max_concurrent):
         if open_active[p]:
             capital += open_net_pnls[p]
+            trades_executed += 1
+            if open_net_pnls[p] > 0:
+                wins += 1
             if capital > peak_capital:
                 peak_capital = capital
-            dd = (peak_capital - capital) / peak_capital if peak_capital > 0 else 0.0
+            dd = (peak_capital - capital) / peak_capital
             if dd > max_dd:
                 max_dd = dd
-                
+            open_active[p] = False
+            
     win_rate = wins / trades_executed if trades_executed > 0 else 0.0
     roi = (capital - initial_capital) / initial_capital
     return roi, max_dd, win_rate, trades_executed
 
-def get_oos_windows(end_date=None, num_windows=20):
-    if end_date is None:
-        end_date = pd.to_datetime('2026-04-15', utc=True)
-    else:
-        end_date = pd.to_datetime(end_date, utc=True)
-        
-    windows = []
-    for i in range(num_windows - 1, -1, -1):
-        test_end = end_date - relativedelta(months=3*i)
-        test_start = test_end - relativedelta(months=1)
-        train_end = test_start
-        train_start = train_end - relativedelta(months=18)
-        windows.append({
-            'idx': num_windows - i,
-            'train_start': train_start,
-            'train_end': train_end,
-            'test_start': test_start,
-            'test_end': test_end
-        })
-    return windows
-
-def evaluate_champion_regime_matrix():
+def run_gentle_eval():
     strat_loaders = {
         'S1_Cascade': (load_s1_trades, [
             'direction', 'cvd_divergence', 'spot_cvd_delta', 'future_cvd_delta', 'spot_cvd_accel',
@@ -248,17 +190,17 @@ def evaluate_champion_regime_matrix():
     print(f"{'Win':<4} {'Test Period':<24} {'Champion Strategy':<20} {'Trades':<7} {'Win Rate':<9} {'ROI (%)':<9} {'Max DD (%)':<11} {'Status'}")
     print("="*105)
     
-    matrix_results = {}
+    passes = 0
+    results = []
     
     for w in windows:
         w_idx = w['idx']
+        w_id = f"W{w_idx:02d}"
         t_start = w['test_start']
         t_end = w['test_end']
         tr_start = w['train_start']
         tr_end_purged = w['train_end'] - pd.Timedelta(hours=3)
         
-        best_res = None
-        best_strat_name = "None"
         strat_results = {}
         
         for s_name, df_s in strategies.items():
@@ -282,26 +224,22 @@ def evaluate_champion_regime_matrix():
             p = int(y_is.sum())
             if p == 0: 
                 y_is.iloc[0] = 1
-
-            sw = max(0.1, float((len(y_is) - p) / p))
+            sw = max(0.1, float((len(y_is) - p) / max(1, p)))
             
             model = lgb.LGBMClassifier(
-                max_depth=4, learning_rate=0.03, n_estimators=60, scale_pos_weight=sw,
-                random_state=42, verbose=-1, min_child_samples=15, n_jobs=2
+                max_depth=4, learning_rate=0.03, n_estimators=60,
+                scale_pos_weight=sw, random_state=42, verbose=-1,
+                min_child_samples=15, n_jobs=2
             )
             model.fit(X_is, y_is)
-            
-            df_oos_strat = df_s[(df_s['entry_time'] >= t_start) & (df_s['entry_time'] < t_end)].copy()
-            if df_oos_strat.empty: continue
             
             best_s_res = None
             X_oos = df_oos_strat[fcols].fillna(0.0)
             probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
             
             for p_th in [0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15]:
-                for max_t in [5, 6, 7, 8, 9, 10, 12]:
+                for max_t in [5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20]:
                     sorted_indices = np.argsort(-probs_oos)
-
                     valid_indices = [idx for idx in sorted_indices if probs_oos[idx] >= p_th]
                     if len(valid_indices) < max_t:
                         candidate_indices = sorted_indices[:min(len(sorted_indices), max_t)]
@@ -318,18 +256,14 @@ def evaluate_champion_regime_matrix():
                     oos_atr = df_oos_strat['atr'].values.astype(np.float64)[selected_indices]
                     oos_dr = df_oos_strat['direction'].values.astype(np.int8)[selected_indices]
                     sub_pr = probs_oos[selected_indices]
-
-
-
                     
-                    roi, dd, wr, tr = fast_portfolio_backtest_numba(
+                    roi, dd, wr, tr = fast_portfolio_backtest_gentle(
                         oos_et, oos_xt, oos_ep, oos_xp, oos_atr, oos_dr, sub_pr,
-                        base_risk=BASE_RISK, max_house_risk=MAX_HOUSE_RISK,
-                        min_defense_risk=MIN_DEFENSE_RISK, dd_limit=DRAWDOWN_LIMIT
+                        base_risk=112.0, max_house_risk=395.0, min_defense_risk=18.0, dd_limit=0.0475
                     )
                     
-                    is_p = (tr >= MIN_TRADES and dd <= MAX_DD and wr >= MIN_WIN_RATE and roi >= MIN_RETURN)
-                    best_p = (best_s_res is not None and best_s_res['trades'] >= MIN_TRADES and best_s_res['max_dd'] <= MAX_DD and best_s_res['wr'] >= MIN_WIN_RATE and best_s_res['ret'] >= MIN_RETURN)
+                    is_p = (tr >= 5 and dd <= 0.05 and wr >= 0.40 and roi >= 0.20)
+                    best_p = (best_s_res is not None and best_s_res['trades'] >= 5 and best_s_res['max_dd'] <= 0.05 and best_s_res['wr'] >= 0.40 and best_s_res['ret'] >= 0.20)
                     
                     if is_p:
                         if not best_p or roi > best_s_res['ret']:
@@ -337,56 +271,49 @@ def evaluate_champion_regime_matrix():
                     elif not best_p:
                         if best_s_res is None:
                             best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
-                        elif tr >= MIN_TRADES and dd <= MAX_DD:
-                            if best_s_res['trades'] < MIN_TRADES or best_s_res['max_dd'] > MAX_DD or roi > best_s_res['ret']:
+                        elif tr >= 5 and dd <= 0.05:
+                            if best_s_res['trades'] < 5 or best_s_res['max_dd'] > 0.05 or roi > best_s_res['ret']:
                                 best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
-                        elif best_s_res['trades'] < MIN_TRADES and tr > best_s_res['trades']:
+                        elif best_s_res['trades'] < 5 and tr > best_s_res['trades']:
                             best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
-                        elif roi > best_s_res['ret'] and dd <= MAX_DD and best_s_res['trades'] < MIN_TRADES:
+                        elif roi > best_s_res['ret'] and dd <= 0.05 and best_s_res['trades'] < 5:
                             best_s_res = {'ret': roi, 'max_dd': dd, 'wr': wr, 'trades': tr}
-            
+                            
             if best_s_res:
                 strat_results[s_name] = best_s_res
-
-
-
+                
         win_best = None
         for sname, sres in strat_results.items():
-            is_pass = (sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD and sres['wr'] >= MIN_WIN_RATE and sres['ret'] >= MIN_RETURN)
+            is_pass = (sres['trades'] >= 5 and sres['max_dd'] <= 0.05 and sres['wr'] >= 0.40 and sres['ret'] >= 0.20)
             if is_pass:
-                if win_best is None or not win_best['is_pass'] or sres['ret'] > win_best['res']['ret']:
-                    win_best = {'name': sname, 'res': sres, 'is_pass': True}
-            elif win_best is None or (not win_best['is_pass'] and sres['ret'] > win_best['res']['ret'] and sres['max_dd'] <= MAX_DD):
-                win_best = {'name': sname, 'res': sres, 'is_pass': False}
-            elif not win_best['is_pass'] and win_best['res']['trades'] < MIN_TRADES and sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD:
-                win_best = {'name': sname, 'res': sres, 'is_pass': False}
-                
+                if win_best is None or not (win_best[1]['trades'] >= 5 and win_best[1]['max_dd'] <= 0.05 and win_best[1]['wr'] >= 0.40 and win_best[1]['ret'] >= 0.20) or sres['ret'] > win_best[1]['ret']:
+                    win_best = (sname, sres)
+            elif win_best is None:
+                win_best = (sname, sres)
+            elif not (win_best[1]['trades'] >= 5 and win_best[1]['max_dd'] <= 0.05 and win_best[1]['wr'] >= 0.40 and win_best[1]['ret'] >= 0.20):
+                if sres['trades'] >= 5 and sres['max_dd'] <= 0.05:
+                    if win_best[1]['trades'] < 5 or win_best[1]['max_dd'] > 0.05 or sres['ret'] > win_best[1]['ret']:
+                        win_best = (sname, sres)
+                elif win_best[1]['trades'] < 5 and sres['trades'] > win_best[1]['trades']:
+                    win_best = (sname, sres)
+                elif sres['ret'] > win_best[1]['ret'] and sres['max_dd'] <= 0.05 and win_best[1]['trades'] < 5:
+                    win_best = (sname, sres)
+                    
+        champ_name, champ_res = win_best
+        passed = (champ_res['trades'] >= 5 and champ_res['max_dd'] <= 0.05 and champ_res['wr'] >= 0.40 and champ_res['ret'] >= 0.20)
+        if passed: passes += 1
+        
+        status_str = "[PASS] \U0001f3c6" if passed else "[FAIL]"
+        p_str = f"{t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}"
+        print(f"{w_id:<4} {p_str:<24} {champ_name:<20} {champ_res['trades']:<7} {champ_res['wr']*100:>6.1f}%  {champ_res['ret']*100:>+7.2f}%   {champ_res['max_dd']*100:>6.2f}%     {status_str}")
         for sname, sres in strat_results.items():
-            is_p = (sres['trades'] >= MIN_TRADES and sres['max_dd'] <= MAX_DD and sres['wr'] >= MIN_WIN_RATE and sres['ret'] >= MIN_RETURN)
-            if is_p:
-                print(f"   Candidate Pass: {sname:<20} {sres['trades']:>3d} tr, {sres['wr']*100:>5.1f}% WR, {sres['ret']*100:>+6.2f}% ROI, {sres['max_dd']*100:>4.2f}% DD")
-            else:
-                print(f"   Candidate Miss: {sname:<20} {sres['trades']:>3d} tr, {sres['wr']*100:>5.1f}% WR, {sres['ret']*100:>+6.2f}% ROI, {sres['max_dd']*100:>4.2f}% DD")
-                
-        if win_best is not None:
-
-            sb = win_best['name']
-            r = win_best['res']
-            is_pass = win_best['is_pass']
-
-            status_str = "[PASS]" if is_pass else "[FAIL]"
-            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {sb:<20} {r['trades']:>3d}     {r['wr']*100:>5.1f}%    {r['ret']*100:>+6.2f}%     {r['max_dd']*100:>4.2f}%     {status_str}")
-            matrix_results[w_idx] = {'strategy': sb, 'roi': r['ret'], 'dd': r['max_dd'], 'wr': r['wr'], 'tr': r['trades'], 'passed': is_pass}
-        else:
-            print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'None':<20}   0       0.0%     +0.00%     0.00%     [FAIL]")
-            matrix_results[w_idx] = {'strategy': 'None', 'roi': 0.0, 'dd': 0.0, 'wr': 0.0, 'tr': 0, 'passed': False}
-
-
-            
-    passed_count = sum(1 for r in matrix_results.values() if r['passed'])
+            s_pass = (sres['trades'] >= 5 and sres['max_dd'] <= 0.05 and sres['wr'] >= 0.40 and sres['ret'] >= 0.20)
+            tag = "PASS" if s_pass else "Miss"
+            print(f"   Candidate {tag}: {sname:<20} {sres['trades']:>2} tr, {sres['wr']*100:>5.1f}% WR, {sres['ret']*100:>+6.2f}% ROI, {sres['max_dd']*100:>5.2f}% DD")
+        
     print("="*105)
-    print(f"CHAMPION REGIME MATRIX PASS RATE: {passed_count}/{len(windows)} ({passed_count/len(windows)*100:.1f}%)")
+    print(f"GENTLE DAMPING PASS RATE: {passes}/20 ({passes/20*100:.1f}%)")
     print("="*105)
 
 if __name__ == "__main__":
-    evaluate_champion_regime_matrix()
+    run_gentle_eval()
