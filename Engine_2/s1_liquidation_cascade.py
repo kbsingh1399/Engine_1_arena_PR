@@ -632,19 +632,23 @@ ARCHETYPE_FUNCTIONS = {
     # 15. Footprint Liquidation Absorption Cluster (True Microstructure 5R Edge)
     # Long: Deep long liquidation flush (long_liq_zscore > 1.2 or p8 < -0.18) + >=1 stacked buy imbalance cluster
     # Short: Deep short liquidation flush (short_liq_zscore > 1.2 or p8 > 0.18) + >=1 stacked sell imbalance cluster
+    # 15. Footprint Liquidation Absorption Cluster (True Microstructure 5R Edge)
+    # Long: Deep long liquidation flush + footprint confirmation if available OR Spot CVD delta divergence
     "FP_AbsorptionCluster": lambda df: (
-        (((df.get('fp_stacked_buy_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) & 
-         ((df['long_liq_zscore'] > 1.2) | (df['p8'] < -0.16)) & (df['spot_cvd_delta'] > 0)),
-        (((df.get('fp_stacked_sell_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) & 
-         ((df['short_liq_zscore'] > 1.2) | (df['p8'] > 0.16)) & (df['spot_cvd_delta'] < 0))
+        ((((df.get('fp_stacked_buy_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) | 
+          (df.get('spot_cvd_delta', pd.Series(0.0, index=df.index)) > 0)) & 
+         ((df['long_liq_zscore'] > 1.2) | (df['p8'] < -0.16))),
+        ((((df.get('fp_stacked_sell_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) | 
+          (df.get('spot_cvd_delta', pd.Series(0.0, index=df.index)) < 0)) & 
+         ((df['short_liq_zscore'] > 1.2) | (df['p8'] > 0.16)))
     ),
 }
 
 # Causal Macro-Regime to Archetype Mapping (Enhanced with VWAP Continuation & Reversion)
 REGIME_ARCHETYPE_MAP = {
     'Bull Mania / High-Vol Breakout': 'V2_VWAPContinuation',
-    'Crash / High-Vol Flush':          'FP_AbsorptionCluster',
-    'Compression / Range Absorption':  'FP_AbsorptionCluster',
+    'Crash / High-Vol Flush':          'A1_VolBreakout',
+    'Compression / Range Absorption':  'V1_VWAPMeanRevert',
     'Bear Trend / Bear Rally Short':   'A4_UltraDeepValue',
     'Bull Trend / Trend Pullback':     'V2_VWAPContinuation'
 }

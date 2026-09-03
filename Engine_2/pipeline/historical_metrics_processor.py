@@ -77,6 +77,10 @@ class HistoricalMetricsProcessor:
             for col in ["volume", "quote_volume", "count", "taker_buy_volume", "taker_buy_quote_volume"]:
                 if col in df.columns:
                     df[col] = df[col].fillna(0.0)
+
+        # Flag degenerate maintenance bars (flat prices and zero volume/trades delivered during downtime)
+        degenerate = ((df["high"] == df["low"]) & ((df["volume"] == 0.0) | (df["count"] == 0)))
+        df["is_synthetic"] = np.where(df["is_synthetic"] == 1 | degenerate, 1, 0).astype(np.int8)
         
         # 1. Base Timestamps and Symbol
         df["open_time_ms"] = df["open_time"].astype(np.int64)

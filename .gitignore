@@ -33,6 +33,7 @@ backtesting_data/
 models/
 */models/
 *.parquet
+!Engine_2/binance_backtesting_data/*.parquet
 *.patch
 .venv/
 engine_log.txt

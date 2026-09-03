@@ -173,12 +173,13 @@ def compute_session_cvd(timestamps_ms: np.ndarray, deltas: np.ndarray) -> np.nda
 
 def estimate_depth_from_volatility(closes: np.ndarray, atrs: np.ndarray, base_vols: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Computes +-1% resting order book depth in USD and Coin
-    directly proportional to empirical order book liquidity without arbitrary offsets.
+    Estimates +-1% resting order book depth proxy in USD and Coin from ATR volatility and base volume.
+    Note: Both bid and ask depths are returned as positive non-negative liquidity magnitudes.
     """
-    n = len(closes)
-    bid_depth_coin = np.round(base_vols * 0.025, 4)
-    ask_depth_coin = np.round(-base_vols * 0.025, 4)
+    # Liquidity elasticity proxy: higher ATR slightly widens the book, reducing immediate resting depth
+    vol_scaling = np.clip(1.0 / (np.maximum(atrs / np.maximum(closes, 1e-4), 0.001) * 100.0), 0.5, 2.0)
+    bid_depth_coin = np.round(base_vols * 0.025 * vol_scaling, 4)
+    ask_depth_coin = np.round(base_vols * 0.025 * vol_scaling, 4) # Positive magnitude
     bid_depth_usd = np.round(bid_depth_coin * closes, 2)
     ask_depth_usd = np.round(ask_depth_coin * closes, 2)
     return bid_depth_usd, ask_depth_usd, bid_depth_coin, ask_depth_coin
