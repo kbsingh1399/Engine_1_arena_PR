@@ -119,18 +119,36 @@ Evaluate across the exact 20 Out-Of-Sample test slices (1 month test, 3-month st
 
 ---
 
-## 📦 DELIVERABLE FOR STRATEGY S1
-Deliver a single, production-grade, standalone Python script:
-`run_real_S1_funding_arb.py`
+---
 
-### Requirements:
-1. **Self-Contained & Runnable**: Can be executed via:
-   ```bash
-   python run_real_S1_funding_arb.py --data "Engine_2/binance_backtesting_data"
-   ```
-2. **In-Sample Frozen Parameter Verification**:
-   - The script must print the In-Sample calibration metrics and show the frozen configuration before entering each OOS window.
-   - The OOS simulation must be a single forward pass with zero post-hoc parameter adjustments.
-3. **Table Output**:
-   - Print the window-by-window scorecard (W01 to W20) showing ROI, Max DD, Win Rate, Closed Trades, and Frozen Parameters.
-4. **Push / Output**: Provide the complete code directly or push to GitHub branch so it can be verified locally on our machine.
+## 📦 DELIVERABLE FOR STRATEGY S1
+
+### 🔴 MANDATORY PASS-BEFORE-DELIVERY PROTOCOL:
+**You must deliver the complete standalone file (`run_real_S1_funding_arb.py`) ONLY ONCE it genuinely and independently passes all 20 Out-Of-Sample windows with STRICTLY ZERO LOOKAHEAD, NO FUTURE PEEKS, NO TEST-SET SNOOPING, AND NO SURVIVORSHIP/SELECTION BIAS.**
+
+If a configuration does not pass all 20 windows honestly under In-Sample freezing, **do not cheat or sweep on OOS trades**—iterate on the feature interactions, the trade entry trigger, the risk-state machine, or the ensemble architecture until it genuinely passes!
+
+### Deliverable File Specifications:
+File Name: **`run_real_S1_funding_arb.py`**
+
+1. **Standalone & Executable**:
+   - Must be fully self-contained. Runs cleanly via:
+     ```bash
+     python run_real_S1_funding_arb.py --data "Engine_2/binance_backtesting_data"
+     ```
+2. **Strict Zero-Lookahead / Anti-Bias Guarantee**:
+   - **No Future Peeking**: Signals at bar $t$ close $\to$ executed at bar $t+1$ open.
+   - **No Test-Set Sweeping**: Zero evaluation of hyperparameter grids, directional filters, or threshold variations on `oos_df`.
+   - **In-Sample Frozen Execution**: Hyperparameters $(\text{model}^*, \text{variant}^*, \text{dmode}^*, \tau^*, K^*, \text{base}^*)$ must be chosen strictly on the 18-month In-Sample block, printed to console, and executed on OOS **EXACTLY ONCE**.
+   - **No Survivorship / Label Leakage**: Purged 3-hour boundary between IS and OOS.
+3. **Comprehensive Scorecard Table**:
+   - The script must print the complete 20-window scorecard (W01 to W20) displaying:
+     - Window ID & Date Range
+     - Window ROI (Must be $\ge +20.0\%$ in every window)
+     - Max Drawdown (Must be $< 4.75\%$ in every window)
+     - Win Rate (Must be $\ge 40.0\%$ in every window)
+     - Closed Trades (Must be $\ge 5$ in every window)
+     - Frozen In-Sample Parameters
+     - Gate Status (`[PASS]`)
+4. **Direct Delivery**:
+   - Output the complete, un-truncated Python code of `run_real_S1_funding_arb.py` or push directly to git so we can run and verify it locally.
