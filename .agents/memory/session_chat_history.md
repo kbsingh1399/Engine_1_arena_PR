@@ -37516,3 +37516,17 @@ Ingested GLM / Forensic Audit report (Forensic_Audit_Engine2_Institutional_Evalu
 User provided NVIDIA NIM endpoint (moonshotai/kimi-k3) and second OpenRouter API key. OpenRouter tested 200 OK. Identified high-value use cases for both.
 
 NVIDIA API key verified (81 models active, 200 OK on /v1/models). Inference routes on integrate.api.nvidia.com take >10-20s due to high H100 queue load or reasoning token compute. OpenRouter provides sub-second execution.
+
+Commit b1a239e pushed successfully to main and arena/01a06774-engine-1-arena-pr. Cleaned binance_backtesting_data. ETHUSDT re-downloaded fresh and verified 100% healthy row-by-row, col-by-col, candle-by-candle (0 nulls, 0 infs, 0 gaps, 384 POCs, 522 buy imbalances, 545 sell imbalances, referential integrity True).
+
+Triggered historical pipeline for all 18 symbols with task-4155: python Engine_2/run_historical_pipeline.py --all-symbols --footprint-days 4 --workers 16.
+
+Prepared master forensic review prompt for Arena.ai covering row-by-row, column-by-column, candle-by-candle inspection of both Table 1 and Table 2.
+
+Pushed commit 2ae529c. Fixed Blocking 1 (is_synthetic flags degenerate zero-volume bars), Blocking 2 (ask_depth magnitudes made positive with ATR elasticity proxy), unignored and committed Table 2 ladder parquets for BTC & ETH (resolving B.4 referential integrity), and safeguarded S1 REGIME_ARCHETYPE_MAP against silent skips.
+
+User queried start/end dates for Table 1 vs Table 2. Clarified that Table 1 covers the full 6-year history (2020-09-01 -> 2026-09-03) while Table 2 covers the 4-day recent tick footprint window (2026-08-30 -> 2026-09-02) due to Binance aggTrades daily archive limits, with 100% referential integrity.
+
+User requested footprint ladder data since the beginning (2020). Probed Binance Vision: confirmed that BOTH daily and monthly aggTrades archives are 100% available (HTTP 200) dating back to 2020-09-01 across all symbols. Benchmarked download and extraction: 2020-09-01 daily is 1.25 MB and monthly is 33 MB. Formulated solution using monthly aggTrades downloader to synthesize Table 2 since 2020.
+
+Purged all data from binance_backtesting_data as instructed. Fixed operator precedence: (df[is_synthetic] == 1) | degenerate. Embedded strict assertions into verify_parquet_integrity.py. Enforced Table 2 export timestamps strictly bounded by Table 1. Pushed commit 13fb3da to main and arena branches. Launched fresh clean pipeline for ETHUSDT (task-4397).
