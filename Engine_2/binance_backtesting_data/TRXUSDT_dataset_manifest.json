@@ -1,7 +1,7 @@
 {
   "symbol": "TRXUSDT",
   "timeframe": "15m",
-  "total_rows": 209760,
+  "total_rows": 210588,
   "columns": [
     "open_time_ms",
     "close_time_ms",
@@ -63,8 +63,8 @@
   ],
   "column_count": 57,
   "start_time_utc": "2020-09-01 00:00:00",
-  "end_time_utc": "2026-08-30 23:45:00",
-  "exported_at_utc": "2026-08-31T10:53:08.121460+00:00",
+  "end_time_utc": "2026-09-03 14:45:00",
+  "exported_at_utc": "2026-09-03T15:01:47.284950+00:00",
   "master_file": "TRXUSDT_15m_master_2020_2026.parquet",
-  "master_size_mb": 40.74
+  "master_size_mb": 41.58
 }
