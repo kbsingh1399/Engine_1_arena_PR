@@ -37178,3 +37178,21 @@ Key Takeaways & Consensus:
    - Mandatory Multi-Strategy Ensemble: S1 (Liquidation Exhaustion) + S2 (CVD Momentum) + S3 (Macro Trend) + VWAP Bands / L2 Order-Flow Imbalance.
    - Regime-gated capital allocation (low-volatility compression sits in cash or runs mean-reversion).
    - L2 Order Book Imbalance (OBI) and Order Flow Imbalance (OFI) filters.
+
+---
+
+**User Request: Integration of Continue.dev (https://github.com/continuedev/continue) with our practice and brain by default for improvement.**
+
+**OMNI-O Technical Evaluation & Architecture Plan:**
+1. **What is Continue.dev?**:
+   - Continue is the leading open-source AI code assistant protocol and engine (VS Code and JetBrains extension).
+   - Core Architecture:
+     - Model Agnostic: Connects any LLM (Claude 3.7/Opus, DeepSeek R1/V3, Qwen 2.5/3.8, Ollama, OpenAI) via unified JSON config (config.json / config.ts).
+     - Context Providers (@code, @docs, @diff, @terminal, @folder, @codebase): Granular RAG context injection into developer prompts.
+     - Custom Slash Commands (/test, /edit, /comment, /review, custom bash hooks).
+     - System Prompts & Rule Injection (.continuerules or custom markdown rules).
+     - MCP (Model Context Protocol) Support: Seamlessly connects to external servers (reticle, chrome-devtools, sqlite, code-review-graph).
+2. **Integration into our Environment**:
+   - **Workspace Configuration**: We can create a root .continue/config.json and .continue/rules/ within this repository to define our custom models, prompt templates, and slash commands.
+   - **Global Configuration**: C:\Users\SIGMA\.continue\config.json to link our models and Antigravity context providers across all IDE sessions.
+   - **Brain & Practice Unification**: Continue rules can reference our .agents/rules/AGENTS.md, FABLE5_CHECKLIST.md, and .okf/ index directly, giving any Continue session in VS Code immediate zero-drift access to our institutional quantitative rules.

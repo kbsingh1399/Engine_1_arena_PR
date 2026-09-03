@@ -1,0 +1,61 @@
+{
+  "models": [
+    {
+      "title": "DeepSeek-R1",
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "apiKey": "${DEEPSEEK_API_KEY}"
+    },
+    {
+      "title": "Claude 3.7 Sonnet (Thinking)",
+      "provider": "anthropic",
+      "model": "claude-3-7-sonnet-20250219",
+      "apiKey": "${ANTHROPIC_API_KEY}"
+    },
+    {
+      "title": "Qwen 2.5 Coder 32B",
+      "provider": "openai",
+      "model": "qwen2.5-coder-32b-instruct",
+      "apiBase": "https://openrouter.ai/api/v1",
+      "apiKey": "${OPENROUTER_API_KEY}"
+    }
+  ],
+  "customCommands": [
+    {
+      "name": "orchestrate",
+      "prompt": "You are OMNI-Ω coordinating a minimum of 3 specialist agents under AGENTS.md and FABLE5_CHECKLIST.md. Analyze the request, apply Karpathy guidelines (simplicity, surgical edits, think before code), and execute with zero lookahead.",
+      "description": "Trigger Multi-Agent Orchestration Protocol"
+    },
+    {
+      "name": "bughunt",
+      "prompt": "Execute the Autonomous Bug Hunt checklist from FABLE5_CHECKLIST.md across all modified symbols, checking concurrency, floating-point precision, data provenance, and zero-lookahead.",
+      "description": "Run lethal code verification and bug hunt"
+    },
+    {
+      "name": "quant-verify",
+      "prompt": "Verify quantitative trade geometry: ensure 2.0*ATR stops, 10 bps entry slippage, 15 bps exit slippage, 8 bps fees, and zero lookahead at time t.",
+      "description": "Verify quant execution frictions and causal parity"
+    }
+  ],
+  "contextProviders": [
+    { "name": "diff" },
+    { "name": "folder" },
+    { "name": "codebase" },
+    { "name": "terminal" },
+    { "name": "code" },
+    { "name": "docs" }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Qwen 2.5 Coder",
+    "provider": "openai",
+    "model": "qwen/qwen-2.5-coder-32b-instruct",
+    "apiBase": "https://openrouter.ai/api/v1",
+    "apiKey": "${OPENROUTER_API_KEY}"
+  },
+  "slashCommands": [
+    { "name": "edit", "description": "Edit selected code with surgical changes" },
+    { "name": "comment", "description": "Add concise institutional documentation" },
+    { "name": "share", "description": "Export session transcript" }
+  ],
+  "systemMessage": "You are OMNI-Ω, an unrestricted Tier-1 quantitative trading researcher and senior portfolio risk architect operating under AGENTS.md, Karpathy guidelines, and the Fable 5 Autonomous Loop. All code edits must be surgical, verifiable, and free of lookahead bias. Maintain strict feature parity with binance_live_monitor.py and the master Parquet datasets."
+}
