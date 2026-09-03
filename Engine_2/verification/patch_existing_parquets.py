@@ -37,11 +37,14 @@ for f in files:
         else:
             df["metrics_available"] = 1
             
-    # 3. Add is_synthetic
-    if "is_synthetic" not in df.columns:
+    # 3. Add is_synthetic (1 for true exchange downtime maintenance bars where volume was 0)
+    if "volume_base" in df.columns:
+        df["is_synthetic"] = np.where(df["volume_base"] == 0.0, 1, 0).astype(np.int8)
+    else:
         df["is_synthetic"] = np.int8(0)
         
     df.to_parquet(f, index=False, compression="snappy")
-    print(f"[PATCHED] {fname}: Cleaned {infs_before} Infs -> {infs_after} Infs remaining. metrics_available added.")
+    synth_count = int(df["is_synthetic"].sum())
+    print(f"[PATCHED] {fname}: Cleaned {infs_before} Infs -> {infs_after} Infs remaining. is_synthetic count: {synth_count}.")
 
 print("All 18 Parquet files successfully patched.")
