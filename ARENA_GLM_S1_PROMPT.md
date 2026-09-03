@@ -35,6 +35,23 @@ Before generating any architecture or code, you MUST fetch and strictly adhere t
 
 ---
 
+## 🛑 STRICT QUANTITATIVE GATES (NON-NEGOTIABLE CRITERIA PER WINDOW)
+
+Every Out-Of-Sample window must independently and strictly satisfy ALL of the following criteria:
+
+| Metric | Strict Threshold | Mathematical / Execution Enforcement |
+|---|---|---|
+| **Window Return (ROI)** | **$\ge +20.0\%$ per Window** | Minimum +$1,000 profit on $5,000 starting equity in every single 1-month window |
+| **Window Win Rate** | **$\ge 40.0\%$ per Window** | Wins / (Wins + Losses) $\ge 0.40$ on closed trades |
+| **Max Drawdown** | **$< 5.0\%$ (Target $< 4.75\%$)** | Drawdown from window equity peak must NEVER breach $5.0\%$ ($\le \$237.50$ on $\$5,000$) |
+| **Per-Trade R-Multiple** | **$\ge +5.0R$ Target for Winners** | Every winning trade must capture $\ge 5.0R$ net profit. Initial stop = $1.0R$ (`max(sl_mult * ATR14, 0.65% * px)`). |
+| **Trailing Stop Mandate** | **Trailing Stop Armed at 5R** | Trailing SL automatically engages the moment Maximum Favorable Excursion (MFE) hits $\ge +5.0R$, locking profit $\ge +5.0R$ and trailing upward |
+| **Minimum Closed Trades** | **$\ge 5$ Trades per Window** | Window must have at least 5 closed trades (strictly $\ge 5$ trade opportunities) to ensure statistical significance |
+| **Causal & Non-Biased** | **Zero Lookahead ($T \to T+1$)** | Strict zero-lookahead. Signal at bar $t$ close $\to$ filled at bar $t+1$ open. 9 bps taker fees + 5 bps adverse stop slippage. In-sample parameter freezing (NO test-set snooping/sweeping) |
+| **Portfolio Concurrency** | **Max 2 Open Positions** | Max 2 simultaneous open positions across all 18 symbols |
+
+---
+
 ## 🎯 MISSION: SOLVE STRATEGY S1 INDIVIDUALLY FIRST
 
 We are taking a disciplined, 1-strategy-at-a-time approach. We are NOT blending, cross-subsidizing, or rushing all 9 strategies. We will solve and certify **Strategy S1: Funding Rate Mean Reversion & Basis Arbitrage** to perfection first.
