@@ -63,12 +63,18 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
             else:
                 timestamps = np.array([])
 
-            if len(timestamps) > 1:
+            is_ladder = "ladder" in fname
+            if len(timestamps) > 1 and not is_ladder:
                 time_diffs = np.diff(timestamps)
                 expected_diff = 15 * 60 * 1000 # 15 minutes in ms
                 gaps = np.where(time_diffs != expected_diff)[0]
                 num_gaps = len(gaps)
                 is_monotonic = bool(np.all(time_diffs > 0))
+            elif is_ladder and len(timestamps) > 1:
+                # Ladder table has multiple price rungs per timestamp; timestamps must be non-decreasing
+                time_diffs = np.diff(timestamps)
+                num_gaps = 0
+                is_monotonic = bool(np.all(time_diffs >= 0))
             else:
                 num_gaps = 0
                 is_monotonic = True

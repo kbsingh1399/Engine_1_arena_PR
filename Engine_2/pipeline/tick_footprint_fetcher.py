@@ -60,8 +60,8 @@ class TickFootprintFetcher:
                 time.sleep(1.0 * (attempt + 1))
         return None
 
-    def fetch_footprint(self, symbol: str = "BTCUSDT", start_date: str = "2026-08-20") -> pd.DataFrame:
-        print(f"[FOOTPRINT] Fetching daily aggTrades for {symbol} from {start_date} and aggregating to 15m footprint...")
+    def fetch_footprint(self, symbol: str = "BTCUSDT", start_date: str = "2026-08-20", return_ladder: bool = False):
+        print(f"[FOOTPRINT] Fetching daily aggTrades for {symbol} from {start_date} and aggregating to 15m footprint (return_ladder={return_ladder})...")
         now = datetime.now(timezone.utc)
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         day_diff = (now - start_dt).days
@@ -69,19 +69,21 @@ class TickFootprintFetcher:
 
         bin_step = SYMBOL_BIN_STEPS.get(symbol, 0.001)
 
-
-        def _process_daily_ticks(ymd: str) -> Optional[pd.DataFrame]:
+        def _process_daily_ticks(ymd: str):
             cache_file = os.path.join(self.fp_dir, f"{symbol}-footprint-15m-{ymd}.parquet")
+            ladder_cache_file = os.path.join(self.fp_dir, f"{symbol}-ladder-15m-{ymd}.parquet")
             if os.path.exists(cache_file):
                 try:
-                    return pd.read_parquet(cache_file)
+                    c_df = pd.read_parquet(cache_file)
+                    l_df = pd.read_parquet(ladder_cache_file) if os.path.exists(ladder_cache_file) else pd.DataFrame()
+                    return c_df, l_df
                 except Exception:
                     pass
             
             url = f"https://data.binance.vision/data/futures/um/daily/aggTrades/{symbol}/{symbol}-aggTrades-{ymd}.zip"
             data = self._fetch_url(url)
             if not data:
-                return None
+                return None, None
             
             try:
                 zf = zipfile.ZipFile(io.BytesIO(data))
@@ -152,27 +154,69 @@ class TickFootprintFetcher:
                 grouped = grouped.merge(imbalances, on="open_time_ms", how="left")
                 grouped.drop(columns=["poc_volume"], inplace=True, errors="ignore")
                 
+                # Format detailed ladder for Table 2
+                ladder_export = ladder.copy()
+                ladder_export.rename(columns={
+                    "b_vol": "ask_vol_coin",
+                    "s_vol": "bid_vol_coin",
+                    "buy_imbalance": "is_buy_imbalance",
+                    "sell_imbalance": "is_sell_imbalance"
+                }, inplace=True)
+                ladder_export["net_delta_coin"] = ladder_export["ask_vol_coin"] - ladder_export["bid_vol_coin"]
+                ladder_export = ladder_export.merge(poc_max[["open_time_ms", "real_poc"]], on="open_time_ms", how="left")
+                ladder_export["is_poc"] = (ladder_export["price_bin"] == ladder_export["real_poc"]).astype(int)
+                ladder_export.drop(columns=["real_poc"], inplace=True, errors="ignore")
+                ladder_export = ladder_export[[
+                    "open_time_ms", "price_bin", "bid_vol_coin", "ask_vol_coin", "net_delta_coin",
+                    "is_buy_imbalance", "is_sell_imbalance", "is_poc"
+                ]]
+                
                 grouped.to_parquet(cache_file, index=False)
-                return grouped
+                ladder_cache_file = os.path.join(self.fp_dir, f"{symbol}-ladder-15m-{ymd}.parquet")
+                ladder_export.to_parquet(ladder_cache_file, index=False)
+                return grouped, ladder_export
             except Exception as e:
                 print(f"[WARN] Error processing {symbol} {ymd}: {e}")
-                return None
+                return None, None
 
-        dfs = []
+        dfs_summary = []
+        dfs_ladder = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_date = {executor.submit(_process_daily_ticks, d): d for d in all_dates}
             for future in as_completed(future_to_date):
                 res = future.result()
-                if res is not None and not res.empty:
-                    dfs.append(res)
+                if res is None:
+                    continue
+                if isinstance(res, tuple):
+                    sum_df, lad_df = res
+                else:
+                    sum_df, lad_df = res, None
+                if sum_df is not None and not sum_df.empty:
+                    dfs_summary.append(sum_df)
+                if lad_df is not None and not lad_df.empty:
+                    dfs_ladder.append(lad_df)
                     
-        if not dfs:
+        if not dfs_summary:
             print(f"[WARN] No footprint data loaded for {symbol}.")
+            if return_ladder:
+                return pd.DataFrame(), pd.DataFrame()
             return pd.DataFrame()
             
-        master = pd.concat(dfs, ignore_index=True)
-        master.drop_duplicates(subset=["open_time_ms"], inplace=True)
-        master.sort_values("open_time_ms", inplace=True)
-        master.reset_index(drop=True, inplace=True)
-        print(f"[FOOTPRINT] Total footprint rows loaded for {symbol}: {len(master):,}")
-        return master
+        master_summary = pd.concat(dfs_summary, ignore_index=True)
+        master_summary.drop_duplicates(subset=["open_time_ms"], inplace=True)
+        master_summary.sort_values("open_time_ms", inplace=True)
+        master_summary.reset_index(drop=True, inplace=True)
+        print(f"[FOOTPRINT] Total footprint candle rows loaded for {symbol}: {len(master_summary):,}")
+
+        if return_ladder and dfs_ladder:
+            master_ladder = pd.concat(dfs_ladder, ignore_index=True)
+            master_ladder.drop_duplicates(subset=["open_time_ms", "price_bin"], inplace=True)
+            master_ladder.sort_values(["open_time_ms", "price_bin"], inplace=True)
+            master_ladder.reset_index(drop=True, inplace=True)
+            print(f"[FOOTPRINT] Total footprint ladder rungs loaded for {symbol}: {len(master_ladder):,}")
+            return master_summary, master_ladder
+        elif return_ladder:
+            return master_summary, pd.DataFrame()
+            
+        return master_summary
+

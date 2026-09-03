@@ -113,10 +113,15 @@ def run_pipeline(
 
         print(f"[FOOTPRINT] Fetching tick footprint data for {symbol} from {fp_start} ({footprint_days} days window)...")
         fp_fetcher = TickFootprintFetcher(cache_dir=cache_dir, max_workers=max_workers)
-        fp_df = fp_fetcher.fetch_footprint(symbol=symbol, start_date=fp_start)
-        print(f"[OK] Tick Footprint data aggregated for {symbol} in {time.time() - t_fp:.1f}s ({len(fp_df):,} bars)")
+        fp_res = fp_fetcher.fetch_footprint(symbol=symbol, start_date=fp_start, return_ladder=True)
+        if isinstance(fp_res, tuple):
+            fp_df, ladder_df = fp_res
+        else:
+            fp_df, ladder_df = fp_res, pd.DataFrame()
+        print(f"[OK] Tick Footprint data aggregated for {symbol} in {time.time() - t_fp:.1f}s ({len(fp_df):,} bars, {len(ladder_df):,} ladder rungs)")
     else:
         fp_df = pd.DataFrame()
+        ladder_df = pd.DataFrame()
 
     # Fetch spot klines for real basis USD and real spot CVD
     t_sp = time.time()
@@ -143,13 +148,18 @@ def run_pipeline(
 
     print(f"[OK] Indicators computed for {symbol} in {time.time() - t3:.1f}s ({len(master_df):,} bars x {len(master_df.columns)} cols)")
 
-    # 3. Export Parquet Datasets
+    # 3. Export Dual-Table Relational Parquet Datasets
     t4 = time.time()
     exporter = ParquetExporter(output_dir=target_dir)
     manifest = exporter.export_dataset(master_df, symbol=symbol)
     
-    # Export the separate Footprint summary file requested by run_all_6.py
-    if not fp_df.empty:
+    # Export Table 2: Microstructure Footprint Price Ladder
+    if not ladder_df.empty:
+        ladder_out = os.path.join(target_dir, f"{symbol}_15m_footprint_ladder.parquet")
+        ladder_df.to_parquet(ladder_out, index=False)
+        print(f"[OK] Exported Table 2 Footprint Ladder to {ladder_out} ({len(ladder_df):,} rungs)")
+    elif not fp_df.empty:
+        # Fallback export of footprint summary
         fp_out = os.path.join(target_dir, f"Master_{symbol}_15m_Final_Footprint.parquet")
         fp_export = fp_df.copy()
         fp_export.rename(columns={"open_time_ms": "ts"}, inplace=True)
