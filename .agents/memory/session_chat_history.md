@@ -37409,3 +37409,19 @@ Auditing storage architectures: Small-file problem vs Nested Parquet List vs Dua
   - Table 1 (Primary Feature Table): {symbol}_15m_master_2020_2026.parquet (62 canonical columns: OHLCV, CVD, Liquidations, Funding, POC, Imbalance Counts).
   - Table 2 (Microstructure Ladder Table): {symbol}_15m_footprint_ladder.parquet ([open_time_ms, price_bin, bid_vol_coin, ask_vol_coin, delta_coin, is_buy_imb, is_sell_imb, is_poc]).
 - Delivered Final Arena.ai Master Architectural Review Prompt.
+
+---
+**Dual-Table Footprint Architecture Implemented & Verified**:
+- Wiped old Parquets from Engine_2/binance_backtesting_data.
+- Upgraded TickFootprintFetcher, 
+un_historical_pipeline.py, and erify_parquet_integrity.py.
+- Tested single-asset pipeline on ETHUSDT:
+  - Table 1 (ETHUSDT_15m_master_2020_2026.parquet): 210,607 rows x 62 columns, 0 nulls, 0 infs, 0 gaps. Status: PASS.
+  - Table 2 (ETHUSDT_15m_footprint_ladder.parquet): 3,812 ladder rungs x 8 columns, 0 nulls, 0 infs, 0 gaps. Status: PASS.
+- Pushed Commit 396c04c to main and rena/01a06774-engine-1-arena-pr.
+
+---
+Audit on Monte Carlo and Bayesian:
+1. Optuna (Bayesian TPE): Present in Python environment, but not yet integrated into s1 walk-forward loop.
+2. Monte Carlo: Not yet applied to OOS trade sequences.
+Plan: Add In-Sample Optuna Bayesian hyperparameter search and Out-of-Sample Monte Carlo drawdown permutation test.

@@ -28,6 +28,9 @@ import numpy as np
 from numba import njit
 import gc
 import lightgbm as lgb
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -768,11 +771,42 @@ def run_all_20_windows(data_by_symbol):
         p = int(y_train.sum())
         sw = max(0.1, float((len(y_train) - p) / p)) if p > 0 else 1.0
         
-        # 3. Train LightGBM Model Strictly on In-Sample (IS) Data
+        # 3. In-Sample Bayesian Hyperparameter Optimization (Optuna TPE)
+        def _optuna_objective(trial):
+            md = trial.suggest_int("max_depth", 3, 6)
+            lr = trial.suggest_float("learning_rate", 0.015, 0.08, log=True)
+            ne = trial.suggest_int("n_estimators", 40, 100, step=20)
+            mcs = trial.suggest_int("min_child_samples", 10, 30, step=5)
+            
+            # 80/20 In-Sample temporal split
+            n_split = int(len(X_train) * 0.8)
+            X_tr, X_val = X_train[:n_split], X_train[n_split:]
+            y_tr, y_val = y_train[:n_split], y_train[n_split:]
+            
+            sub_model = lgb.LGBMClassifier(
+                max_depth=md, learning_rate=lr, n_estimators=ne,
+                scale_pos_weight=sw, min_child_samples=mcs,
+                random_state=42, verbose=-1, n_jobs=1
+            )
+            sub_model.fit(X_tr, y_tr)
+            val_probs = sub_model.predict_proba(X_val)[:, 1]
+            # Maximize precision on high conviction signals (top 20%)
+            top_cut = np.percentile(val_probs, 80)
+            pred = (val_probs >= top_cut).astype(int)
+            val_wr = (y_val[pred == 1]).mean() if (pred == 1).sum() > 0 else 0.0
+            return val_wr
+
+        study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42))
+        study.optimize(_optuna_objective, n_trials=15, timeout=10)
+        best_p = study.best_params
+
+        # Train final LightGBM Model Strictly on entire In-Sample (IS) Data with Bayesian params
         model = lgb.LGBMClassifier(
-            max_depth=4, learning_rate=0.03, n_estimators=60,
-            scale_pos_weight=sw, random_state=42, verbose=-1,
-            min_child_samples=15, n_jobs=2
+            max_depth=best_p.get("max_depth", 4),
+            learning_rate=best_p.get("learning_rate", 0.03),
+            n_estimators=best_p.get("n_estimators", 60),
+            min_child_samples=best_p.get("min_child_samples", 15),
+            scale_pos_weight=sw, random_state=42, verbose=-1, n_jobs=2
         )
         model.fit(X_train, y_train)
         
@@ -800,6 +834,33 @@ def run_all_20_windows(data_by_symbol):
             sub_et, sub_xt, sub_ep, sub_xp, sub_atr, sub_mae, sub_dr, sub_pr,
             house_trigger=HOUSE_PROFIT_TRIGGER, house_risk=HOUSE_MONEY_RISK, base_risk=BASE_RISK
         )
+
+        # 5. Out-Of-Sample Monte Carlo Permutation Stress Test (1,000 resamples)
+        mc_worst_dd = dd
+        mc_prob_profit = 1.0 if roi > 0 else 0.0
+        if tr >= 4:
+            trade_r_multiples = df_oos['r_multiple'].values[mask_oos]
+            n_mc = 1000
+            mc_returns = np.zeros(n_mc)
+            mc_dds = np.zeros(n_mc)
+            np.random.seed(42)
+            for m in range(n_mc):
+                shuffled_r = np.random.choice(trade_r_multiples, size=len(trade_r_multiples), replace=True)
+                # Compute compounding synthetic equity curve
+                eq = 1.0
+                peak = 1.0
+                curr_max_dd = 0.0
+                for r_val in shuffled_r:
+                    # Normalized 1.5% base risk per trade
+                    trade_pct = r_val * 0.015
+                    eq *= (1.0 + trade_pct)
+                    if eq > peak: peak = eq
+                    c_dd = (peak - eq) / peak if peak > 0 else 0.0
+                    if c_dd > curr_max_dd: curr_max_dd = c_dd
+                mc_returns[m] = eq - 1.0
+                mc_dds[m] = curr_max_dd
+            mc_worst_dd = float(np.percentile(mc_dds, 95)) # 95% worst-case MaxDD
+            mc_prob_profit = float((mc_returns > 0).mean())
         
         # Calculate Window Calmar Ratio (Annualized ROI / MaxDD)
         # 30-day window annualization factor = 365 / 30 = 12.167
@@ -811,8 +872,8 @@ def run_all_20_windows(data_by_symbol):
         
         logger.info(
             f"Window {w_idx:02d} ({test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}): "
-            f"Trades: {tr:2d}, Win Rate: {wr*100:5.1f}%, ROI: {roi*100:6.2f}%, Max MTM DD: {dd*100:5.2f}%, Calmar: {calmar:5.2f} "
-            f"[{arch_name}] -> {status_icon}"
+            f"Trades: {tr:2d}, Win Rate: {wr*100:5.1f}%, ROI: {roi*100:6.2f}%, Max MTM DD: {dd*100:5.2f}%, Calmar: {calmar:5.2f}, "
+            f"MC-95DD: {mc_worst_dd*100:4.1f}% [{arch_name}] -> {status_icon}"
         )
         
         window_record = {
@@ -826,6 +887,9 @@ def run_all_20_windows(data_by_symbol):
             "roi_pct": round(roi * 100, 2),
             "max_dd_pct": round(dd * 100, 2),
             "calmar_ratio": calmar,
+            "mc_95_max_dd_pct": round(mc_worst_dd * 100, 2),
+            "mc_prob_profit_pct": round(mc_prob_profit * 100, 2),
+            "bayesian_params": best_p,
             "status": status_icon
         }
         all_window_results.append(window_record)
