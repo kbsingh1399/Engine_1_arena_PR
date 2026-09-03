@@ -167,45 +167,76 @@ class TickFootprintFetcher:
                 ).reset_index()
                 ladder.sort_values(["open_time_ms", "bin_idx"], inplace=True)
                 
-                # Gate 4: True Diagonal Imbalance across adjacent price rungs with minimum volume floor
-                # Buy Imbalance: Ask volume at P >= 3.0 * Bid volume at (P - 1 bin)
-                # Sell Imbalance: Bid volume at P >= 3.0 * Ask volume at (P + 1 bin)
+                # Gate 4: True Diagonal Imbalance across STRICTLY ADJACENT price rungs with minimum volume floor
+                # Buy Imbalance: Ask volume at P >= 3.0 * Bid volume at (P - 1 bin) ONLY if (P - (P-1)) == 1 bin_idx
+                # Sell Imbalance: Bid volume at P >= 3.0 * Ask volume at (P + 1 bin) ONLY if ((P+1) - P) == 1 bin_idx
                 # Minimum volume floor: At least 0.5% of bar volume or 5 trades to filter noise
                 ladder = ladder.merge(grouped[["open_time_ms", "total_vol_coin"]], on="open_time_ms", how="left")
                 min_vol_floor = np.maximum(ladder["total_vol_coin"] * 0.005, 0.05)
                 
-                ladder["s_vol_below"] = ladder.groupby("open_time_ms")["s_vol"].shift(1)
-                ladder["b_vol_above"] = ladder.groupby("open_time_ms")["b_vol"].shift(-1)
+                # Strict Price Adjacency Validation: diff() of bin_idx within each candle
+                ladder["bin_diff_below"] = ladder.groupby("open_time_ms")["bin_idx"].diff(1)
+                ladder["bin_diff_above"] = -ladder.groupby("open_time_ms")["bin_idx"].diff(-1)
                 
+                # Shifted volumes masked by strict adjacency (bin_diff == 1)
+                raw_s_vol_below = ladder.groupby("open_time_ms")["s_vol"].shift(1)
+                ladder["s_vol_below"] = raw_s_vol_below.where(ladder["bin_diff_below"] == 1, 0.0)
+                
+                raw_b_vol_above = ladder.groupby("open_time_ms")["b_vol"].shift(-1)
+                ladder["b_vol_above"] = raw_b_vol_above.where(ladder["bin_diff_above"] == 1, 0.0)
+                
+                # Diagonal imbalance test
                 ladder["buy_imbalance"] = (
                     (ladder["b_vol"] >= 3.0 * np.maximum(ladder["s_vol_below"].fillna(0.0), 1e-4)) & 
-                    (ladder["b_vol"] >= min_vol_floor)
+                    (ladder["b_vol"] >= min_vol_floor) &
+                    (ladder["bin_diff_below"] == 1)
                 ).astype(int)
                 
                 ladder["sell_imbalance"] = (
                     (ladder["s_vol"] >= 3.0 * np.maximum(ladder["b_vol_above"].fillna(0.0), 1e-4)) & 
-                    (ladder["s_vol"] >= min_vol_floor)
+                    (ladder["s_vol"] >= min_vol_floor) &
+                    (ladder["bin_diff_above"] == 1)
                 ).astype(int)
 
-                # Consecutive Run "Stacked" Imbalance Logic (Run-Length >= 3 consecutive bins)
-                def _calc_consecutive_stacked(series):
-                    arr = series.values
-                    runs = np.zeros(len(arr), dtype=np.int32)
-                    cur = 0
-                    for k in range(len(arr)):
-                        if arr[k] == 1:
-                            cur += 1
+                # Consecutive Run "Stacked" Imbalance Logic:
+                # Requires BOTH: imbalance == 1 AND bin_idx strictly contiguous (bin_diff == 1)
+                def _calc_contiguous_stacked_clusters(df_bar, imb_col):
+                    bins = df_bar["bin_idx"].values
+                    imbs = df_bar[imb_col].values
+                    n = len(bins)
+                    if n < 3:
+                        return 0
+                    
+                    cluster_count = 0
+                    current_run = 0
+                    for k in range(n):
+                        if imbs[k] == 1:
+                            if k == 0 or (bins[k] - bins[k-1] == 1):
+                                current_run += 1
+                            else:
+                                if current_run >= 3:
+                                    cluster_count += 1
+                                current_run = 1
                         else:
-                            cur = 0
-                        runs[k] = cur
-                    # Flag as stacked if any run reached >= 3
-                    return int((runs >= 3).sum())
+                            if current_run >= 3:
+                                cluster_count += 1
+                            current_run = 0
+                    if current_run >= 3:
+                        cluster_count += 1
+                    return cluster_count
 
-                stacked_df = ladder.groupby("open_time_ms").agg(
-                    stacked_buy_imbalances=pd.NamedAgg(column="buy_imbalance", aggfunc=_calc_consecutive_stacked),
-                    stacked_sell_imbalances=pd.NamedAgg(column="sell_imbalance", aggfunc=_calc_consecutive_stacked),
-                    bins_populated=pd.NamedAgg(column="bin_idx", aggfunc="count")
-                ).reset_index()
+                # Compute per bar stacked clusters and populated rungs
+                bar_records = []
+                for bar_time, bar_data in ladder.groupby("open_time_ms"):
+                    buy_clusters = _calc_contiguous_stacked_clusters(bar_data, "buy_imbalance")
+                    sell_clusters = _calc_contiguous_stacked_clusters(bar_data, "sell_imbalance")
+                    bar_records.append({
+                        "open_time_ms": bar_time,
+                        "stacked_buy_imbalances": buy_clusters,
+                        "stacked_sell_imbalances": sell_clusters,
+                        "bins_populated": len(bar_data)
+                    })
+                stacked_df = pd.DataFrame(bar_records)
 
                 grouped = grouped.merge(stacked_df, on="open_time_ms", how="left")
                 grouped.drop(columns=["poc_volume", "poc_bin_idx"], inplace=True, errors="ignore")
@@ -222,7 +253,7 @@ class TickFootprintFetcher:
                 ladder_export = ladder_export.merge(poc_max[["open_time_ms", "poc_bin_idx"]], on="open_time_ms", how="left")
                 # Integer comparison for exact POC flag
                 ladder_export["is_poc"] = (ladder_export["bin_idx"] == ladder_export["poc_bin_idx"]).astype(int)
-                ladder_export.drop(columns=["poc_bin_idx", "s_vol_below", "b_vol_above", "total_vol_coin"], inplace=True, errors="ignore")
+                ladder_export.drop(columns=["poc_bin_idx", "s_vol_below", "b_vol_above", "total_vol_coin", "bin_diff_below", "bin_diff_above"], inplace=True, errors="ignore")
                 ladder_export = ladder_export[[
                     "open_time_ms", "price_bin", "bid_vol_coin", "ask_vol_coin", "net_delta_coin",
                     "is_buy_imbalance", "is_sell_imbalance", "is_poc", "trade_count"

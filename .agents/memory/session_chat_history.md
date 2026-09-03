@@ -37448,3 +37448,39 @@ Plan: Add In-Sample Optuna Bayesian hyperparameter search and Out-of-Sample Mont
      - is_poc float equality: Replace with integer bin indexing or 
 p.isclose.
   5. Strategy Consumption: S1 was not actually consuming Table 2; and 0.35% fixed stop causes fee drag (0.94R per trade at 33 bps). Must widen stop to >= 0.65% or use maker limit entries.
+
+---
+**All 4 Arena.ai Council Blocking Gates Resolved & Verified**:
+1. Gate 1 (CLI Dead Code): Decoupled --all-footprint from ootprint_days > 0.
+2. Gate 2 (Silent Zero-Fill Trap): Added 
+equire_footprint parameter in process_master_dataset which raises RuntimeError if footprint is missing when --all-footprint was requested.
+3. Gate 3 (Bin-Step Scale Drift): Implemented scale-invariant dynamic bin steps normalized to ~3.5 bps of nominal price, and persisted p_effective_bps.
+4. Gate 4 (Imbalance Semantics & POC Equality):
+   - Diagonal Imbalance: _vol at P evaluated against s_vol at P-1.
+   - Stacked Imbalances: Implemented _calc_consecutive_stacked requiring consecutive runs >= 3.
+   - Volume Floor: Minimum notional floor (0.5% of bar volume) to eliminate single-trade noise.
+   - Exact POC: Integer bin comparison (in_idx == poc_bin_idx) replacing float equality.
+5. Local Verification on ETHUSDT:
+   - Table 1 (Master): 210,609 rows x 62 cols | 0 Nulls | 0 Infs | 0 Gaps | [PASS]
+   - Table 2 (Ladder): 4,391 rungs x 9 cols (with trade_count) | 0 Nulls | 0 Infs | 0 Gaps | [PASS]
+6. Pushed Commit e39335c to main and rena/01a06774-engine-1-arena-pr.
+
+---
+Claude Desktop OpenRouter URL fix:
+Change Gateway base URL from https://openrouter.ai/ to https://openrouter.ai/api/v1
+
+---
+**Claude Desktop Error Diagnostics**:
+Screenshot shows error:
+404 https://openrouter.ai/api/v1/v1/models
+Reason: Claude Desktop automatically appends /v1/models (or /v1/...) to the Gateway Base URL!
+Therefore, setting Gateway base URL to https://openrouter.ai/api makes the full request:
+https://openrouter.ai/api + /v1/models = https://openrouter.ai/api/v1/models (Valid HTTP 200).
+
+Claude Desktop: URL https://openrouter.ai/api is verified. 401 User not found indicates revoked or expired OpenRouter API key.
+
+User confirmed Claude Desktop inference key is working.
+
+User provided Claude Desktop Fable 5.1 interface. Prepared single master review prompt with direct Windows file paths.
+
+User instructed to leave Claude Desktop and proceed on our side.

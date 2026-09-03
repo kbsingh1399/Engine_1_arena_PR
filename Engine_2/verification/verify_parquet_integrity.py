@@ -64,28 +64,38 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
                 timestamps = np.array([])
 
             is_ladder = "ladder" in fname
-            if len(timestamps) > 1 and not is_ladder:
-                time_diffs = np.diff(timestamps)
-                expected_diff = 15 * 60 * 1000 # 15 minutes in ms
-                gaps = np.where(time_diffs != expected_diff)[0]
-                num_gaps = len(gaps)
-                is_monotonic = bool(np.all(time_diffs > 0))
-            elif is_ladder and len(timestamps) > 1:
-                # Ladder table has multiple price rungs per timestamp; timestamps must be non-decreasing
-                time_diffs = np.diff(timestamps)
-                num_gaps = 0
-                is_monotonic = bool(np.all(time_diffs >= 0))
+            if not is_ladder:
+                if len(timestamps) > 1:
+                    time_diffs = np.diff(timestamps)
+                    expected_diff = 15 * 60 * 1000 # 15 minutes in ms
+                    gaps = np.where(time_diffs != expected_diff)[0]
+                    num_gaps = len(gaps)
+                    is_monotonic = bool(np.all(time_diffs > 0))
+                else:
+                    num_gaps = 0
+                    is_monotonic = True
             else:
-                num_gaps = 0
-                is_monotonic = True
+                # Gate 5: Real Gap Audit on Table 2 by evaluating unique candle open timestamps
+                unique_ts = np.unique(timestamps)
+                if len(unique_ts) > 1:
+                    time_diffs = np.diff(unique_ts)
+                    expected_diff = 15 * 60 * 1000
+                    gaps = np.where(time_diffs != expected_diff)[0]
+                    num_gaps = len(gaps)
+                    # Within the ladder, timestamps must be non-decreasing
+                    is_monotonic = bool(np.all(np.diff(timestamps) >= 0))
+                else:
+                    num_gaps = 0
+                    is_monotonic = True
 
             # 3. Range Sanity Checks (where columns exist)
             rsi_valid = bool((df["rsi_14"] >= 0.0).all() and (df["rsi_14"] <= 100.0).all()) if "rsi_14" in df.columns else True
             close_valid = bool((df["close"] > 0.0).all()) if "close" in df.columns else True
             liq_valid = bool((df["long_liq_usd"] <= 0.0).all() and (df["short_liq_usd"] >= 0.0).all()) if "long_liq_usd" in df.columns else True
             
-            # Table 2 Ladder Integrity Check
+            # Table 2 Ladder Integrity & Referential Sanity Check
             ladder_valid = True
+            ref_valid = True
             if is_ladder:
                 ladder_valid = bool(
                     (df["trade_count"] > 0).all() and 
@@ -94,9 +104,18 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
                     df["is_buy_imbalance"].isin([0, 1]).all() and
                     df["is_sell_imbalance"].isin([0, 1]).all()
                 )
+                # Referential integrity: check that ladder timestamps exist in matching master dataset
+                symbol_prefix = fname.split("_")[0]
+                master_fname = f"{symbol_prefix}_15m_master_2020_2026.parquet"
+                master_path = os.path.join(target_dir, master_fname)
+                if os.path.exists(master_path):
+                    master_df_sample = pd.read_parquet(master_path, columns=["open_time_ms"])
+                    master_ts_set = set(master_df_sample["open_time_ms"].values)
+                    unmatched_ts = set(unique_ts) - master_ts_set
+                    ref_valid = (len(unmatched_ts) == 0)
 
             # Strict Gate: num_gaps MUST be 0, inf_count MUST be 0, null_count MUST be 0
-            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid and ladder_valid) else "FAIL"
+            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid and ladder_valid and ref_valid) else "FAIL"
             if status == "FAIL":
                 all_passed = False
 
