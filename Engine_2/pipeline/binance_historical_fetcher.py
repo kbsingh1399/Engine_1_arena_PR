@@ -18,6 +18,7 @@ import zipfile
 import urllib.request
 import urllib.error
 import pandas as pd
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timezone
@@ -195,6 +196,35 @@ class BinanceHistoricalFetcher:
         master_df.drop_duplicates(subset=["open_time"], inplace=True)
         master_df.sort_values(by="open_time", inplace=True)
         master_df.reset_index(drop=True, inplace=True)
+        
+        # Automatic Gap Detection & Daily Archive Patching
+        diffs = master_df["open_time"].diff()
+        gap_mask = diffs > 900_000 # gaps > 15 minutes (900,000 ms)
+        if gap_mask.any():
+            gap_indices = master_df[gap_mask].index.tolist()
+            print(f"[FETCHER] Detected {len(gap_indices)} timestamp gap(s) for {symbol}. Scanning Binance Vision daily archives to patch...")
+            daily_patch_dfs = []
+            for idx in gap_indices:
+                prev_ms = master_df.loc[idx - 1, "open_time"]
+                curr_ms = master_df.loc[idx, "open_time"]
+                start_gap_dt = datetime.fromtimestamp((prev_ms + 900_000) / 1000, tz=timezone.utc)
+                end_gap_dt = datetime.fromtimestamp((curr_ms - 900_000) / 1000, tz=timezone.utc)
+                date_range = pd.date_range(start_gap_dt.strftime("%Y-%m-%d"), end_gap_dt.strftime("%Y-%m-%d"), freq="D")
+                for d in date_range:
+                    ymd = d.strftime("%Y-%m-%d")
+                    daily_df = _get_daily_kline(ymd)
+                    if daily_df is not None and not daily_df.empty:
+                        daily_patch_dfs.append(daily_df)
+                        print(f"  [PATCH] Successfully retrieved daily klines for {symbol} {ymd} ({len(daily_df)} bars)")
+            
+            if daily_patch_dfs:
+                kline_dfs.extend(daily_patch_dfs)
+                master_df = pd.concat(kline_dfs, ignore_index=True)
+                master_df.drop_duplicates(subset=["open_time"], inplace=True)
+                master_df.sort_values(by="open_time", inplace=True)
+                master_df.reset_index(drop=True, inplace=True)
+                print(f"[FETCHER] Post-patch total bars for {symbol}: {len(master_df):,}")
+
         print(f"[FETCHER] Total Historical Klines loaded for {symbol}: {len(master_df):,} bars (From {datetime.fromtimestamp(master_df['open_time'].iloc[0]/1000, tz=timezone.utc)} to {datetime.fromtimestamp(master_df['open_time'].iloc[-1]/1000, tz=timezone.utc)})")
         return master_df
 
@@ -229,7 +259,9 @@ class BinanceHistoricalFetcher:
                 if not has_header:
                     df.columns = SPOT_COLS[:len(df.columns)]
                 df = df[pd.to_numeric(df["open_time"], errors="coerce").notnull()].copy()
-                df["open_time"] = df["open_time"].astype(int)
+                df["open_time"] = df["open_time"].astype(np.int64)
+                # Normalize microsecond timestamps (16-digits) down to milliseconds (13-digits)
+                df["open_time"] = np.where(df["open_time"] > 2_000_000_000_000, df["open_time"] // 1000, df["open_time"]).astype(np.int64)
                 df["close"] = df["close"].astype(float)
                 df["volume"] = df["volume"].astype(float)
                 df["taker_buy_volume"] = df["taker_buy_volume"].astype(float)
@@ -251,7 +283,11 @@ class BinanceHistoricalFetcher:
             cache_file = os.path.join(spot_dir, f"{symbol}-spot-15m-{ym}.csv")
             if os.path.exists(cache_file) and os.path.getsize(cache_file) > 100:
                 try:
-                    return pd.read_csv(cache_file)
+                    cdf = pd.read_csv(cache_file)
+                    if "open_time" in cdf.columns:
+                        cdf["open_time"] = pd.to_numeric(cdf["open_time"], errors="coerce").fillna(0).astype(np.int64)
+                        cdf["open_time"] = np.where(cdf["open_time"] > 2_000_000_000_000, cdf["open_time"] // 1000, cdf["open_time"]).astype(np.int64)
+                    return cdf
                 except Exception:
                     pass
             url = f"https://data.binance.vision/data/spot/monthly/klines/{symbol}/15m/{symbol}-15m-{ym}.zip"
@@ -314,9 +350,45 @@ class BinanceHistoricalFetcher:
             return pd.DataFrame()
 
         master = pd.concat(spot_dfs, ignore_index=True)
+        master["open_time"] = pd.to_numeric(master["open_time"], errors="coerce").fillna(0).astype(np.int64)
+        master["open_time"] = np.where(master["open_time"] > 2_000_000_000_000, master["open_time"] // 1000, master["open_time"]).astype(np.int64)
         master.drop_duplicates(subset=["open_time"], inplace=True)
         master.sort_values("open_time", inplace=True)
         master.reset_index(drop=True, inplace=True)
+        
+        # Spot Gap Detection & Daily Archive Patching
+        diffs = master["open_time"].diff()
+        gap_mask = diffs > 900_000
+        if gap_mask.any():
+            gap_indices = master[gap_mask].index.tolist()
+            if len(gap_indices) <= 50:
+                print(f"[FETCHER] Detected {len(gap_indices)} spot timestamp gap(s) for {symbol}. Scanning Binance Vision daily archives to patch...")
+                daily_patch_dfs = []
+                for idx in gap_indices:
+                    prev_ms = master.loc[idx - 1, "open_time"]
+                    curr_ms = master.loc[idx, "open_time"]
+                    if curr_ms > prev_ms and (curr_ms - prev_ms) < 30 * 86_400_000: # < 30 days gap
+                        start_gap_dt = datetime.fromtimestamp((prev_ms + 900_000) / 1000, tz=timezone.utc)
+                        end_gap_dt = datetime.fromtimestamp((curr_ms - 900_000) / 1000, tz=timezone.utc)
+                        date_range = pd.date_range(start_gap_dt.strftime("%Y-%m-%d"), end_gap_dt.strftime("%Y-%m-%d"), freq="D")
+                        for d in date_range:
+                            ymd = d.strftime("%Y-%m-%d")
+                            url = f"https://data.binance.vision/data/spot/daily/klines/{symbol}/15m/{symbol}-15m-{ymd}.zip"
+                            data = self._fetch_url(url)
+                            if data:
+                                df = _parse_spot_zip(data)
+                                if df is not None and not df.empty:
+                                    daily_patch_dfs.append(df)
+                if daily_patch_dfs:
+                    spot_dfs.extend(daily_patch_dfs)
+                    master = pd.concat(spot_dfs, ignore_index=True)
+                    master["open_time"] = pd.to_numeric(master["open_time"], errors="coerce").fillna(0).astype(np.int64)
+                    master["open_time"] = np.where(master["open_time"] > 2_000_000_000_000, master["open_time"] // 1000, master["open_time"]).astype(np.int64)
+                    master.drop_duplicates(subset=["open_time"], inplace=True)
+                    master.sort_values("open_time", inplace=True)
+                    master.reset_index(drop=True, inplace=True)
+                    print(f"[FETCHER] Post-patch total spot bars for {symbol}: {len(master):,}")
+
         master.rename(columns={
             "close": "spot_close",
             "volume": "spot_volume",

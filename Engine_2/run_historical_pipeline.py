@@ -53,7 +53,7 @@ def run_pipeline(
     start_year: int = 2020,
     end_year: int = 2026,
     start_date_str: str = "2020-09-01",
-    target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min",
+    target_dir: str = os.path.join(SCRIPT_DIR, "binance_backtesting_data"),
     cache_dir: str = os.path.join(SCRIPT_DIR, "data_cache"),
     max_workers: int = 16,
     footprint_days: int = 30,
@@ -102,18 +102,21 @@ def run_pipeline(
 
     # Fetch footprint data (Smart windowing for tick-level aggTrades)
     t_fp = time.time()
-    if all_footprint:
-        fp_start = metrics_start
-    else:
-        now_dt = datetime.now(timezone.utc)
-        fp_start = (now_dt - pd.Timedelta(days=footprint_days)).strftime("%Y-%m-%d")
-        if start_date_str and parsed_dt > datetime.strptime(fp_start, "%Y-%m-%d").replace(tzinfo=timezone.utc):
-            fp_start = start_date_str
+    if footprint_days > 0:
+        if all_footprint:
+            fp_start = metrics_start
+        else:
+            now_dt = datetime.now(timezone.utc)
+            fp_start = (now_dt - pd.Timedelta(days=footprint_days)).strftime("%Y-%m-%d")
+            if start_date_str and parsed_dt > datetime.strptime(fp_start, "%Y-%m-%d").replace(tzinfo=timezone.utc):
+                fp_start = start_date_str
 
-    print(f"[FOOTPRINT] Fetching tick footprint data for {symbol} from {fp_start} ({footprint_days} days window)...")
-    fp_fetcher = TickFootprintFetcher(cache_dir=cache_dir, max_workers=max_workers)
-    fp_df = fp_fetcher.fetch_footprint(symbol=symbol, start_date=fp_start)
-    print(f"[OK] Tick Footprint data aggregated for {symbol} in {time.time() - t_fp:.1f}s ({len(fp_df):,} bars)")
+        print(f"[FOOTPRINT] Fetching tick footprint data for {symbol} from {fp_start} ({footprint_days} days window)...")
+        fp_fetcher = TickFootprintFetcher(cache_dir=cache_dir, max_workers=max_workers)
+        fp_df = fp_fetcher.fetch_footprint(symbol=symbol, start_date=fp_start)
+        print(f"[OK] Tick Footprint data aggregated for {symbol} in {time.time() - t_fp:.1f}s ({len(fp_df):,} bars)")
+    else:
+        fp_df = pd.DataFrame()
 
     # Fetch spot klines for real basis USD and real spot CVD
     t_sp = time.time()
@@ -187,9 +190,9 @@ if __name__ == "__main__":
     parser.add_argument("--start-year", type=int, default=2020, help="Start year (default: 2020)")
     parser.add_argument("--end-year", type=int, default=2026, help="End year (default: 2026)")
     parser.add_argument("--start-date", type=str, default="2020-09-01", help="Specific start date YYYY-MM-DD (default: 2020-09-01)")
-    parser.add_argument("--target-dir", type=str, default=r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min", help="Output directory")
+    parser.add_argument("--target-dir", type=str, default=os.path.join(SCRIPT_DIR, "binance_backtesting_data"), help="Output directory")
     parser.add_argument("--workers", type=int, default=16, help="Concurrent worker threads")
-    parser.add_argument("--footprint-days", type=int, default=30, help="Days of high-resolution tick footprint (default: 30)")
+    parser.add_argument("--footprint-days", type=int, default=0, help="Days of high-resolution tick footprint (default: 0)")
     parser.add_argument("--all-footprint", action="store_true", help="Download raw aggTrades ticks for full historical range")
     parser.add_argument("--clean-cache", action="store_true", help="Wipe intermediate raw download cache upon successful export")
     

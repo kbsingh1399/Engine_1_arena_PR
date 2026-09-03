@@ -44,6 +44,35 @@ class HistoricalMetricsProcessor:
         print(f"[PROCESSOR] Processing Master Historical Dataset for {symbol}...")
         df = klines_df.copy()
         
+        # Guarantee 100% continuous, unbroken 15m timeline
+        df.drop_duplicates(subset=["open_time"], inplace=True)
+        df.sort_values(by="open_time", inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        
+        start_ms = int(df["open_time"].iloc[0])
+        end_ms = int(df["open_time"].iloc[-1])
+        expected_ms = np.arange(start_ms, end_ms + 900_000, 900_000, dtype=np.int64)
+        
+        if len(df) < len(expected_ms):
+            missing_bars = len(expected_ms) - len(df)
+            print(f"[PROCESSOR] Symbol {symbol} has {missing_bars} residual missing bars. Reindexing to unbroken continuous 15m timeline...")
+            df = df.set_index("open_time").reindex(expected_ms)
+            df.index.name = "open_time"
+            df.reset_index(inplace=True)
+            df["open_time"] = df["open_time"].astype(np.int64)
+            df["close_time"] = df["open_time"] + 899_999
+            
+            # Forward fill prices so no NaNs exist
+            df["close"] = df["close"].ffill().bfill()
+            df["open"] = df["open"].fillna(df["close"])
+            df["high"] = df["high"].fillna(df["close"])
+            df["low"] = df["low"].fillna(df["close"])
+            
+            # Zero out volume on exchange downtime
+            for col in ["volume", "quote_volume", "count", "taker_buy_volume", "taker_buy_quote_volume"]:
+                if col in df.columns:
+                    df[col] = df[col].fillna(0.0)
+        
         # 1. Base Timestamps and Symbol
         df["open_time_ms"] = df["open_time"].astype(np.int64)
         df["close_time_ms"] = df["close_time"].astype(np.int64)
