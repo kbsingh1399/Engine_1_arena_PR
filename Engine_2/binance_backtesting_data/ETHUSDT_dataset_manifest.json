@@ -1,7 +1,7 @@
 {
   "symbol": "ETHUSDT",
   "timeframe": "15m",
-  "total_rows": 210610,
+  "total_rows": 210612,
   "columns": [
     "open_time_ms",
     "close_time_ms",
@@ -68,8 +68,8 @@
   ],
   "column_count": 62,
   "start_time_utc": "2020-09-01 00:00:00",
-  "end_time_utc": "2026-09-03 20:15:00",
-  "exported_at_utc": "2026-09-03T20:39:49.139446+00:00",
+  "end_time_utc": "2026-09-03 20:45:00",
+  "exported_at_utc": "2026-09-03T21:10:07.933515+00:00",
   "master_file": "ETHUSDT_15m_master_2020_2026.parquet",
-  "master_size_mb": 53.02
+  "master_size_mb": 52.98
 }
