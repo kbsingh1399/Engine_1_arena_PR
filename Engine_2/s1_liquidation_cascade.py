@@ -195,6 +195,21 @@ def load_and_preprocess_data():
             df['atr'] = tr.rolling(14, min_periods=1).mean().clip(lower=1e-6)
             df['rsi'] = df.get('rsi_14', 50.0).fillna(50.0)
             
+            # 5. Anchored Daily VWAP & Bands (Strict 00:00:00 UTC = 05:30:00 IST Boundary Reset)
+            day_anchor = df['datetime_utc'].dt.floor('1D')
+            typ_price = (df['high'] + df['low'] + df['close']) / 3.0
+            vol_base = df.get('volume_base', pd.Series(1.0, index=df.index)).fillna(1.0)
+            pv = typ_price * vol_base
+            cum_pv = pv.groupby(day_anchor).cumsum()
+            cum_vol = vol_base.groupby(day_anchor).cumsum()
+            vwap = cum_pv / (cum_vol + 1e-8)
+            pv2 = ((typ_price - vwap) ** 2) * vol_base
+            cum_pv2 = pv2.groupby(day_anchor).cumsum()
+            vwap_std = np.sqrt(cum_pv2 / (cum_vol + 1e-8)).clip(lower=1e-6)
+            df['vwap'] = vwap
+            df['vwap_zscore'] = ((df['close'] - vwap) / (vwap_std + 1e-8)).clip(-4.0, 4.0).fillna(0.0)
+            df['vwap_dev_pct'] = ((df['close'] - vwap) / (vwap + 1e-8)).clip(-0.20, 0.20).fillna(0.0)
+            
             ef = df['close'].ewm(span=200, min_periods=50).mean()
             es = df['close'].ewm(span=800, min_periods=100).mean()
             df['macro_spread'] = (ef - es) / (df['atr'] + 1e-8)
@@ -600,15 +615,25 @@ ARCHETYPE_FUNCTIONS = {
         ((df['mc'] > 0) & (df['p8'] < -0.18)),
         ((df['mc'] < 0) & (df['p8'] > 0.14) & (df['spot_cvd_delta'] < 0))
     ),
+    # 13. VWAP Band Mean Reversion (Fade Extreme 2.0 Sigma Stretches with CVD Delta Absorption)
+    "V1_VWAPMeanRevert": lambda df: (
+        ((df['vwap_zscore'] < -1.8) & (df['spot_cvd_delta'] > 0) & (df['rsi'] < 38)),
+        ((df['vwap_zscore'] > 1.8) & (df['spot_cvd_delta'] < 0) & (df['rsi'] > 62))
+    ),
+    # 14. VWAP Band Continuation (Pullback to VWAP / +1 Sigma in Directional Trend)
+    "V2_VWAPContinuation": lambda df: (
+        ((df['mc'] > 0) & (df['vwap_zscore'] > 0.0) & (df['vwap_zscore'] < 1.2) & (df['spot_cvd_delta'] > 0) & (df['vol_ratio'] > 1.05)),
+        ((df['mc'] < 0) & (df['vwap_zscore'] < 0.0) & (df['vwap_zscore'] > -1.2) & (df['spot_cvd_delta'] < 0) & (df['vol_ratio'] > 1.05))
+    ),
 }
 
-# Causal Macro-Regime to Archetype Mapping (Zero Lookahead / Economic Alignment)
+# Causal Macro-Regime to Archetype Mapping (Enhanced with VWAP Continuation & Reversion)
 REGIME_ARCHETYPE_MAP = {
-    'Bull Mania / High-Vol Breakout': 'A6_SpotAbsorptionDiv',
+    'Bull Mania / High-Vol Breakout': 'V2_VWAPContinuation',
     'Crash / High-Vol Flush':          'A1_VolBreakout',
-    'Compression / Range Absorption':  'A5_PureRelativeCVD',
+    'Compression / Range Absorption':  'V1_VWAPMeanRevert',
     'Bear Trend / Bear Rally Short':   'A4_UltraDeepValue',
-    'Bull Trend / Trend Pullback':     'A1_VolBreakout'
+    'Bull Trend / Trend Pullback':     'V2_VWAPContinuation'
 }
 
 def classify_macro_regime_causal(btc_df, train_end_purged):
@@ -686,7 +711,8 @@ def run_all_20_windows(data_by_symbol):
         'zc4', 'zc10', 'zc20', 'zb20', 'zb4', 'zc_rel_btc', 'zc4_rel_btc',
         'liq_imbalance', 'liq_vol_ratio', 'liq_long_ratio', 'liq_short_ratio', 'liq_zscore_24h',
         'long_liq_zscore', 'short_liq_zscore', 'oi_flush', 'zoi', 'oid', 'oicc', 'fr', 'zfr', 'zls',
-        'macro_spread', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'trend_strength', 'regime'
+        'macro_spread', 'mc', 'p8', 'p21', 'p50', 'p200', 'rsi', 'vol_ratio', 'trend_strength', 'regime',
+        'vwap_zscore', 'vwap_dev_pct'
     ]
     
     logger.info("Extracting candidate trade streams for liquidation-enhanced archetypes...")
