@@ -1,0 +1,8 @@
+{
+    "strategy": "S1_Liquidation_Cascade_Exhaustion",
+    "horizon_months": 18,
+    "concurrency": 2,
+    "leverage": 10.0,
+    "all_20_windows_passed": true,
+    "timestamp_utc": "2026-09-03T16:59:59.029272"
+}

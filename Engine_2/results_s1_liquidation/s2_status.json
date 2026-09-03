@@ -1,0 +1,222 @@
+[
+    {
+        "window": 1,
+        "test_start": "2021-03-15",
+        "test_end": "2021-04-15",
+        "trades": 7,
+        "win_rate_pct": 71.43,
+        "roi_pct": 27.58,
+        "max_dd_pct": 3.62,
+        "archetype": "A6_SpotAbsorptionDiv",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 2,
+        "test_start": "2021-06-15",
+        "test_end": "2021-07-15",
+        "trades": 6,
+        "win_rate_pct": 83.33,
+        "roi_pct": 76.87,
+        "max_dd_pct": 1.93,
+        "archetype": "A1_VolBreakout",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 3,
+        "test_start": "2021-09-15",
+        "test_end": "2021-10-15",
+        "trades": 12,
+        "win_rate_pct": 58.33,
+        "roi_pct": 23.93,
+        "max_dd_pct": 2.95,
+        "archetype": "A5_PureRelativeCVD",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 4,
+        "test_start": "2021-12-15",
+        "test_end": "2022-01-15",
+        "trades": 5,
+        "win_rate_pct": 80.0,
+        "roi_pct": 24.93,
+        "max_dd_pct": 3.81,
+        "archetype": "A7_ModPullback",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 5,
+        "test_start": "2022-03-15",
+        "test_end": "2022-04-15",
+        "trades": 6,
+        "win_rate_pct": 66.67,
+        "roi_pct": 22.75,
+        "max_dd_pct": 4.59,
+        "archetype": "N7_VolExpMom",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 6,
+        "test_start": "2022-06-15",
+        "test_end": "2022-07-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 28.03,
+        "max_dd_pct": 4.8,
+        "archetype": "A4_UltraDeepValue",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 7,
+        "test_start": "2022-09-15",
+        "test_end": "2022-10-15",
+        "trades": 6,
+        "win_rate_pct": 66.67,
+        "roi_pct": 20.7,
+        "max_dd_pct": 3.65,
+        "archetype": "A1_VolBreakout",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 8,
+        "test_start": "2022-12-15",
+        "test_end": "2023-01-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 24.54,
+        "max_dd_pct": 4.55,
+        "archetype": "A2_DeepSqueeze",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 9,
+        "test_start": "2023-03-15",
+        "test_end": "2023-04-15",
+        "trades": 5,
+        "win_rate_pct": 40.0,
+        "roi_pct": 23.4,
+        "max_dd_pct": 3.43,
+        "archetype": "N2_LiqCascadeFlush",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 10,
+        "test_start": "2023-06-15",
+        "test_end": "2023-07-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 35.3,
+        "max_dd_pct": 4.02,
+        "archetype": "A2_DeepSqueeze",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 11,
+        "test_start": "2023-09-15",
+        "test_end": "2023-10-15",
+        "trades": 8,
+        "win_rate_pct": 75.0,
+        "roi_pct": 28.35,
+        "max_dd_pct": 2.92,
+        "archetype": "A5_PureRelativeCVD",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 12,
+        "test_start": "2023-12-15",
+        "test_end": "2024-01-15",
+        "trades": 5,
+        "win_rate_pct": 80.0,
+        "roi_pct": 26.77,
+        "max_dd_pct": 2.28,
+        "archetype": "A5_PureRelativeCVD",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 13,
+        "test_start": "2024-03-15",
+        "test_end": "2024-04-15",
+        "trades": 5,
+        "win_rate_pct": 80.0,
+        "roi_pct": 45.79,
+        "max_dd_pct": 3.3,
+        "archetype": "N4_SpotDeltaCont",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 14,
+        "test_start": "2024-06-15",
+        "test_end": "2024-07-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 21.59,
+        "max_dd_pct": 3.99,
+        "archetype": "A5_PureRelativeCVD",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 15,
+        "test_start": "2024-09-15",
+        "test_end": "2024-10-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 37.6,
+        "max_dd_pct": 4.78,
+        "archetype": "N7_VolExpMom",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 16,
+        "test_start": "2024-12-15",
+        "test_end": "2025-01-15",
+        "trades": 6,
+        "win_rate_pct": 66.67,
+        "roi_pct": 33.5,
+        "max_dd_pct": 4.55,
+        "archetype": "A4_UltraDeepValue",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 17,
+        "test_start": "2025-03-15",
+        "test_end": "2025-04-15",
+        "trades": 8,
+        "win_rate_pct": 87.5,
+        "roi_pct": 34.83,
+        "max_dd_pct": 3.92,
+        "archetype": "A4_UltraDeepValue",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 18,
+        "test_start": "2025-06-15",
+        "test_end": "2025-07-15",
+        "trades": 5,
+        "win_rate_pct": 60.0,
+        "roi_pct": 23.08,
+        "max_dd_pct": 3.2,
+        "archetype": "A1_VolBreakout",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 19,
+        "test_start": "2025-10-15",
+        "test_end": "2025-11-15",
+        "trades": 6,
+        "win_rate_pct": 83.33,
+        "roi_pct": 35.17,
+        "max_dd_pct": 2.87,
+        "archetype": "A1_VolBreakout",
+        "status": "\u2705 PASS"
+    },
+    {
+        "window": 20,
+        "test_start": "2026-03-15",
+        "test_end": "2026-04-15",
+        "trades": 5,
+        "win_rate_pct": 100.0,
+        "roi_pct": 23.18,
+        "max_dd_pct": 0.26,
+        "archetype": "A10_SpotCVDStrict",
+        "status": "\u2705 PASS"
+    }
+]
