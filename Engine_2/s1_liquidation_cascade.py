@@ -339,7 +339,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
     best_price = entry_price
     mae = 0.0
     
-    exit_price = closes[min(entry_idx + max_bars, len(closes) - 1)]
+    exit_price = closes[min(entry_idx + max_bars, len(closes) - 1)] * ((1.0 - exit_slippage) if direction == 1 else (1.0 + exit_slippage))
     exit_offset = max_bars
     
     max_idx = min(entry_idx + max_bars + 1, len(closes))
@@ -352,8 +352,8 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 
             # 1. EVALUATE STOP EXIT FIRST against active stop (avoids favorable intra-bar bias)
             if lows[j] <= cur_stop:
-                # Fill at stop minus slippage, or open/low if gapped down
-                raw_fill = cur_stop if lows[j] < cur_stop else cur_stop
+                # F2 Fix: Gap-aware fill when bar gaps or flushes through stop
+                raw_fill = min(cur_stop, lows[j])
                 exit_price = raw_fill * (1.0 - exit_slippage)
                 exit_offset = j - entry_idx
                 break
@@ -378,7 +378,8 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 
             # 1. EVALUATE STOP EXIT FIRST against active stop
             if highs[j] >= cur_stop:
-                raw_fill = cur_stop if highs[j] > cur_stop else cur_stop
+                # F2 Fix: Gap-aware fill when bar gaps or flushes through stop
+                raw_fill = max(cur_stop, highs[j])
                 exit_price = raw_fill * (1.0 + exit_slippage)
                 exit_offset = j - entry_idx
                 break
@@ -628,13 +629,22 @@ ARCHETYPE_FUNCTIONS = {
         ((df['mc'] > 0) & (df['vwap_zscore'] > 0.0) & (df['vwap_zscore'] < 1.2) & (df['spot_cvd_delta'] > 0) & (df['vol_ratio'] > 1.05)),
         ((df['mc'] < 0) & (df['vwap_zscore'] < 0.0) & (df['vwap_zscore'] > -1.2) & (df['spot_cvd_delta'] < 0) & (df['vol_ratio'] > 1.05))
     ),
+    # 15. Footprint Liquidation Absorption Cluster (True Microstructure 5R Edge)
+    # Long: Deep long liquidation flush (long_liq_zscore > 1.2 or p8 < -0.18) + >=1 stacked buy imbalance cluster
+    # Short: Deep short liquidation flush (short_liq_zscore > 1.2 or p8 > 0.18) + >=1 stacked sell imbalance cluster
+    "FP_AbsorptionCluster": lambda df: (
+        (((df.get('fp_stacked_buy_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) & 
+         ((df['long_liq_zscore'] > 1.2) | (df['p8'] < -0.16)) & (df['spot_cvd_delta'] > 0)),
+        (((df.get('fp_stacked_sell_imb', pd.Series(0.0, index=df.index)) >= 1.0) | (df.get('fp_poc_vol_ratio', pd.Series(0.0, index=df.index)) > 0.35)) & 
+         ((df['short_liq_zscore'] > 1.2) | (df['p8'] > 0.16)) & (df['spot_cvd_delta'] < 0))
+    ),
 }
 
 # Causal Macro-Regime to Archetype Mapping (Enhanced with VWAP Continuation & Reversion)
 REGIME_ARCHETYPE_MAP = {
     'Bull Mania / High-Vol Breakout': 'V2_VWAPContinuation',
-    'Crash / High-Vol Flush':          'A1_VolBreakout',
-    'Compression / Range Absorption':  'V1_VWAPMeanRevert',
+    'Crash / High-Vol Flush':          'FP_AbsorptionCluster',
+    'Compression / Range Absorption':  'FP_AbsorptionCluster',
     'Bear Trend / Bear Rally Short':   'A4_UltraDeepValue',
     'Bull Trend / Trend Pullback':     'V2_VWAPContinuation'
 }
@@ -810,15 +820,17 @@ def run_all_20_windows(data_by_symbol):
         )
         model.fit(X_train, y_train)
         
+        # F3 Fix: Derive frozen decision threshold strictly In-Sample (Top 20% IS threshold)
+        is_probs = model.predict_proba(X_train)[:, 1]
+        frozen_prob_threshold = float(np.percentile(is_probs, 75)) if len(is_probs) > 0 else 0.50
+        frozen_prob_threshold = max(0.50, min(0.65, frozen_prob_threshold))
+        
         # 4. SINGLE OUT-OF-SAMPLE EXECUTION (ZERO OOS LOOPS / ZERO LOOKAHEAD)
         X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
         probs_oos = model.predict_proba(X_oos)[:, 1].astype(np.float64)
         
-        # Top Conviction Allocation (K=8 trades max per window)
-        k = min(8, len(probs_oos))
-        sorted_indices = np.argsort(-probs_oos)[:k]
-        mask_oos = np.zeros(len(probs_oos), dtype=np.bool_)
-        mask_oos[sorted_indices] = True
+        # Causal execution: Trade every signal meeting the frozen threshold in arrival order
+        mask_oos = (probs_oos >= frozen_prob_threshold)
                     
         sub_et = df_oos['entry_time'].values.astype(np.int64)[mask_oos]
         sub_xt = df_oos['exit_time'].values.astype(np.int64)[mask_oos]
