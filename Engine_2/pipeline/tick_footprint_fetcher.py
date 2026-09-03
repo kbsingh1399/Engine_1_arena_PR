@@ -112,10 +112,33 @@ class TickFootprintFetcher:
                 
                 # Align timestamps to 15m boundary
                 df["open_time_ms"] = (df["transact_time"] // 900000) * 900000
-                
-                # Compute real POC & granular price bins
+                # Prevents early-year bin collapse where fixed dollar ticks exceeded 15m candle range
                 df["price"] = df["price"].astype(np.float64)
-                df["price_bin"] = (df["price"] / bin_step).round() * bin_step
+                median_px = df["price"].median()
+                
+                # Target ~3.5 bps (0.035%) of nominal price, bounded by exchange min tick
+                raw_step = median_px * 0.00035
+                default_step = SYMBOL_BIN_STEPS.get(symbol, 0.001)
+                
+                # Use nice round numbers appropriate for the scale
+                if raw_step >= 10.0:
+                    daily_bin_step = round(raw_step / 5.0) * 5.0
+                elif raw_step >= 1.0:
+                    daily_bin_step = round(raw_step, 1)
+                elif raw_step >= 0.1:
+                    daily_bin_step = round(raw_step, 2)
+                elif raw_step >= 0.01:
+                    daily_bin_step = round(raw_step, 3)
+                elif raw_step >= 0.001:
+                    daily_bin_step = round(raw_step, 4)
+                else:
+                    daily_bin_step = round(raw_step, 6)
+                daily_bin_step = max(daily_bin_step, 1e-6)
+                effective_bps = round((daily_bin_step / median_px) * 10000.0, 2)
+                
+                # Compute integer bin index to eliminate floating point equality errors
+                df["bin_idx"] = np.round(df["price"] / daily_bin_step).astype(np.int64)
+                df["price_bin"] = df["bin_idx"] * daily_bin_step
                 
                 grouped = df.groupby("open_time_ms").agg(
                     total_vol_coin=pd.NamedAgg(column="quantity", aggfunc="sum"),
@@ -125,34 +148,67 @@ class TickFootprintFetcher:
                     taker_buy_count=pd.NamedAgg(column="taker_buy", aggfunc="sum"),
                     taker_sell_count=pd.NamedAgg(column="taker_sell", aggfunc="sum")
                 ).reset_index()
+                grouped["fp_effective_bps"] = effective_bps
                 
                 # Real POC per 15m bar: price_bin with max volume
-                poc_df = df.groupby(["open_time_ms", "price_bin"])["quantity"].sum().reset_index()
-                poc_max = poc_df.loc[poc_df.groupby("open_time_ms")["quantity"].idxmax()][["open_time_ms", "price_bin", "quantity"]]
-                poc_max.rename(columns={"price_bin": "real_poc", "quantity": "poc_volume"}, inplace=True)
-                grouped = grouped.merge(poc_max, on="open_time_ms", how="left")
+                poc_df = df.groupby(["open_time_ms", "bin_idx", "price_bin"])["quantity"].sum().reset_index()
+                poc_max = poc_df.loc[poc_df.groupby("open_time_ms")["quantity"].idxmax()][["open_time_ms", "bin_idx", "price_bin", "quantity"]]
+                poc_max.rename(columns={"bin_idx": "poc_bin_idx", "price_bin": "real_poc", "quantity": "poc_volume"}, inplace=True)
+                grouped = grouped.merge(poc_max[["open_time_ms", "real_poc", "poc_bin_idx", "poc_volume"]], on="open_time_ms", how="left")
                 
                 # Compute POC Volume Ratio
                 grouped["poc_vol_ratio"] = np.round(grouped["poc_volume"] / np.maximum(grouped["total_vol_coin"], 1e-6), 4)
                 
-                # Compute Stacked Imbalances & Wick Absorptions per 15m candle
-                # Aggregate Buy and Sell per Price Bin
-                ladder = df.groupby(["open_time_ms", "price_bin"]).agg(
+                # Compute Granular Price Ladder per Price Bin
+                ladder = df.groupby(["open_time_ms", "bin_idx", "price_bin"]).agg(
                     b_vol=pd.NamedAgg(column="taker_buy_vol", aggfunc="sum"),
-                    s_vol=pd.NamedAgg(column="taker_sell_vol", aggfunc="sum")
+                    s_vol=pd.NamedAgg(column="taker_sell_vol", aggfunc="sum"),
+                    trade_count=pd.NamedAgg(column="quantity", aggfunc="count")
                 ).reset_index()
+                ladder.sort_values(["open_time_ms", "bin_idx"], inplace=True)
                 
-                # Diagonal imbalance ratio >= 3.0
-                ladder["buy_imbalance"] = (ladder["b_vol"] >= 3.0 * np.maximum(ladder["s_vol"], 1e-4)).astype(int)
-                ladder["sell_imbalance"] = (ladder["s_vol"] >= 3.0 * np.maximum(ladder["b_vol"], 1e-4)).astype(int)
+                # Gate 4: True Diagonal Imbalance across adjacent price rungs with minimum volume floor
+                # Buy Imbalance: Ask volume at P >= 3.0 * Bid volume at (P - 1 bin)
+                # Sell Imbalance: Bid volume at P >= 3.0 * Ask volume at (P + 1 bin)
+                # Minimum volume floor: At least 0.5% of bar volume or 5 trades to filter noise
+                ladder = ladder.merge(grouped[["open_time_ms", "total_vol_coin"]], on="open_time_ms", how="left")
+                min_vol_floor = np.maximum(ladder["total_vol_coin"] * 0.005, 0.05)
                 
-                imbalances = ladder.groupby("open_time_ms").agg(
-                    stacked_buy_imbalances=pd.NamedAgg(column="buy_imbalance", aggfunc="sum"),
-                    stacked_sell_imbalances=pd.NamedAgg(column="sell_imbalance", aggfunc="sum")
+                ladder["s_vol_below"] = ladder.groupby("open_time_ms")["s_vol"].shift(1)
+                ladder["b_vol_above"] = ladder.groupby("open_time_ms")["b_vol"].shift(-1)
+                
+                ladder["buy_imbalance"] = (
+                    (ladder["b_vol"] >= 3.0 * np.maximum(ladder["s_vol_below"].fillna(0.0), 1e-4)) & 
+                    (ladder["b_vol"] >= min_vol_floor)
+                ).astype(int)
+                
+                ladder["sell_imbalance"] = (
+                    (ladder["s_vol"] >= 3.0 * np.maximum(ladder["b_vol_above"].fillna(0.0), 1e-4)) & 
+                    (ladder["s_vol"] >= min_vol_floor)
+                ).astype(int)
+
+                # Consecutive Run "Stacked" Imbalance Logic (Run-Length >= 3 consecutive bins)
+                def _calc_consecutive_stacked(series):
+                    arr = series.values
+                    runs = np.zeros(len(arr), dtype=np.int32)
+                    cur = 0
+                    for k in range(len(arr)):
+                        if arr[k] == 1:
+                            cur += 1
+                        else:
+                            cur = 0
+                        runs[k] = cur
+                    # Flag as stacked if any run reached >= 3
+                    return int((runs >= 3).sum())
+
+                stacked_df = ladder.groupby("open_time_ms").agg(
+                    stacked_buy_imbalances=pd.NamedAgg(column="buy_imbalance", aggfunc=_calc_consecutive_stacked),
+                    stacked_sell_imbalances=pd.NamedAgg(column="sell_imbalance", aggfunc=_calc_consecutive_stacked),
+                    bins_populated=pd.NamedAgg(column="bin_idx", aggfunc="count")
                 ).reset_index()
-                
-                grouped = grouped.merge(imbalances, on="open_time_ms", how="left")
-                grouped.drop(columns=["poc_volume"], inplace=True, errors="ignore")
+
+                grouped = grouped.merge(stacked_df, on="open_time_ms", how="left")
+                grouped.drop(columns=["poc_volume", "poc_bin_idx"], inplace=True, errors="ignore")
                 
                 # Format detailed ladder for Table 2
                 ladder_export = ladder.copy()
@@ -163,12 +219,13 @@ class TickFootprintFetcher:
                     "sell_imbalance": "is_sell_imbalance"
                 }, inplace=True)
                 ladder_export["net_delta_coin"] = ladder_export["ask_vol_coin"] - ladder_export["bid_vol_coin"]
-                ladder_export = ladder_export.merge(poc_max[["open_time_ms", "real_poc"]], on="open_time_ms", how="left")
-                ladder_export["is_poc"] = (ladder_export["price_bin"] == ladder_export["real_poc"]).astype(int)
-                ladder_export.drop(columns=["real_poc"], inplace=True, errors="ignore")
+                ladder_export = ladder_export.merge(poc_max[["open_time_ms", "poc_bin_idx"]], on="open_time_ms", how="left")
+                # Integer comparison for exact POC flag
+                ladder_export["is_poc"] = (ladder_export["bin_idx"] == ladder_export["poc_bin_idx"]).astype(int)
+                ladder_export.drop(columns=["poc_bin_idx", "s_vol_below", "b_vol_above", "total_vol_coin"], inplace=True, errors="ignore")
                 ladder_export = ladder_export[[
                     "open_time_ms", "price_bin", "bid_vol_coin", "ask_vol_coin", "net_delta_coin",
-                    "is_buy_imbalance", "is_sell_imbalance", "is_poc"
+                    "is_buy_imbalance", "is_sell_imbalance", "is_poc", "trade_count"
                 ]]
                 
                 grouped.to_parquet(cache_file, index=False)

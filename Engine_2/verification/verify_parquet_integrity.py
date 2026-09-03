@@ -83,9 +83,20 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
             rsi_valid = bool((df["rsi_14"] >= 0.0).all() and (df["rsi_14"] <= 100.0).all()) if "rsi_14" in df.columns else True
             close_valid = bool((df["close"] > 0.0).all()) if "close" in df.columns else True
             liq_valid = bool((df["long_liq_usd"] <= 0.0).all() and (df["short_liq_usd"] >= 0.0).all()) if "long_liq_usd" in df.columns else True
+            
+            # Table 2 Ladder Integrity Check
+            ladder_valid = True
+            if is_ladder:
+                ladder_valid = bool(
+                    (df["trade_count"] > 0).all() and 
+                    (df["price_bin"] > 0).all() and 
+                    df["is_poc"].isin([0, 1]).all() and
+                    df["is_buy_imbalance"].isin([0, 1]).all() and
+                    df["is_sell_imbalance"].isin([0, 1]).all()
+                )
 
             # Strict Gate: num_gaps MUST be 0, inf_count MUST be 0, null_count MUST be 0
-            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid) else "FAIL"
+            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid and ladder_valid) else "FAIL"
             if status == "FAIL":
                 all_passed = False
 

@@ -102,16 +102,17 @@ def run_pipeline(
 
     # Fetch footprint data (Smart windowing for tick-level aggTrades)
     t_fp = time.time()
-    if footprint_days > 0:
+    should_fetch_fp = (footprint_days > 0) or all_footprint
+    if should_fetch_fp:
         if all_footprint:
-            fp_start = metrics_start
+            fp_start = start_date_str if start_date_str else metrics_start
         else:
             now_dt = datetime.now(timezone.utc)
             fp_start = (now_dt - pd.Timedelta(days=footprint_days)).strftime("%Y-%m-%d")
             if start_date_str and parsed_dt > datetime.strptime(fp_start, "%Y-%m-%d").replace(tzinfo=timezone.utc):
                 fp_start = start_date_str
 
-        print(f"[FOOTPRINT] Fetching tick footprint data for {symbol} from {fp_start} ({footprint_days} days window)...")
+        print(f"[FOOTPRINT] Fetching tick footprint data for {symbol} from {fp_start} (all_footprint={all_footprint}, footprint_days={footprint_days})...")
         fp_fetcher = TickFootprintFetcher(cache_dir=cache_dir, max_workers=max_workers)
         fp_res = fp_fetcher.fetch_footprint(symbol=symbol, start_date=fp_start, return_ladder=True)
         if isinstance(fp_res, tuple):
@@ -137,7 +138,8 @@ def run_pipeline(
         funding_df=funding_df,
         footprint_df=fp_df,
         spot_df=spot_df,
-        symbol=symbol
+        symbol=symbol,
+        require_footprint=all_footprint
     )
     
     # 2b. Now filter the final master dataset to the requested start date

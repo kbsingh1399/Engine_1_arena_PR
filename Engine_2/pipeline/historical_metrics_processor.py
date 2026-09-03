@@ -36,7 +36,8 @@ class HistoricalMetricsProcessor:
         funding_df: pd.DataFrame,
         footprint_df: pd.DataFrame = None,
         spot_df: pd.DataFrame = None,
-        symbol: str = "BTCUSDT"
+        symbol: str = "BTCUSDT",
+        require_footprint: bool = False
     ) -> pd.DataFrame:
         """
         Executes end-to-end indicator calculation and produces a canonical multi-indicator DataFrame.
@@ -221,6 +222,9 @@ class HistoricalMetricsProcessor:
             df["fp_stacked_buy_imb"] = poc_merged["stacked_buy_imbalances"].fillna(0.0).values if "stacked_buy_imbalances" in poc_merged.columns else 0.0
             df["fp_stacked_sell_imb"] = poc_merged["stacked_sell_imbalances"].fillna(0.0).values if "stacked_sell_imbalances" in poc_merged.columns else 0.0
         else:
+            if require_footprint:
+                raise RuntimeError(f"[FATAL GATE 2] require_footprint=True but footprint_df is empty for {symbol}! Refusing to zero-fill dead features.")
+            print(f"[WARN] No tick footprint data provided for {symbol}. Using OHLC approximation.")
             df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 1)
             df["poc_source"] = "OHLC_APPROX"
             df["fp_poc_vol_ratio"] = 0.0

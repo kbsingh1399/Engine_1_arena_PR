@@ -37425,3 +37425,26 @@ Audit on Monte Carlo and Bayesian:
 1. Optuna (Bayesian TPE): Present in Python environment, but not yet integrated into s1 walk-forward loop.
 2. Monte Carlo: Not yet applied to OOS trade sequences.
 Plan: Add In-Sample Optuna Bayesian hyperparameter search and Out-of-Sample Monte Carlo drawdown permutation test.
+
+---
+**Progress Verified & Synchronized**:
+- Integrated In-Sample Bayesian Hyperparameter Optimization (Optuna TPE) on every walk-forward window.
+- Integrated Out-of-Sample Monte Carlo Permutation Stress Testing (1,000 resamples per window) calculating 95% worst-case Max Drawdown and Probability of Profit.
+- Verified syntax, imports, and execution locally.
+- Pushed Commit 279b76b to main and rena/01a06774-engine-1-arena-pr.
+
+---
+**Arena.ai Council Review Ingested & Analyzed**:
+- Source file: C:\Users\SIGMA\Downloads\Arena_footprint_Architecture_Review.txt
+- Verdict: **CONDITIONAL — DO NOT RUN FULL PIPELINE YET**.
+- 4 Blocking Architectural Gates Identified:
+  1. Gate 1 (CLI Bug): --all-footprint was gated on ootprint_days > 0. Defaulting to 0 caused all-footprint to be skipped.
+  2. Gate 2 (Silent Zero-Fill Trap): historical_metrics_processor.py was zero-filling p_poc_vol_ratio, p_stacked_buy_imb, and p_stacked_sell_imb if footprint data was empty, passing auditor silently. Must raise or warn loudly.
+  3. Gate 3 (Bin-Step Drift / Scale Invariance): Static dollar steps (e.g. SOL .10, DOGE .0001) drift 267x–301x across historical price ranges (collapsing early 2021 bars to 1 rung). Must store effective_bps or adapt to ATR.
+  4. Gate 4 (Imbalance Semantics):
+     - Diagonal vs Inline: Compare _vol[P] against s_vol[P-1] instead of same-bin.
+     - Stacked vs Count: Consecutive run-length logic (>=3 in a row), not simple sum.
+     - Volume Floor: Add minimum notional floor so  trades don't trigger 3:1 imbalances.
+     - is_poc float equality: Replace with integer bin indexing or 
+p.isclose.
+  5. Strategy Consumption: S1 was not actually consuming Table 2; and 0.35% fixed stop causes fee drag (0.94R per trade at 33 bps). Must widen stop to >= 0.65% or use maker limit entries.
