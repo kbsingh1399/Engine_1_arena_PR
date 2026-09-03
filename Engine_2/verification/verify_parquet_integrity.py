@@ -112,10 +112,28 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
                     master_df_sample = pd.read_parquet(master_path, columns=["open_time_ms"])
                     master_ts_set = set(master_df_sample["open_time_ms"].values)
                     unmatched_ts = set(unique_ts) - master_ts_set
-                    ref_valid = (len(unmatched_ts) == 0)
+            # 3b. Master Specific Verification Gates
+            master_gates_valid = True
+            if not is_ladder:
+                if "is_synthetic" in df.columns:
+                    # Assert is_synthetic is int8 and flags maintenance bars where volume is 0
+                    has_flat_zero_bars = bool(((df["high"] == df["low"]) & (df["volume_base"] == 0.0)).any())
+                    synth_tagged = bool((df["is_synthetic"] == 1).any())
+                    dtype_valid = (df["is_synthetic"].dtype == np.int8 or df["is_synthetic"].dtype == "int8")
+                    if has_flat_zero_bars and not synth_tagged:
+                        master_gates_valid = False
+                        print(f"       -> [FAIL] {fname}: Flat zero-volume bars exist but is_synthetic.sum() == 0")
+                    if not dtype_valid:
+                        master_gates_valid = False
+                        print(f"       -> [FAIL] {fname}: is_synthetic dtype is {df['is_synthetic'].dtype}, expected int8")
+                if "ask_depth_usd" in df.columns:
+                    # Assert ask_depth_usd is positive liquidity magnitude
+                    if (df["ask_depth_usd"] < 0.0).any():
+                        master_gates_valid = False
+                        print(f"       -> [FAIL] {fname}: ask_depth_usd has negative values (min: {df['ask_depth_usd'].min()})")
 
             # Strict Gate: num_gaps MUST be 0, inf_count MUST be 0, null_count MUST be 0
-            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid and ladder_valid and ref_valid) else "FAIL"
+            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid and ladder_valid and ref_valid and master_gates_valid) else "FAIL"
             if status == "FAIL":
                 all_passed = False
 

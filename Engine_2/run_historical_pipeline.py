@@ -155,11 +155,17 @@ def run_pipeline(
     exporter = ParquetExporter(output_dir=target_dir)
     manifest = exporter.export_dataset(master_df, symbol=symbol)
     
-    # Export Table 2: Microstructure Footprint Price Ladder
+    # Export Table 2: Microstructure Footprint Price Ladder (Strictly Aligned with Table 1 Bounds)
     if not ladder_df.empty:
         ladder_out = os.path.join(target_dir, f"{symbol}_15m_footprint_ladder.parquet")
-        ladder_df.to_parquet(ladder_out, index=False)
-        print(f"[OK] Exported Table 2 Footprint Ladder to {ladder_out} ({len(ladder_df):,} rungs)")
+        # Ensure Table 2 start and ending timestamps match Table 1 master bounds
+        min_master_ts = master_df["open_time_ms"].min()
+        max_master_ts = master_df["open_time_ms"].max()
+        aligned_ladder = ladder_df[(ladder_df["open_time_ms"] >= min_master_ts) & (ladder_df["open_time_ms"] <= max_master_ts)].copy()
+        aligned_ladder.sort_values(["open_time_ms", "price_bin"], inplace=True)
+        aligned_ladder.reset_index(drop=True, inplace=True)
+        aligned_ladder.to_parquet(ladder_out, index=False)
+        print(f"[OK] Exported Table 2 Footprint Ladder to {ladder_out} ({len(aligned_ladder):,} rungs, aligned {min_master_ts} -> {max_master_ts})")
     elif not fp_df.empty:
         # Fallback export of footprint summary
         fp_out = os.path.join(target_dir, f"Master_{symbol}_15m_Final_Footprint.parquet")

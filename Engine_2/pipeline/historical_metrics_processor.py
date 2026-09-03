@@ -80,7 +80,7 @@ class HistoricalMetricsProcessor:
 
         # Flag degenerate maintenance bars (flat prices and zero volume/trades delivered during downtime)
         degenerate = ((df["high"] == df["low"]) & ((df["volume"] == 0.0) | (df["count"] == 0)))
-        df["is_synthetic"] = np.where(df["is_synthetic"] == 1 | degenerate, 1, 0).astype(np.int8)
+        df["is_synthetic"] = np.where((df["is_synthetic"] == 1) | degenerate, 1, 0).astype(np.int8)
         
         # 1. Base Timestamps and Symbol
         df["open_time_ms"] = df["open_time"].astype(np.int64)
