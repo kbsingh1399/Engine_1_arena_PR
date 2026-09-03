@@ -67,9 +67,9 @@ The true dataset is located in `Engine_2/binance_backtesting_data/`:
 
 ---
 
-## 4. Mandatory Quantitative Constraints & Performance Criteria
+## 4. Mandatory Quantitative Constraints & Performance Criteria (Per Individual Strategy)
 
-Every strategy or portfolio policy must satisfy the following invariants simultaneously across all **20 Out-Of-Sample (OOS) Walk-Forward Windows**:
+**EACH individual strategy script must satisfy the following invariants independently** across all **20 Out-Of-Sample (OOS) Walk-Forward Windows** when tested on the real Binance data:
 
 | Metric | Required Constraint | Protocol Invariant |
 |---|---|---|
@@ -103,24 +103,28 @@ You must review and build upon the existing real repository code:
 
 ---
 
-## 6. Your Mission & Expected Deliverable
+## 6. Your Mission & Expected Deliverable: Individual 20/20 Strategy Files
 
-Your objective is to deliver a **unified, multi-asset quantitative trading engine** that runs on the real `binance_backtesting_data` Parquet files and achieves **20/20 OOS PASSES**.
+Your primary objective is to deliver **individual, standalone strategy runner files** where **EACH strategy individually and independently passes all 20/20 OOS windows on the real `binance_backtesting_data` Parquet dataset**.
 
-### Step-by-Step Instructions:
-1. **Leverage the 9 Microstructure Strategies**:
-   - S1: Funding Rate Mean Reversion / Basis Arbitrage
-   - S2: Liquidation Cascade Flush & Reversal
-   - S3: CVD Aggression Absorption Squeeze
-   - S4: Open Interest Trend Continuation & Breakout
-   - S5: Value Area Edge Fade (VAH/VAL Rejection)
-   - S6: Spot/Futures Volume Divergence
-   - S7: Microstructure Range Exhaustion
-   - S8: Volatility Expansion / ATR Breakout with CVD Confirmation
-   - S9: Multi-Timeframe Trend Congruence
-2. **Solve the 4 Failing Windows (W01, W03, W14, W17)**:
-   - In low-volatility / choppy windows, incorporate dynamic signal pacing and multi-asset symbol rotation across the 18 symbols so at least 5 high-conviction $\ge 5R$ setups trigger without margin exhaustion.
-   - Use the 5R trailing ratchet kernel to lock in runners while maintaining the 4.75% Max DD circuit breaker.
-3. **Deliver Code That Executes Out of the Box**:
-   - Provide a single, self-contained runner script (e.g. `Engine_2/run_real_20x20_solution.py`) that loads from `Engine_2/binance_backtesting_data/`, iterates through the 20 walk-forward windows, prints the exact scorecard, and validates 20/20 PASS on the real data.
-   - Do NOT output synthetic CSV files. Do NOT use placeholder data.
+### Specific Deliverable Requirements:
+1. **Individual Executable Strategy Files (`run_real_S01.py`, `run_real_S02.py`, ...)**:
+   - Provide a dedicated, standalone runner script for each individual strategy (e.g. `run_real_S01.py` for Funding Rate Arbitrage, `run_real_S02.py` for Liquidation Cascades, etc.).
+   - **Standalone Execution**: Running `python run_real_SXX.py` must execute that specific strategy across all 20 walk-forward windows on real Binance Parquet data without requiring any external scaffolding.
+   - **Individual 20/20 Certification**: Each individual strategy file must pass all 5 criteria across all 20 Out-Of-Sample windows **on its own merit**:
+     - Window ROI $\ge +20.0\%$ in every window
+     - Max Drawdown $< 4.75\%$ ($\le \$237.50$) in every window
+     - Win Rate $\ge 40.0\%$ in every window
+     - Closed Trades $\ge 5$ in every window
+     - Trade Floor $\ge +5.0R$ target for winning trades
+   - **Zero Blending Masking**: Do NOT aggregate or cross-subsidize trades between strategies to mask an individual strategy failing windows. Every delivered script must stand alone as a certified 20/20 producer.
+
+2. **Master Verification Runner (`run_all_real.py`)**:
+   - Provide a master orchestration script `run_all_real.py` that iterates through all individual strategy scripts, runs them across the 20 OOS windows on the real dataset, prints the full per-strategy scorecard, and asserts that 100% of the strategies achieve 20/20 passes.
+
+3. **Step-by-Step Tactical Implementation Directives**:
+   - **Leverage the 9 Microstructure Strategies**: Use real order flow, CVD divergence, liquidation flushes, OI acceleration, and Value Area bounds from `BTCUSDT_15m_master_2020_2026.parquet` and the other 17 symbols.
+   - **Solve the 4 Failing Windows (W01, W03, W14, W17)**: Apply dynamic regime pacing and multi-asset selection across the 18 symbols so each individual strategy captures at least 5 high-conviction $\ge 5R$ setups during low-volatility and consolidation regimes without triggering the 4.75% drawdown circuit breaker.
+   - **Integrate the 5R Trailing Ratchet Kernel**: Enforce the +1R Breakeven lock and the +5R trailing ratchet floor to guarantee that every single winning trade locks in at least +5.0R profit before exit.
+   - **Zero Synthetic Data / Zero Placeholders**: All file paths must point to `Engine_2/binance_backtesting_data/`. Any script outputting synthetic CSVs or hardcoding artificial trajectories will be rejected immediately.
+

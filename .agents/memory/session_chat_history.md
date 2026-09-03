@@ -36451,6 +36451,11 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - Prompt Formulated: Created `Engine_2/GLM_FORENSIC_FEEDBACK_PROMPT.md` containing full forensic audit, exposing the 30 synthetic data streams, the $4.8 Sextillion synthetic equity vs 0/30 real pass rate, the stripped 57 microstructure features, the 18-symbol concurrency constraint, and pointing to raw GitHub references.
 - Git Push: Staged 73 files (including `Engine_2/strategies_20x20/` suite, patched loaders, and prompt), committed (`6a71bc0`), and successfully pushed to `origin/main`.
 
+### Turn Update (2026-09-03 09:21)
+- User: I hope we ask him give output file each strategy individually passing 20/20 windows
+- Prompt Refined: Updated `Engine_2/GLM_FORENSIC_FEEDBACK_PROMPT.md` Section 4 & Section 6 with explicit mandates requiring GLM to deliver standalone, individual runner files (`run_real_S01.py`, `run_real_S02.py`, ...) where EACH strategy individually and independently achieves 20/20 OOS window passes on real `binance_backtesting_data` Parquet data without cross-subsidization or blended curve masking.
+- Git Commit & Push: Committed and pushed changes to GitHub origin/main.
+
 ### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
 - **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021â€“2026 Walk-Forward Windows).
 - **Strategy Breakthrough:** S4 (CVD Divergence Squeeze) achieved +39.55% ROI, 83.3% WR, 2.38% Max DD in W07.
