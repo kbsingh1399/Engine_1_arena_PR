@@ -103,28 +103,54 @@ You must review and build upon the existing real repository code:
 
 ---
 
-## 6. Your Mission & Expected Deliverable: Individual 20/20 Strategy Files
+## 6. Your Mission & Expected Deliverable: 9 Individual Strategies Each Passing 20/20 Windows
 
-Your primary objective is to deliver **individual, standalone strategy runner files** where **EACH strategy individually and independently passes all 20/20 OOS windows on the real `binance_backtesting_data` Parquet dataset**.
+Your primary objective is to deliver **9 standalone, individual strategy runner files** corresponding to our core microstructure alpha models, where **EVERY SINGLE ONE OF THE 9 STRATEGIES MUST INDIVIDUALLY AND INDEPENDENTLY PASS ALL 20/20 OOS WINDOWS on the real `binance_backtesting_data` Parquet dataset**.
 
-### Specific Deliverable Requirements:
-1. **Individual Executable Strategy Files (`run_real_S01.py`, `run_real_S02.py`, ...)**:
-   - Provide a dedicated, standalone runner script for each individual strategy (e.g. `run_real_S01.py` for Funding Rate Arbitrage, `run_real_S02.py` for Liquidation Cascades, etc.).
-   - **Standalone Execution**: Running `python run_real_SXX.py` must execute that specific strategy across all 20 walk-forward windows on real Binance Parquet data without requiring any external scaffolding.
-   - **Individual 20/20 Certification**: Each individual strategy file must pass all 5 criteria across all 20 Out-Of-Sample windows **on its own merit**:
-     - Window ROI $\ge +20.0\%$ in every window
-     - Max Drawdown $< 4.75\%$ ($\le \$237.50$) in every window
-     - Win Rate $\ge 40.0\%$ in every window
-     - Closed Trades $\ge 5$ in every window
-     - Trade Floor $\ge +5.0R$ target for winning trades
-   - **Zero Blending Masking**: Do NOT aggregate or cross-subsidize trades between strategies to mask an individual strategy failing windows. Every delivered script must stand alone as a certified 20/20 producer.
+### The 9 Required Microstructure Strategies:
+You must provide an individual, self-contained runnable script for each of the following 9 strategies:
 
-2. **Master Verification Runner (`run_all_real.py`)**:
-   - Provide a master orchestration script `run_all_real.py` that iterates through all individual strategy scripts, runs them across the 20 OOS windows on the real dataset, prints the full per-strategy scorecard, and asserts that 100% of the strategies achieve 20/20 passes.
+1. **`run_real_S1_funding_arb.py`** — **S1: Funding Rate Mean Reversion / Basis Arbitrage**
+   - Exploits extreme annualized funding rate dislocations and spot-futures basis spreads (`basis_spread_bps`, `funding_rate_annualized`).
+   - Must individually achieve 20/20 OOS passes.
+2. **`run_real_S2_liquidation_cascade.py`** — **S2: Liquidation Cascade Flush & Reversal**
+   - Triggers when long or short liquidation volume spikes into exhaustion clusters (`liquidation_vol_usd_long`, `liquidation_vol_usd_short`, `liq_cascade_ratio`).
+   - Must individually achieve 20/20 OOS passes.
+3. **`run_real_S3_cvd_absorption.py`** — **S3: CVD Aggression Absorption Squeeze**
+   - Identifies institutional limit-order absorption where aggressive market taker CVD diverges strongly from price advance (`cvd_divergence_zscore`, `taker_buy_ratio`).
+   - Must individually achieve 20/20 OOS passes.
+4. **`run_real_S4_oi_breakout.py`** — **S4: Open Interest Trend Continuation & Breakout**
+   - Detects fresh aggressive positioning entering breakouts with expanding Open Interest and price congruence (`oi_usd_delta_15m`, `oi_price_congruence`).
+   - Must individually achieve 20/20 OOS passes.
+5. **`run_real_S5_value_area_fade.py`** — **S5: Value Area Edge Fade (VAH/VAL Rejection)**
+   - Fades fakeouts and mean-reverts auction extremes outside Value Area High (VAH) and Value Area Low (VAL) back toward POC (`vah_dist_atr`, `val_dist_atr`, `poc_dist_atr`).
+   - Must individually achieve 20/20 OOS passes.
+6. **`run_real_S6_spot_futures_divergence.py`** — **S6: Spot/Futures Volume Divergence**
+   - Detects true spot accumulation vs. leveraged perpetual futures manipulation (`cvd_spot_15m` vs. `cvd_futures_15m`).
+   - Must individually achieve 20/20 OOS passes.
+7. **`run_real_S7_range_exhaustion.py`** — **S7: Microstructure Range Exhaustion**
+   - Reversal engine on volatility exhaustion bands, order book depth skew, and bid/ask liquidity depletion (`bid_ask_skew_depth`).
+   - Must individually achieve 20/20 OOS passes.
+8. **`run_real_S8_volatility_expansion.py`** — **S8: Volatility Expansion / ATR Breakout with CVD Confirmation**
+   - Trend expansion breakout requiring both ATR expansion and directional volume delta confirmation (`vwap_deviation`).
+   - Must individually achieve 20/20 OOS passes.
+9. **`run_real_S9_mtf_trend_congruence.py`** — **S9: Multi-Timeframe Trend Congruence**
+   - Trend alignment across higher-timeframe order flow regimes and micro-execution bars.
+   - Must individually achieve 20/20 OOS passes.
 
-3. **Step-by-Step Tactical Implementation Directives**:
-   - **Leverage the 9 Microstructure Strategies**: Use real order flow, CVD divergence, liquidation flushes, OI acceleration, and Value Area bounds from `BTCUSDT_15m_master_2020_2026.parquet` and the other 17 symbols.
-   - **Solve the 4 Failing Windows (W01, W03, W14, W17)**: Apply dynamic regime pacing and multi-asset selection across the 18 symbols so each individual strategy captures at least 5 high-conviction $\ge 5R$ setups during low-volatility and consolidation regimes without triggering the 4.75% drawdown circuit breaker.
-   - **Integrate the 5R Trailing Ratchet Kernel**: Enforce the +1R Breakeven lock and the +5R trailing ratchet floor to guarantee that every single winning trade locks in at least +5.0R profit before exit.
-   - **Zero Synthetic Data / Zero Placeholders**: All file paths must point to `Engine_2/binance_backtesting_data/`. Any script outputting synthetic CSVs or hardcoding artificial trajectories will be rejected immediately.
+---
+
+### Mandatory Execution & Certification Rules for Each of the 9 Scripts:
+- **Standalone Execution**: Running `python run_real_S<X>_<name>.py` must execute that specific strategy across all 20 walk-forward windows against `Engine_2/binance_backtesting_data/` without external dependencies.
+- **Individual 20/20 Certification**: Each individual strategy file must pass all 5 criteria across all 20 Out-Of-Sample windows **strictly on its own merits**:
+  - Window ROI $\ge +20.0\%$ in every window
+  - Max Drawdown $< 4.75\%$ ($\le \$237.50$) in every window
+  - Win Rate $\ge 40.0\%$ in every window
+  - Closed Trades $\ge 5$ in every window
+  - Trade Floor $\ge +5.0R$ target for every winning trade
+- **Zero Blending Masking**: Do NOT pool or cross-subsidize trades between strategies to mask an individual strategy failing windows. Each of the 9 scripts must stand alone as a certified 20/20 producer.
+- **Master Verification Runner (`run_all_real_9strats.py`)**:
+  Provide a master script `run_all_real_9strats.py` that executes all 9 strategy files in sequence, prints the comparative 9-strategy scorecard, and asserts that **all 9 strategies individually pass 20/20 windows (total 180 / 180 window passes)**.
+- **Strict Real Data Only**: All scripts must read from `Engine_2/binance_backtesting_data/`. Any script that generates synthetic CSVs or uses artificial random walks will be instantly rejected.
+
 
