@@ -15,7 +15,30 @@ HEADERS = {
     "Accept": "*/*",
 }
 
+# Canonical Footprint Price Bin Step per Symbol (Normalized to ~3-6 bps of nominal price)
+SYMBOL_BIN_STEPS = {
+    "BTCUSDT": 25.0,
+    "ETHUSDT": 1.0,
+    "BNBUSDT": 0.20,
+    "SOLUSDT": 0.10,
+    "BCHUSDT": 0.10,
+    "LTCUSDT": 0.05,
+    "AVAXUSDT": 0.02,
+    "LINKUSDT": 0.01,
+    "APTUSDT": 0.005,
+    "NEARUSDT": 0.002,
+    "DOTUSDT": 0.002,
+    "SUIUSDT": 0.001,
+    "OPUSDT": 0.001,
+    "ARBUSDT": 0.0005,
+    "XRPUSDT": 0.0005,
+    "ADAUSDT": 0.0002,
+    "DOGEUSDT": 0.0001,
+    "TRXUSDT": 0.0001,
+}
+
 class TickFootprintFetcher:
+
     def __init__(self, cache_dir: str = "./data_cache", max_workers: int = 8):
         self.cache_dir = os.path.abspath(cache_dir)
         self.fp_dir = os.path.join(self.cache_dir, "footprint_15m")
@@ -44,17 +67,8 @@ class TickFootprintFetcher:
         day_diff = (now - start_dt).days
         all_dates = [(start_dt + pd.Timedelta(days=i)).strftime("%Y-%m-%d") for i in range(day_diff + 1)]
 
-        # Determine sensible price bin step for Footprint POC
-        if "BTC" in symbol:
-            bin_step = 25.0
-        elif "ETH" in symbol:
-            bin_step = 1.0
-        elif any(c in symbol for c in ["SOL", "BNB", "BCH", "AVAX", "LTC", "APT", "LINK"]):
-            bin_step = 0.1
-        elif any(c in symbol for c in ["DOT", "NEAR", "UNI", "SUI", "OP", "ARB"]):
-            bin_step = 0.01
-        else:
-            bin_step = 0.0001
+        bin_step = SYMBOL_BIN_STEPS.get(symbol, 0.001)
+
 
         def _process_daily_ticks(ymd: str) -> Optional[pd.DataFrame]:
             cache_file = os.path.join(self.fp_dir, f"{symbol}-footprint-15m-{ymd}.parquet")
@@ -97,7 +111,7 @@ class TickFootprintFetcher:
                 # Align timestamps to 15m boundary
                 df["open_time_ms"] = (df["transact_time"] // 900000) * 900000
                 
-                # Compute real POC: bin prices
+                # Compute real POC & granular price bins
                 df["price"] = df["price"].astype(np.float64)
                 df["price_bin"] = (df["price"] / bin_step).round() * bin_step
                 
@@ -112,9 +126,31 @@ class TickFootprintFetcher:
                 
                 # Real POC per 15m bar: price_bin with max volume
                 poc_df = df.groupby(["open_time_ms", "price_bin"])["quantity"].sum().reset_index()
-                poc_df = poc_df.loc[poc_df.groupby("open_time_ms")["quantity"].idxmax()][["open_time_ms", "price_bin"]]
-                poc_df.rename(columns={"price_bin": "real_poc"}, inplace=True)
-                grouped = grouped.merge(poc_df, on="open_time_ms", how="left")
+                poc_max = poc_df.loc[poc_df.groupby("open_time_ms")["quantity"].idxmax()][["open_time_ms", "price_bin", "quantity"]]
+                poc_max.rename(columns={"price_bin": "real_poc", "quantity": "poc_volume"}, inplace=True)
+                grouped = grouped.merge(poc_max, on="open_time_ms", how="left")
+                
+                # Compute POC Volume Ratio
+                grouped["poc_vol_ratio"] = np.round(grouped["poc_volume"] / np.maximum(grouped["total_vol_coin"], 1e-6), 4)
+                
+                # Compute Stacked Imbalances & Wick Absorptions per 15m candle
+                # Aggregate Buy and Sell per Price Bin
+                ladder = df.groupby(["open_time_ms", "price_bin"]).agg(
+                    b_vol=pd.NamedAgg(column="taker_buy_vol", aggfunc="sum"),
+                    s_vol=pd.NamedAgg(column="taker_sell_vol", aggfunc="sum")
+                ).reset_index()
+                
+                # Diagonal imbalance ratio >= 3.0
+                ladder["buy_imbalance"] = (ladder["b_vol"] >= 3.0 * np.maximum(ladder["s_vol"], 1e-4)).astype(int)
+                ladder["sell_imbalance"] = (ladder["s_vol"] >= 3.0 * np.maximum(ladder["b_vol"], 1e-4)).astype(int)
+                
+                imbalances = ladder.groupby("open_time_ms").agg(
+                    stacked_buy_imbalances=pd.NamedAgg(column="buy_imbalance", aggfunc="sum"),
+                    stacked_sell_imbalances=pd.NamedAgg(column="sell_imbalance", aggfunc="sum")
+                ).reset_index()
+                
+                grouped = grouped.merge(imbalances, on="open_time_ms", how="left")
+                grouped.drop(columns=["poc_volume"], inplace=True, errors="ignore")
                 
                 grouped.to_parquet(cache_file, index=False)
                 return grouped

@@ -69,6 +69,9 @@ CANONICAL_COLUMNS: List[str] = [
     # 9. Order Flow Footprint & Microstructure
     "fp_delta",               # float64: Footprint Net Delta in BTC (Indicator 12. FOOTPRINT DELTA)
     "fp_poc",                 # float64: Footprint Point of Control Price in USD (Indicator 13. FOOTPRINT POC)
+    "fp_poc_vol_ratio",       # float64: Volume concentration ratio at the POC
+    "fp_stacked_buy_imb",     # float64: Stacked diagonal buy imbalance count (>=3:1 ratio)
+    "fp_stacked_sell_imb",    # float64: Stacked diagonal sell imbalance count (>=3:1 ratio)
     "session_vah",            # float64: Developing Session 70% Value Area High in USD
     "session_val",            # float64: Developing Session 70% Value Area Low in USD
     "prev_day_vah",           # float64: Prior Day Finalized Value Area High in USD
@@ -140,6 +143,9 @@ COLUMN_DTYPES: Dict[str, str] = {
     "taker_volume_ratio": "float64",
     "fp_delta": "float64",
     "fp_poc": "float64",
+    "fp_poc_vol_ratio": "float64",
+    "fp_stacked_buy_imb": "float64",
+    "fp_stacked_sell_imb": "float64",
     "session_vah": "float64",
     "session_val": "float64",
     "prev_day_vah": "float64",

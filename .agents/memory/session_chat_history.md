@@ -37262,3 +37262,93 @@ Key Takeaways & Consensus:
  - Engine_2/MASTER_COUNCIL_REVIEW_PROMPT.md updated with all audit discoveries, Calmar metrics, raw GitHub links, and live terminal review directives
  7. Remote Git Synchronization:
  - All commits pushed and fully in sync with origin/main and origin/arena/01a06774-engine-1-arena-pr.
+
+---
+
+**User Query: " also are we using Optuna?\**
+
+**OMNI-O Architectural Analysis on Optuna Usage:**
+1. **Current State**:
+ - optuna is installed in the environment (import optuna is available).
+ - In s1_liquidation_cascade.py, Optuna was previously NOT used inside the walk-forward OOS loop because running Optuna on test sets creates data snooping bias unless restricted strictly to In-Sample cross-validation.
+2. **How Optuna MUST be Used (Institutional Protocol)**:
+ - **Strictly In-Sample (IS) Bayesian Hyperparameter Optimization**:
+ - Objective: Maximize In-Sample Walk-Forward Efficiency (WFE) or Calmar Ratio on 80/20 IS train/validation splits.
+ - Search Space:
+ - XGBoost / LightGBM: learning_rate [0.01, 0.08], max_depth [3, 6], subsample [0.70, 0.95], colsample_bytree [0.60, 0.90].
+ - Risk Multiplier: prob_threshold [0.52, 0.70], op_k [4, 9].
+ - Zero Lookahead: The best trial parameters from In-Sample are frozen and evaluated *once* on the unseen OOS month.
+
+---
+**User Directives**:
+1. ensure that we are targeting each trade to be > 5R
+2. focusing on mean reversion in Engine_2/s1_liquidation_cascade.py
+
+**Analysis**:
+Auditing 5R trailing stop mechanics and R-multiple distribution for mean reversion setups.
+
+---
+**User Directives Ingested**:
+1. ensure that we are targeting each trade to be > 5R
+2. I am focusing on mean reversion
+3. other than machine learning...do we have any other approach with data to trade
+
+**Empirical 5R Audit Findings on 3,463,698 bars**:
+- On pure Mean Reversion (extreme VWAP stretch + CVD absorption):
+  - Total trades: 11,752
+  - WinRate: 25.95%
+  - Trades reaching >= 5R: 349 (2.97%)
+  - Trades reaching >= 3R: 1,093 (9.30%)
+  - Mean R: -0.197 R (Max: +16.26R)
+- **Key Insight**: Pure mean reversion returns to the session mean (typically a 1.5R - 2.5R amplitude). It rarely expands to 5R unless a full trend reversal develops. Targeting >5R on mean reversion causes trades that reach +2R to give back gains and stop out at breakeven or loss.
+
+---
+**Notification Update**:
+Task-3367 finished successfully with exact empirical metrics on 11,752 mean-reversion trades across 3.46M bars.
+Scoreboard: WinRate=25.95%, Mean R=-0.197R, >=5R Trades=2.97%, >=3R Trades=9.30%, >=1.5R Trades=41.02%.
+Awaiting user confirmation on testing the Deterministic Structural Mean-Reversion strategy across all 20 OOS windows.
+
+---
+User Query Ingested:
+Footprint chart tick-level data evaluation for binance_backtesting_data.
+Evaluating Bid x Ask ladder, Delta Imbalances, POC absorption, and aggTrades storage.
+
+---
+**User Directives Ingested**:
+1. Modify Engine_2/run_historical_pipeline.py and test it.
+2. Review with Arena.ai before taking full dump.
+3. Decide merge level for tick footprint dump (e.g. ,  for BTC, and respective ticks for others).
+4. Delete all data from Engine_2/binance_backtesting_data and redownload.
+
+**Next Steps**:
+1. Formulate exact Bin Steps (tick merge levels) across all 18 symbols.
+2. Enhance 	ick_footprint_fetcher.py to extract true Footprint features:
+   - 
+eal_poc: Point of control price
+   - stacked_imbalance_buy: Diagonal buy imbalance count/volume
+   - stacked_imbalance_sell: Diagonal sell imbalance count/volume
+   - 	rapped_buyer_vol: Aggressive buyers above candle close
+   - 	rapped_seller_vol: Aggressive sellers below candle close
+   - bsorption_ratio: Volume absorption at wicks
+3. Construct Arena.ai architectural review prompt referencing GitHub links.
+4. Prepare safe delete and redownload procedure.
+
+---
+**Footprint Prototype Test Result (BTCUSDT)**:
+- Successfully downloaded Binance Vision daily aggTrades zip.
+- Extracted exact tick prints and binned volume into  steps.
+- Calculated exact 15m 
+eal_poc (e.g. 78,175.0), 	otal_vol_coin, max_single_trade_vol, 	aker_buy_vol_coin, 	aker_sell_vol_coin, and trade counts.
+- Time taken: Fast multithreaded stream parsing.
+
+**Next Steps**:
+1. Formulate Bin Size Grid (- for BTC, and proportional tick levels for other 17 assets).
+2. Propose Footprint Imbalance Schema (Diagonal Imbalances & Absorption).
+3. Draft the Arena.ai Master Architectural Review Prompt.
+4. Define the clean wipe and redownload protocol for Engine_2/binance_backtesting_data.
+
+---
+**Notification Update**:
+Task-3411 closed after task-3407 finished successfully with verified BTCUSDT tick-level footprint ingestion.
+Reported complete tick merge table across 18 symbols and Arena.ai review prompt to user.
+Awaiting user direction to proceed with footprint feature enhancements.

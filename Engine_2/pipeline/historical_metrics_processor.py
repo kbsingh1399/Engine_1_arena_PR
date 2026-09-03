@@ -199,21 +199,33 @@ class HistoricalMetricsProcessor:
         df["spot_cvd_session"] = compute_session_cvd(open_times, spot_delta_15m)
         df["spot_cvd_lifetime"] = np.round(np.cumsum(spot_delta_15m), 2)
 
-        # 8. Footprint POC
+        # 8. Footprint POC & Microstructure Imbalances
         df["fp_delta"] = fut_delta_15m
         if footprint_df is not None and "real_poc" in footprint_df.columns:
+            fp_cols = ["open_time_ms", "real_poc"]
+            for col in ["poc_vol_ratio", "stacked_buy_imbalances", "stacked_sell_imbalances"]:
+                if col in footprint_df.columns:
+                    fp_cols.append(col)
+                    
             poc_merged = pd.merge(
                 df[["open_time_ms"]],
-                footprint_df[["open_time_ms", "real_poc"]].drop_duplicates("open_time_ms"),
+                footprint_df[fp_cols].drop_duplicates("open_time_ms"),
                 on="open_time_ms", how="left"
             )
             real_poc = poc_merged["real_poc"].values
             fallback_poc = np.round((df["high"].values + df["low"].values + 2.0 * df["close"].values) / 4.0, 1)
             df["fp_poc"] = np.where(np.isnan(real_poc), fallback_poc, np.round(real_poc, 1))
             df["poc_source"] = np.where(np.isnan(real_poc), "OHLC_APPROX", "TICK_EXACT")
+            
+            df["fp_poc_vol_ratio"] = poc_merged["poc_vol_ratio"].fillna(0.0).values if "poc_vol_ratio" in poc_merged.columns else 0.0
+            df["fp_stacked_buy_imb"] = poc_merged["stacked_buy_imbalances"].fillna(0.0).values if "stacked_buy_imbalances" in poc_merged.columns else 0.0
+            df["fp_stacked_sell_imb"] = poc_merged["stacked_sell_imbalances"].fillna(0.0).values if "stacked_sell_imbalances" in poc_merged.columns else 0.0
         else:
             df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 1)
             df["poc_source"] = "OHLC_APPROX"
+            df["fp_poc_vol_ratio"] = 0.0
+            df["fp_stacked_buy_imb"] = 0.0
+            df["fp_stacked_sell_imb"] = 0.0
         
         # 9. Order Book Depth (+-1% span normalized)
         print("[PROCESSOR] Estimating Order Book Depth Liquidity...")

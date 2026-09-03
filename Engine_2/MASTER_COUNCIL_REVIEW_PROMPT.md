@@ -73,7 +73,17 @@ Provide an uncompromising, institutional-level evaluation answering the followin
   2. **Regime-Gated Capital Allocation**: Should the engine sit 100% in cash/treasuries during low-volatility compression months (where liquidation edge is near zero), and deploy size only during verified cascade regimes?
   3. **Order Book Micro-Imbalance**: What specific L2 order-book imbalance, touch-width filters, or iceberg execution algorithms should be added to protect against cascade gap risk?
 
-#### Domain 4: Final Investment Committee Recommendation
+#### Domain 4: Tick-Level Footprint Aggregation & 5R Mean-Reversion Architecture
+- Inspect our updated Footprint Ingestion Pipeline:
+  - `Engine_2/pipeline/tick_footprint_fetcher.py`: https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_2/pipeline/tick_footprint_fetcher.py
+  - `Engine_2/pipeline/historical_metrics_processor.py`: https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_2/pipeline/historical_metrics_processor.py
+  - `Engine_2/core/schema.py`: https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_2/core/schema.py
+- **Bin Size Resolution**: For BTCUSDT, we set a $25.00 bin step (~3.1 bps); for ETHUSDT, $1.00 (~3.5 bps); for SOLUSDT, $0.10. Does this binning resolution adequately preserve diagonal delta imbalances (>=3:1 ratio) and wick absorption without memory bloat?
+- **Mean Reversion with 5R Mandate**: Our empirical audit of 11,752 mean-reversion trades revealed that 41.02% reach >=1.5R, but only 2.97% reach >=5R under a standard trailing ratchet. How should `fp_real_poc`, `fp_poc_vol_ratio`, and stacked diagonal imbalances be combined to narrow entry risk from 1.5% to 0.35%, transforming a 1.8% reversion into a true >5R trade?
+- **Data Pipeline Safeguards**: Before deleting the existing Parquets in `Engine_2/binance_backtesting_data` and triggering a full 5-year tick-level re-download across 18 symbols, what automated disk, checksum, and memory safeguards are mandatory?
+
+#### Domain 5: Final Investment Committee Recommendation
 - Deliver a clear, unhedged **Verdict**: [ALLOCATE / CONDITIONAL ALLOCATE / REJECT].
 - Outline the exact 3-phase roadmap you would mandate before allocating $10M+ of proprietary institutional AUM to this multi-strategy system.
 ```
+
