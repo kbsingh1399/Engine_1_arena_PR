@@ -53,17 +53,21 @@ class HistoricalMetricsProcessor:
         end_ms = int(df["open_time"].iloc[-1])
         expected_ms = np.arange(start_ms, end_ms + 900_000, 900_000, dtype=np.int64)
         
-        if len(df) < len(expected_ms):
+        df["is_synthetic"] = 0
+        if len(df) != len(expected_ms) or not np.array_equal(df["open_time"].values, expected_ms):
             missing_bars = len(expected_ms) - len(df)
-            print(f"[PROCESSOR] Symbol {symbol} has {missing_bars} residual missing bars. Reindexing to unbroken continuous 15m timeline...")
+            print(f"[PROCESSOR] Symbol {symbol} has {missing_bars} timeline discrepancies. Reindexing to unbroken continuous 15m timeline...")
             df = df.set_index("open_time").reindex(expected_ms)
             df.index.name = "open_time"
             df.reset_index(inplace=True)
             df["open_time"] = df["open_time"].astype(np.int64)
             df["close_time"] = df["open_time"] + 899_999
             
-            # Forward fill prices so no NaNs exist
-            df["close"] = df["close"].ffill().bfill()
+            # Identify synthetic bars where close was NaN prior to forward fill
+            df["is_synthetic"] = np.where(df["close"].isna(), 1, 0).astype(np.int8)
+            
+            # Forward fill prices causally (strictly NO lookahead bfill)
+            df["close"] = df["close"].ffill()
             df["open"] = df["open"].fillna(df["close"])
             df["high"] = df["high"].fillna(df["close"])
             df["low"] = df["low"].fillna(df["close"])
@@ -136,7 +140,7 @@ class HistoricalMetricsProcessor:
                 df.sort_values("open_time_ms"),
                 fp_clean,
                 on="open_time_ms",
-                direction="nearest",
+                direction="backward",
                 tolerance=60000
             )
             
@@ -261,6 +265,10 @@ class HistoricalMetricsProcessor:
                 right_on="timestamp_ms",
                 direction="backward"
             )
+            
+            # Explicit boolean mask: 1 if real exchange metrics exist, 0 if prior to collection
+            df["metrics_available"] = np.where(merged["sum_open_interest"].notna(), 1, 0).astype(np.int8)
+
             raw_oi_btc = merged["sum_open_interest"].ffill().values
             oi_btc = np.nan_to_num(raw_oi_btc, nan=0.0)
 
@@ -295,6 +303,7 @@ class HistoricalMetricsProcessor:
             else:
                 df["taker_volume_ratio"] = fallback_taker
         else:
+            df["metrics_available"] = 0
             df["open_interest_k"] = 0.0
             df["open_interest_usd"] = 0.0
             df["ls_ratio_global"] = 1.0
@@ -303,8 +312,8 @@ class HistoricalMetricsProcessor:
             df["whale_index"] = 100.0
             df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
 
-        # OI rate of change (% per 15m bar)
-        df["oi_change_pct"] = np.round(df["open_interest_k"].pct_change().fillna(0.0).values * 100.0, 4)
+        # OI rate of change (% per 15m bar) - strictly prevent Inf when previous OI is 0
+        df["oi_change_pct"] = np.round(df["open_interest_k"].pct_change().replace([np.inf, -np.inf], np.nan).fillna(0.0).values * 100.0, 4)
 
         # 12. Compute Mathematical Liquidations using Upgraded Model
         print("[PROCESSOR] Computing Mathematical Liquidations (Non-Linear Cascade + Funding Asymmetry)...")

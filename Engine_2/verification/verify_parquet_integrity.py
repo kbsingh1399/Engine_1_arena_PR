@@ -18,7 +18,9 @@ from typing import Dict, Any, List
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-def verify_all_parquets(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min") -> bool:
+DEFAULT_TARGET = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "binance_backtesting_data")
+
+def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
     print("=" * 90)
     print(f"PARQUET INTEGRITY & CONTINUITY AUDITOR")
     print(f"Target Directory: {target_dir}")
@@ -47,8 +49,10 @@ def verify_all_parquets(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pi
             cols = len(df.columns)
             size_mb = os.path.getsize(p_file) / (1024 * 1024)
 
-            # 1. Null / NaN Check
-            null_count = df.isnull().sum().sum()
+            # 1. Null / NaN & Infinite Values Check
+            null_count = int(df.isnull().sum().sum())
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            inf_count = int(np.isinf(df[num_cols].to_numpy()).sum()) if len(num_cols) > 0 else 0
             
             # 2. Timestamp Continuity Check
             if "open_time_ms" in df.columns:
@@ -69,19 +73,20 @@ def verify_all_parquets(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pi
                 num_gaps = 0
                 is_monotonic = True
 
-            # 4. Range Sanity Checks (where columns exist)
+            # 3. Range Sanity Checks (where columns exist)
             rsi_valid = bool((df["rsi_14"] >= 0.0).all() and (df["rsi_14"] <= 100.0).all()) if "rsi_14" in df.columns else True
             close_valid = bool((df["close"] > 0.0).all()) if "close" in df.columns else True
             liq_valid = bool((df["long_liq_usd"] <= 0.0).all() and (df["short_liq_usd"] >= 0.0).all()) if "long_liq_usd" in df.columns else True
 
-            status = "PASS" if (null_count == 0 and is_monotonic and rsi_valid and close_valid and liq_valid) else "FAIL"
+            # Strict Gate: num_gaps MUST be 0, inf_count MUST be 0, null_count MUST be 0
+            status = "PASS" if (null_count == 0 and inf_count == 0 and num_gaps == 0 and is_monotonic and rsi_valid and close_valid and liq_valid) else "FAIL"
             if status == "FAIL":
                 all_passed = False
 
             if "master" not in fname:
                 total_records += rows
 
-            print(f"[{status}] {fname:<36} | Rows: {rows:>7,} | Cols: {cols} | Size: {size_mb:5.2f} MB | Nulls: {null_count} | Gaps: {num_gaps} | Monotonic: {is_monotonic}")
+            print(f"[{status}] {fname:<36} | Rows: {rows:>7,} | Cols: {cols} | Size: {size_mb:5.2f} MB | Nulls: {null_count} | Infs: {inf_count} | Gaps: {num_gaps} | Monotonic: {is_monotonic}")
             if num_gaps > 0:
                 print(f"       -> Gap details (first 3): {[str(pd.to_datetime(timestamps[g], unit='ms', utc=True)) for g in gaps[:3]]}")
         except Exception as e:
@@ -95,6 +100,7 @@ def verify_all_parquets(target_dir: str = r"G:\My Drive\_Trading_Data\Binance_Pi
     return all_passed
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else r"G:\My Drive\_Trading_Data\Binance_Pipeline\15_Min"
+    target = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TARGET
     success = verify_all_parquets(target)
     sys.exit(0 if success else 1)
+

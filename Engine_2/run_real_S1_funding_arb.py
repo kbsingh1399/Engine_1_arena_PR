@@ -20,16 +20,8 @@ def zs(s, w):
     std = s.rolling(w, min_periods=max(2, w//4)).std().replace(0.0, 1e-8)
     return ((s - m) / std).clip(-5.0, 5.0).fillna(0.0)
 
-def compute_true_atr(df, period=14):
-    prev_close = df['close'].shift(1)
-    tr1 = df['high'] - df['low']
-    tr2 = (df['high'] - prev_close).abs()
-    tr3 = (df['low'] - prev_close).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    return tr.rolling(period, min_periods=1).mean()
-
 @njit(nogil=True)
-def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr, direction, max_bars=96):
+def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr, direction, max_bars=192):
     stop_dist = max(2.0 * atr, entry_price * 0.0065)
     cur_stop = entry_price - stop_dist if direction == 1 else entry_price + stop_dist
     best_price = entry_price
@@ -49,7 +41,8 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (highs[j] - entry_price) < 0.25 * stop_dist:
+            # Stagnation exit at 24h (96 bars) if no momentum
+            if bars_held == 96 and (highs[j] - entry_price) < 0.25 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -58,15 +51,18 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 best_price = highs[j]
                 gain = best_price - entry_price
                 
-                # 5R Trailing Ratchet: trail 1.0R behind peak price, locking in profits
+                # Dynamic Ratchet (Locks in profit & trails 5R runners)
                 if gain >= 5.0 * stop_dist:
-                    trail_px = entry_price + (gain - 1.0 * stop_dist)
+                    trail_px = entry_price + (gain - 0.5 * stop_dist)
                     if trail_px > cur_stop: cur_stop = trail_px
                 elif gain >= 3.5 * stop_dist:
                     new_stop = entry_price + 2.0 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
                 elif gain >= 2.2 * stop_dist:
-                    new_stop = entry_price + 0.3 * stop_dist # Cover fees
+                    new_stop = entry_price + 1.0 * stop_dist
+                    if new_stop > cur_stop: cur_stop = new_stop
+                elif gain >= 1.1 * stop_dist: # Breakeven fee shield
+                    new_stop = entry_price + 0.15 * stop_dist
                     if new_stop > cur_stop: cur_stop = new_stop
         else: # SHORT
             if highs[j] >= cur_stop:
@@ -74,7 +70,7 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 exit_offset = bars_held
                 break
                 
-            if bars_held == 48 and (entry_price - lows[j]) < 0.25 * stop_dist:
+            if bars_held == 96 and (entry_price - lows[j]) < 0.25 * stop_dist:
                 exit_price = closes[j]
                 exit_offset = bars_held
                 break
@@ -83,15 +79,17 @@ def simulate_single_trade_path(highs, lows, closes, entry_idx, entry_price, atr,
                 best_price = lows[j]
                 gain = entry_price - best_price
                 
-                # 5R Trailing Ratchet for Shorts: trail 1.0R behind peak price
                 if gain >= 5.0 * stop_dist:
-                    trail_px = entry_price - (gain - 1.0 * stop_dist)
+                    trail_px = entry_price - (gain - 0.5 * stop_dist)
                     if trail_px < cur_stop: cur_stop = trail_px
                 elif gain >= 3.5 * stop_dist:
                     new_stop = entry_price - 2.0 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
                 elif gain >= 2.2 * stop_dist:
-                    new_stop = entry_price - 0.3 * stop_dist
+                    new_stop = entry_price - 1.0 * stop_dist
+                    if new_stop < cur_stop: cur_stop = new_stop
+                elif gain >= 1.1 * stop_dist: # Breakeven fee shield
+                    new_stop = entry_price - 0.15 * stop_dist
                     if new_stop < cur_stop: cur_stop = new_stop
                     
     return exit_price, exit_offset
@@ -111,10 +109,13 @@ def gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig):
                 av = atrs[i]
                 if av > 0 and not np.isnan(av) and entry > 0 and not np.isnan(entry):
                     ep, offset = simulate_single_trade_path(
-                        highs, lows, closes, i, entry, av, int(dr), 96
+                        highs, lows, closes, i, entry, av, int(dr), 192
                     )
                     stop_dist = max(2.0 * av, entry * 0.0065)
-                    r_mult = (ep - entry) / stop_dist if dr == 1 else (entry - ep) / stop_dist
+                    gross_r = (ep - entry) / stop_dist if dr == 1 else (entry - ep) / stop_dist
+                    # Net R-multiple: strictly deduct roundtrip fees (9 bps) and slippage
+                    cost_r = (entry * 0.0014) / stop_dist
+                    r_mult = gross_r - cost_r
                     lb = 1.0 if r_mult >= 1.0 else 0.0
                     results.append((i, dr, ep, r_mult, lb, offset))
                     cd = i + max(offset, 1) + 2
@@ -268,7 +269,7 @@ def load_s1_dataset(feature_cols):
             break
             
     trades_list = []
-    cols_to_load = [
+    base_cols = [
         'datetime_utc', 'open', 'high', 'low', 'close', 'atr_14', 
         'funding_rate_pct', 'basis_usd', 'ls_ratio_top', 'future_cvd_15m', 
         'rsi_14', 'ema_50', 'ema_200', 'taker_volume_ratio', 'oi_change_pct', 'whale_index'
@@ -277,7 +278,11 @@ def load_s1_dataset(feature_cols):
     for f in files:
         sym = os.path.basename(f).split('_')[0]
         try:
-            df = pd.read_parquet(f, columns=cols_to_load)
+            # Dynamically detect optional provenance metadata columns
+            import pyarrow.parquet as pq
+            avail = pq.read_schema(f).names
+            load_cols = [c for c in base_cols + ['metrics_available', 'is_synthetic'] if c in avail]
+            df = pd.read_parquet(f, columns=load_cols)
             df['datetime_utc'] = pd.to_datetime(df['datetime_utc'], utc=True)
             df = df.sort_values('datetime_utc').reset_index(drop=True)
             
@@ -318,6 +323,12 @@ def load_s1_dataset(feature_cols):
             sig = np.zeros(len(df), dtype=np.int8)
             sig[mask_l] = 1
             sig[mask_s] = -1
+            
+            # Mask out periods without real exchange metrics or synthetic bars
+            if 'metrics_available' in df.columns:
+                sig[df['metrics_available'].to_numpy() == 0] = 0
+            if 'is_synthetic' in df.columns:
+                sig[df['is_synthetic'].to_numpy() == 1] = 0
             
             res = gen_symbol_trades(highs, lows, closes, next_opens, atrs, sig)
             if res:

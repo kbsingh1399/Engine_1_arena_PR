@@ -190,9 +190,12 @@ class BinanceHistoricalFetcher:
             print(f"[WARN] REST klines fetch failed for {symbol}: {e}")
 
         if not kline_dfs:
-            raise RuntimeError(f"No historical klines were fetched for {symbol}.")
+            raise RuntimeError(f"Failed to fetch any klines for {symbol}!")
 
         master_df = pd.concat(kline_dfs, ignore_index=True)
+        master_df["open_time"] = np.where(master_df["open_time"] > 2e12, master_df["open_time"] // 1000, master_df["open_time"])
+        if "close_time" in master_df.columns:
+            master_df["close_time"] = np.where(master_df["close_time"] > 2e12, master_df["close_time"] // 1000, master_df["close_time"])
         master_df.drop_duplicates(subset=["open_time"], inplace=True)
         master_df.sort_values(by="open_time", inplace=True)
         master_df.reset_index(drop=True, inplace=True)
@@ -210,20 +213,30 @@ class BinanceHistoricalFetcher:
                 start_gap_dt = datetime.fromtimestamp((prev_ms + 900_000) / 1000, tz=timezone.utc)
                 end_gap_dt = datetime.fromtimestamp((curr_ms - 900_000) / 1000, tz=timezone.utc)
                 date_range = pd.date_range(start_gap_dt.strftime("%Y-%m-%d"), end_gap_dt.strftime("%Y-%m-%d"), freq="D")
-                for d in date_range:
-                    ymd = d.strftime("%Y-%m-%d")
-                    daily_df = _get_daily_kline(ymd)
-                    if daily_df is not None and not daily_df.empty:
-                        daily_patch_dfs.append(daily_df)
-                        print(f"  [PATCH] Successfully retrieved daily klines for {symbol} {ymd} ({len(daily_df)} bars)")
+                if len(date_range) <= 60:
+                    for d in date_range:
+                        ymd = d.strftime("%Y-%m-%d")
+                        daily_df = _get_daily_kline(ymd)
+                        if daily_df is not None and not daily_df.empty:
+                            daily_patch_dfs.append(daily_df)
+                            print(f"  [PATCH] Successfully retrieved daily klines for {symbol} {ymd} ({len(daily_df)} bars)")
+                else:
+                    print(f"[WARN] Gap between {start_gap_dt} and {end_gap_dt} is {len(date_range)} days (>60 days). Skipping daily archive hammer.")
             
             if daily_patch_dfs:
                 kline_dfs.extend(daily_patch_dfs)
                 master_df = pd.concat(kline_dfs, ignore_index=True)
+                master_df["open_time"] = np.where(master_df["open_time"] > 2e12, master_df["open_time"] // 1000, master_df["open_time"])
+                if "close_time" in master_df.columns:
+                    master_df["close_time"] = np.where(master_df["close_time"] > 2e12, master_df["close_time"] // 1000, master_df["close_time"])
                 master_df.drop_duplicates(subset=["open_time"], inplace=True)
                 master_df.sort_values(by="open_time", inplace=True)
                 master_df.reset_index(drop=True, inplace=True)
-                print(f"[FETCHER] Post-patch total bars for {symbol}: {len(master_df):,}")
+                
+                # Post-patch gap audit
+                post_diffs = master_df["open_time"].diff()
+                post_gaps = int((post_diffs > 900_000).sum())
+                print(f"[FETCHER] Post-patch total bars for {symbol}: {len(master_df):,} | Residual Gaps: {post_gaps}")
 
         print(f"[FETCHER] Total Historical Klines loaded for {symbol}: {len(master_df):,} bars (From {datetime.fromtimestamp(master_df['open_time'].iloc[0]/1000, tz=timezone.utc)} to {datetime.fromtimestamp(master_df['open_time'].iloc[-1]/1000, tz=timezone.utc)})")
         return master_df

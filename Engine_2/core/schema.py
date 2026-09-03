@@ -90,6 +90,8 @@ CANONICAL_COLUMNS: List[str] = [
     "future_flow_source",     # string: TICK_EXACT or KLINE_APPROX
     "spot_flow_source",       # string: SPOT_EXACT or UNAVAILABLE
     "poc_source",             # string: TICK_EXACT or OHLC_APPROX
+    "is_synthetic",           # int8: 1 if kline bar was interpolated/ffilled across exchange downtime/outage, 0 if authentic market kline
+    "metrics_available",      # int8: 1 if real exchange metrics exist, 0 if prior to exchange collection
 ]
 
 COLUMN_DTYPES: Dict[str, str] = {
@@ -100,6 +102,8 @@ COLUMN_DTYPES: Dict[str, str] = {
     "future_flow_source": "string",
     "spot_flow_source": "string",
     "poc_source": "string",
+    "is_synthetic": "int8",
+    "metrics_available": "int8",
     "open": "float64",
     "high": "float64",
     "low": "float64",
