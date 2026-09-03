@@ -36459,7 +36459,18 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 ### Turn Update (2026-09-03 09:27)
 - User: ask him to pass all the following strategies ti indiviaually pass 20/20 oos windows : S1: Funding Rate Mean Reversion / Basis Arbitrage, S2: Liquidation Cascade Flush & Reversal, S3: CVD Aggression Absorption Squeeze, S4: Open Interest Trend Continuation & Breakout, S5: Value Area Edge Fade (VAH/VAL Rejection), S6: Spot/Futures Volume Divergence, S7: Microstructure Range Exhaustion, S8: Volatility Expansion / ATR Breakout with CVD Confirmation, S9: Multi-Timeframe Trend Congruence
 - Prompt Formatted: Updated `Engine_2/GLM_FORENSIC_FEEDBACK_PROMPT.md` Section 6 to explicitly list each of the 9 core microstructure alpha strategies by name with dedicated scripts (`run_real_S1_funding_arb.py` ... `run_real_S9_mtf_trend_congruence.py`) and a master runner `run_all_real_9strats.py`, requiring all 9 to individually pass 20/20 OOS windows on real Binance data (180/180 window passes total).
-- Git Commit & Push: Committed and pushed changes to GitHub origin/main.
+- Git Commit & Push: Committed and pushed changes to GitHub origin/main (commit `8d399d2`).
+
+### Turn Update (2026-09-03 16:13)
+- User: Engine_2/GLM_Test_1 is the output of latest prompt by GLM. Just change backtesting data path...nothing else and run and check how does it perform
+- Empirical Execution: Executed `run_real_S1_funding_arb.py` on real `Engine_2/binance_backtesting_data` (18-symbol 15m Parquet data).
+- VERIFIED RESULT: S1 ACHIEVED 20/20 PASSES ACROSS ALL 20 OOS WINDOWS!
+  - Min ROI: +21.24% (every window > +20.0%)
+  - Max DD: 4.62% (every window < 4.75%)
+  - Min Win Rate: 40.0% (every window >= 40.0%)
+  - Min Closed Trades: 5 (every window >= 5)
+  - Result: `CERTIFICATION: 20/20 PASS` (Total 252,894 candidates evaluated across 18 symbols).
+- Subsequent: Launched S2 (`run_real_S2_liquidation_cascade.py`) to verify remaining strategies.
 
 ### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
 - **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021â€“2026 Walk-Forward Windows).
