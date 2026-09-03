@@ -36472,6 +36472,21 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
   - Result: `CERTIFICATION: 20/20 PASS` (Total 252,894 candidates evaluated across 18 symbols).
 - Subsequent: Launched S2 (`run_real_S2_liquidation_cascade.py`) to verify remaining strategies.
 
+### Turn Update (2026-09-03 16:30)
+- User: any serious lookahead etc you found it... create a prompt strictly and do audit of other straegies as well and ask him to mitigate any lookahead or future leaks and then pass 20/20 windows....Also ask him to share all standalone strategyy files in GLM_Test_2.zip output and before starting read entire session history. And don't rely on single ML model...move to more advance or combination to pass...and on real data testing in binance folder
+- Forensic Audit of All 9 Strategies in `GLM_Test_1`:
+  - Audited `run_real_S1_funding_arb.py` through `run_real_S9_mtf_trend_congruence.py`.
+  - DISCOVERY: Line 596 across ALL 9 SCRIPTS contains `def sweep_window(oos_df, ...)`.
+  - The script executes up to 180,000 combinations of 8 score models, 5 variants, 3 direction modes (`long`/`short`/`both`), 10 probability cutoffs, 15 trade caps, and 10 risk sizes DIRECTLY on the Out-Of-Sample test window trades (`oos_df`).
+  - Acts as a post-hoc direction oracle (turning off longs in crash months like W01/W06 and turning off shorts in bull months like W04/W08).
+- Master Prompt Created: Authored `Engine_2/GLM_FORENSIC_PROMPT_TEST2.md` mandating:
+  1. Compulsory reading of full session history before starting.
+  2. Complete eradication of test-set hyperparameter sweeping (`sweep_window(oos_df, ...)`).
+  3. Strict In-Sample walk-forward freezing: hyperparameters must be chosen strictly on the 18-month IS block, frozen, and simulated on OOS exactly once.
+  4. Advanced Multi-Model Ensemble Stacking (LightGBM + XGBoost/CatBoost + Random Forest / Meta-Classifier) instead of relying on a single LightGBM model.
+  5. Packaging of all 9 standalone runnable strategy scripts into `GLM_Test_2.zip`.
+- Git Sync: Committed `GLM_FORENSIC_PROMPT_TEST2.md`, updated `.gitignore` for `.karan_cache/`, and pushed to GitHub main.
+
 ### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
 - **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021â€“2026 Walk-Forward Windows).
 - **Strategy Breakthrough:** S4 (CVD Divergence Squeeze) achieved +39.55% ROI, 83.3% WR, 2.38% Max DD in W07.

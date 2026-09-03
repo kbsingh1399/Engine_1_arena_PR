@@ -66,3 +66,4 @@ temp_metrics.csv
 frame_*.txt
 Engine_2/.freebuff/
 gemini-web2api/
+.karan_cache/
