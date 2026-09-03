@@ -36488,6 +36488,20 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
 - Git Sync: Committed `GLM_FORENSIC_PROMPT_TEST2.md`, updated `.gitignore` for `.karan_cache/`, and pushed to GitHub main (commit `c126486`).
 - Empirical Task-371 Finished: `run_real_S2_liquidation_cascade.py` finished. It also reported 20/20 PASS (+21.93% min ROI, 4.67% max DD, 46.2% min WR), confirming empirically that S2 relied on the exact same `sweep_window(oos_df, ...)` lookahead mechanism, switching directions (`d=sho` in downtrends, `d=lon` in uptrends) post-hoc on the test window.
 
+### Turn Update (2026-09-03 18:45)
+- User: Following is the output C:\Users\SIGMA\Downloads\GLM_Test_2. I think we need a more structured approach. Let's start fresh with GLM and arena.ai. GLM didn't passed right? May be write a prompt to target 1 strategy at a time. Also make Engine_1_arena_pr folder more structured and remove files which are not using or never use. delete Engine_2\GLM_Test_1 and clean Engine_2 and keep on main strategies and other part of terminal and pipeline download...rest delete junk files...And rename strategies from s1 onwards. While writing prompt add @.agents/rules/AGENTS.md instruction and push all to git so that glm and arena.ai can contact via git. Also update code-graph review and mcp server with all skills so that you can use all required. remove all md files from Engine_2. do we directly need them run_zscore_ensemble_walkforward.py, run_adaptive_regime_portfolio.py, etc... delete them..
+- GLM_Test_2 Audit: Inspected `C:\Users\SIGMA\Downloads\GLM_Test_2\GLM_Test_2\README.md`. Confirmed GLM honestly reported only 11/180 window passes under zero-lookahead In-Sample parameter freezing, acknowledging that the prior 180/180 was a pure OOS test-set snooping artifact.
+- Deep Cleanup & Refactoring:
+  1. Deleted `Engine_2/GLM_Test_1` and `.karan_cache`.
+  2. Removed `Engine_2/strategies_20x20` (30 synthetic data strategies).
+  3. Purged 30+ scratch debug scripts (`solve_*.py`, `inspect_*.py`, `test_*.py`, `trace_*.py`).
+  4. Purged legacy portfolio runners: `run_zscore_ensemble_walkforward.py`, `run_adaptive_regime_portfolio.py`, `run_all_strategies_parallel.py`, `run_conquest_20_20.py`, `run_ensemble_top5_walkforward.py`, `run_master_portfolio_walkforward.py`, `run_multi_strategy_portfolio_walkforward.py`, `run_optimal_regime_matrix.py`.
+  5. Kept core infrastructure: `run_historical_pipeline.py`, `run_live_terminal.py`, `binance_backtesting_data/`, `pipeline/`, `live/`, `core/`.
+  6. Renamed strategy suite cleanly: `s1_liquidation_cascade.py` through `s9_vwap_profile_conviction.py`.
+  7. Removed all `.md` files from `Engine_2`.
+- Knowledge Graph Sync: Ran `build_or_update_graph_tool` and `run_postprocess_tool` (116,268 symbols FTS indexed, 9,581 flows, 43 communities).
+- Arena.ai & GLM Master Prompt: Created `ARENA_GLM_S1_PROMPT.md` targeting Strategy S1 (Funding Rate Mean Reversion / Basis Arbitrage) 1-strategy-at-a-time, enforcing all `.agents/rules/AGENTS.md` directives (Karpathy principles, causal execution, IS parameter freezing, 5R target, 2 concurrent positions, raw GitHub URLs).
+
 ### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
 - **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021â€“2026 Walk-Forward Windows).
 - **Strategy Breakthrough:** S4 (CVD Divergence Squeeze) achieved +39.55% ROI, 83.3% WR, 2.38% Max DD in W07.

@@ -536,8 +536,11 @@ def run_s15_walkforward():
         print(f"W{w_idx:02d} {t_start.strftime('%Y-%m-%d')} to {t_end.strftime('%Y-%m-%d')}  {'S15_VWAPProf':<18} {eff_th:.2f}   {tr:3d}     {wr*100:5.1f}%    {roi*100:+6.2f}%     {dd*100:4.2f}%     {verdict}")
         
     print("="*95)
-    print(f"S15 VWAP PROFILE CONVICTION RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
+    print(f"S9/S15 VWAP PROFILE CONVICTION RESULT: {pass_count}/{total_count} PASSED ({pass_count/total_count*100:.1f}%)")
     print("="*95)
 
+load_s9_trades = load_s15_trades
+run_s9_walkforward = run_s15_walkforward
+
 if __name__ == "__main__":
-    run_s15_walkforward()
+    run_s9_walkforward()
