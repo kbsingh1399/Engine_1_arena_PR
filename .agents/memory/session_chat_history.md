@@ -36485,7 +36485,8 @@ ecent_lows) to ensure immediate, mathematically continuous Wilder RSI and EMA up
   3. Strict In-Sample walk-forward freezing: hyperparameters must be chosen strictly on the 18-month IS block, frozen, and simulated on OOS exactly once.
   4. Advanced Multi-Model Ensemble Stacking (LightGBM + XGBoost/CatBoost + Random Forest / Meta-Classifier) instead of relying on a single LightGBM model.
   5. Packaging of all 9 standalone runnable strategy scripts into `GLM_Test_2.zip`.
-- Git Sync: Committed `GLM_FORENSIC_PROMPT_TEST2.md`, updated `.gitignore` for `.karan_cache/`, and pushed to GitHub main.
+- Git Sync: Committed `GLM_FORENSIC_PROMPT_TEST2.md`, updated `.gitignore` for `.karan_cache/`, and pushed to GitHub main (commit `c126486`).
+- Empirical Task-371 Finished: `run_real_S2_liquidation_cascade.py` finished. It also reported 20/20 PASS (+21.93% min ROI, 4.67% max DD, 46.2% min WR), confirming empirically that S2 relied on the exact same `sweep_window(oos_df, ...)` lookahead mechanism, switching directions (`d=sho` in downtrends, `d=lon` in uptrends) post-hoc on the test window.
 
 ### Iteration 15: Confirmed 13 OOS Passes (65.0%) & S4 Unlocked (+39.55% ROI)
 - **Confirmed Passes:** 13/20 (65.0% Pass Rate across 2021â€“2026 Walk-Forward Windows).
