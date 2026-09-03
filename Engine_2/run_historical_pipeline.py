@@ -73,8 +73,20 @@ def run_pipeline(
             print(f"Error: Invalid start_date format '{start_date_str}'. Use YYYY-MM-DD.")
             return False
             
-    # For daily metrics fallback, use start_date_str if provided
     metrics_start = start_date_str if start_date_str else "2020-09-01"
+
+    # Fast Skip Check: If valid Master & Ladder Parquets already exist, skip redundant extraction
+    master_file = os.path.join(target_dir, f"{symbol}_15m_master_2020_2026.parquet")
+    ladder_file = os.path.join(target_dir, f"{symbol}_15m_footprint_ladder.parquet")
+    if os.path.exists(master_file) and os.path.exists(ladder_file):
+        try:
+            m_sample = pd.read_parquet(master_file, columns=["open_time_ms"])
+            l_sample = pd.read_parquet(ladder_file, columns=["open_time_ms"])
+            if len(m_sample) > 1000 and len(l_sample) > 1000:
+                print(f"[SKIP] {symbol} already fully processed and verified ({len(m_sample):,} master bars, {len(l_sample):,} ladder rungs). Skipping.")
+                return True
+        except Exception:
+            pass
 
     print("=" * 100)
     print(f"BINANCE 15M HISTORICAL DATA PIPELINE: {symbol} (2020 -> PRESENT)")
@@ -169,7 +181,17 @@ def run_pipeline(
         df_missing = master_df[missing_mask].copy()
         median_px = master_df["close"].median()
         raw_step = median_px * 0.00035
-        daily_bin_step = max(round(raw_step, 2), 1e-4)
+        if raw_step >= 1.0:
+            daily_bin_step = round(raw_step, 1)
+        elif raw_step >= 0.1:
+            daily_bin_step = round(raw_step, 2)
+        elif raw_step >= 0.01:
+            daily_bin_step = round(raw_step, 3)
+        elif raw_step >= 0.001:
+            daily_bin_step = round(raw_step, 4)
+        else:
+            daily_bin_step = round(raw_step, 6)
+        daily_bin_step = max(daily_bin_step, 1e-6)
 
         l_vals = df_missing["low"].values
         h_vals = df_missing["high"].values
