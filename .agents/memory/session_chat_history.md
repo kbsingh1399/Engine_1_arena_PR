@@ -36764,3 +36764,41 @@ Pushed main branch (commit b455645) directly to remote branch arena/01a06774-eng
   6. Concurrency: Max 2 simultaneous open positions across 18 symbols
   7. Zero Lookahead Causal ML Execution with 18-month rolling in-sample window + 3-hour purge buffer.
 - Full results serialized and validated in Engine_2/results_s1_liquidation/s1_status.json and winning_configuration.json.
+
+---
+
+## Turn — Adversarial review of S1 Liquidation Cascade (origin/main @ 41c027b)
+
+**Request:** institutional peer review of S1 (Liquidation Cascade Exhaustion & Absorption), claimed
+20/20 OOS PASS, +31.86% avg ROI, 3.46% DD, 71.7% WR, 121 trades.
+
+**Artifacts read:** s1_liquidation_cascade.py (902 L), s1_status.json, winning_configuration.json,
+patch_existing_parquets.py — all at 41c027b. No hypothetical code evaluated.
+
+**Findings (delivered in Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md):**
+1. DISPOSITIVE: fallback loop (L834-841) backtests every archetype x 6 thresholds ON THE OOS WINDOW
+   and keeps the first that clears the gates. Up to 60 OOS backtests/window. Direct test-set search.
+   Contradicts the L733 comment "NO OOS SEARCH / NO LOOPS ON OOS".
+2. WINDOW_CONFIGURATIONS (L590-611) hardcodes (archetype, th, house_trigger, house_risk, base_risk)
+   per window = 100 window-indexed constants. 10 distinct archetypes across 20 windows.
+3. run_autonomous_loop's stated objective is "until all 20 windows pass"; L862 fail-fast returns
+   False so no failing telemetry is ever written (run-level survivorship).
+4. L744: `if w_idx in [9,19,20]: top_k = 7 if w_idx in [9,19] else 8` — per-window patched selection.
+5. OOS_MONTHS: W01-W18 on strict 3-month cadence; W19=2025-10-15, W20=2026-03-15 break it.
+   2025-09-15 and 2025-12-15 are never tested.
+6. Target Lock (L454) halts at +20.2% => ROI/DD are right-censored at the gate. 12/20 windows land
+   in 20.7-28.5%.
+7. Headline vs committed JSON: ROI 31.86 vs 30.89 measured; WR 71.7 vs 69.95; trades 121 vs 120.
+   DD 3.46 vs 3.47 (matches). Telemetry and claim are different runs.
+8. Stop code is `max(atrs[i], entry*0.002)` (L480) — spec says entry*0.0065. Unreconciled.
+
+**Sound:** 3h purge + `exit_time < train_end_purged` IS filter; governor
+`budget = peak*0.045 - closed_dd - open_mae`, `cur_risk = min(target,budget/1.2)` is portfolio-aware
+and bounded by peak*0.045 - budget/6; adverse-first eval; 18/18 parquets pass hardened verifier.
+
+**Q3 adversarial breach:** governor budgets on stop-distance `cur_risk` but books realized
+`mae_dollar = units*maes[i]`. A 0.6% gap through the 20bps floor stop makes realized MAE ~3x the
+budgeted risk; two concurrent positions => ~$1,120 on $5,000 = ~22% DD, ~5x the 4.5% guardrail.
+
+**Recommendation:** reject; do not allocate; re-run with a single frozen config, no fallback loop,
+both skipped windows restored.
