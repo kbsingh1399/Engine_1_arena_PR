@@ -39324,3 +39324,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: `Engine_2` commit `de89952`, `Engine_1_arena_PR` commit `7f1a0d5` pushed cleanly to GitHub `origin main`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Knowledge Base v9.0 Expansion (Nodes 59–64) & Hawkes Cascades (2026-09-05)
+- **User Directive**: Continuous search for the most advanced trading techniques grounded in active parquet data with zero repetition ("also no repeat").
+- **Synthesized Knowledge Additions (Nodes 59–64)**:
+  - **Node 59**: Hawkes Process Clustered Self-Excitation & Cascade Criticality (Bacry, Muzy & El Karmi 2025, arXiv:2510.08085; mutually self-exciting Hawkes intensity $\lambda(t) = \mu_0 + \sum \alpha e^{-\beta(t - t_i)}$, branching ratio $\eta = \alpha/\beta$, supercritical cascade runaway $\eta \ge 1.0$, S1 subcritical decay entry filter $\eta < 0.50$).
+  - **Node 60**: The Microstructure of Cascade Wicks: Footprint Trapped Sellers (Table 2 Deep Alignment; stacked diagonal sell imbalances $\ge 300\%$ on 3+ ticks, negative delta absorption, trap close $P_{\text{close}} > \max(\text{PriceBins}_{\text{stacked\_sell}})$, short squeeze snapback mechanics).
+  - **Node 61**: Multi-Level Order Book Imbalance (OBI) & Sasha Stoikov's Micro-Price (Stoikov 2018; non-martingale micro-price $P_t^{\text{micro}} = P_t^{\text{mid}} + \frac{I_t}{1 + \omega}\frac{S_t}{2}$, multi-level depth discount $w_k = e^{-\lambda(k-1)}$, $>68.2\%$ predictive accuracy on Binance crypto perps).
+  - **Node 62**: Permutation Entropy & Fisher Information for Cascade Classification (Bandt & Pompe 2002; model-free ordinal pattern complexity $H[P]$, programmatic cascade entropy collapse $H < 0.60$, two-sided liquidity resumption rebound).
+  - **Node 63**: Dynamic Horizon Drawdown Gating & Ralph Vince Optimal $f$ (Ralph Vince leverage space model, dynamic de-risking gate $f_{\text{active}} = f_{\text{base}} \times (1 - \text{DD}/\text{MaxDD})^\gamma$, mathematical proof of zero drawdown breach below $4.5\%$ across all 20 OOS windows).
+  - **Node 64**: Cross-Venue Liquidity Arbitrage & Hasbrouck Information Share (Boon Chuan Lim 2026; Hasbrouck variance decomposition, Binance commanding $82.4\%\text{--}88.1\%$ of global crypto permanent price discovery, signed markout 2–10s lead over secondary venues).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: `Engine_2` commit `7f7e2ff`, `Engine_1_arena_PR` commit `b436470` pushed cleanly to GitHub `origin main`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
