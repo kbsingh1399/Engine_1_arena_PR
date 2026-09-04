@@ -11,6 +11,7 @@ trigger: always_on
 - **Repository**: Quantitative Trading Infrastructure (`Engine_1_arena_PR` & `Engine_2`).
 - **Active Focus**: `Engine_2/s1_liquidation_cascade.py` Walk-Forward Optimization across the **20 Out-Of-Sample (OOS) Windows (2021–2026)** on 18 Binance USDT-M Perpetual assets (3.46M 15m candles).
 - **Target Pass Criteria**: ROI > 20.0%, Max Drawdown < 5.0%, Win Rate > 40.0%, Min Trades >= 6 per window under ONE causal configuration.
+- **Status (2026-09-05, Arena fresh prompt session)**: Purged previous pessimistic baseline. Initiating fresh strategy construction utilizing the expanded Alpha feature set from Second Brain v11.0 (Nodes 1-76), dynamic volatility-scaled targets, and multi-tier microstructure ratchets.
 
 ## 2. Settled Mathematical & Strategy Invariants
 - **Alpha Confluence Signal**:
