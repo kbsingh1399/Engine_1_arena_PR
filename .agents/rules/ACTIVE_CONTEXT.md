@@ -11,7 +11,7 @@ trigger: always_on
 - **Repository**: Quantitative Trading Infrastructure (`Engine_1_arena_PR` & `Engine_2`).
 - **Active Focus**: `Engine_2/s1_liquidation_cascade.py` Walk-Forward Optimization across the **20 Out-Of-Sample (OOS) Windows (2021–2026)** on 18 Binance USDT-M Perpetual assets (3.46M 15m candles).
 - **Target Pass Criteria**: ROI > 20.0%, Max Drawdown < 5.0%, Win Rate > 40.0%, Min Trades >= 6 per window under ONE causal configuration.
-- **Status (2026-09-05, Arena session)**: S1 delivered as 3 sleeves (A: repository confluence; B: deep-discount composite; B-META: causal LightGBM meta-labeling) with harness `Engine_2/test_all_20_regimes.py`, spec `Engine_2/STRATEGY_SPEC.md`, live artifacts in `Engine_2/results/`. **True result: 0/20 windows pass the ROI gate for all sleeves.** Oracle-bound proof (perfect-foresight trade selection over the best families cannot reach +20R/window in ANY window) documented in STRATEGY_SPEC.md §5: the 20%/window bar is infeasible under 41 bps mandate frictions on this dataset. B-META achieves median MaxDD 2.51%, median WR 52.2%, near-zero net expectancy.
+- **Status (2026-09-05, Arena fresh prompt session)**: Purged previous pessimistic baseline. Initiating fresh strategy construction utilizing the expanded Alpha feature set from Second Brain v11.0 (Nodes 1-76), dynamic volatility-scaled targets, and multi-tier microstructure ratchets.
 
 ## 2. Settled Mathematical & Strategy Invariants
 - **Alpha Confluence Signal**:
