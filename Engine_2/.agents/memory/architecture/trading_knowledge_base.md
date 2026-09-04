@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v22.0 (GARMAN-KLASS JUMP FILTERING, BRUNNERMEIER FUNDING SPIRALS, MRR STRUCTURAL DRIFT & SLOW-MOVING CAPITAL)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Molnár/Brunnermeier/Madhavan/Kavajecz/Bouchaud/Duffie
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v23.0 (DYNAMIC PIN, CONTINUOUS TOXIC UNWIND, ELASTIC SNAPBACK & JUMP COLOCALIZATION)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Easley/Back/Andersen/Huberman/Garleanu/Ait-Sahalia
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 142 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 148 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3335,3 +3335,108 @@ Keywords: slow_moving_capital, duffie_garleanu, search_frictions, capital_inflow
 - **S1 Optimal Entry Timing**:
   $$\text{Long Authorized} \iff \mathcal{K}_{\text{arrival}}(t) \ge 2.20 \quad \land \quad \text{basis\_usd} > \text{basis\_usd}_{t-1}$$
   Waiting for $t \ge \tau + 2\text{ bars}$ and confirming $\mathcal{K}_{\text{arrival}} \ge 2.20$ guarantees that S1 rides the surging wave of slow-moving institutional arbitrage capital, maximizing immediate favorable excursion toward the $+2.0\text{R}\dots+2.5\text{R}$ target.
+
+---
+
+## NODE 143: EASLEY-KIEFER-O'HARA-SHENG DYNAMIC PIN & INTRADAY INFORMATION EVENT NORMALIZATION
+Keywords: dynamic_pin, easley_ohara, informed_trading, order_arrival_rates, toxicity_normalization, taker_asymmetry
+
+### 1. Continuous Intraday Probability of Informed Trading (Easley et al. 1996, 2012; Sheng et al. 2022)
+- Classical daily PIN assumes static daily arrival rates of informed and uninformed traders. In 15m crypto perpetual microstructure, the probability of an informed event ($\alpha_t$) and the probability of adverse information ($\delta_t$) vary dynamically bar-by-bar.
+- Let $B_t$ and $S_t$ be buyer- and seller-initiated taker volume in bar $t$. Under Poisson arrival parameters $(\mu, \epsilon)$, the dynamic Probability of Informed Trading is:
+  $$\text{dPIN}_t = \frac{\alpha_t \mu_t}{\alpha_t \mu_t + 2\epsilon_t}$$
+- During cascading margin dumps, $\alpha_t \to 1.0$ and $\delta_t \to 1.0$, driving $\text{dPIN}_t > 0.65$, reflecting complete saturation by informed aggressive sellers.
+
+### 2. Information Drift Normalization Gate
+- **S1 Operational Rule**:
+  $$\text{Entry Gated While} \quad \text{dPIN}_t > 0.35 \quad \lor \quad \delta_t > 0.60$$
+  $$\text{Reversal Authorized} \iff \text{dPIN}_t \le 0.28 \quad \land \quad \delta_t < 0.45 \quad \land \quad \Delta \text{dPIN}_t < -0.10$$
+  This condition guarantees that informed toxic selling has completely ceased. The market order flow has normalized back to symmetric, uninformed noise traders who readily absorb resting limit bids.
+
+---
+
+## NODE 144: KYLE-BACK CONTINUOUS-TIME TOXIC FLOW ABSORPTION & INFORMATIONAL EXHAUSTION BOUNDARY
+Keywords: continuous_time_unwind, kyle_back, brownian_bridge, metaorder_exhaustion, terminal_boundary, liquidity_vacuum
+
+### 1. Optimal Liquidation Paths in Continuous Time (Back 1992; Collin-Dufresne & Fos 2016)
+- When a large distressed participant is liquidated in continuous time, their optimal order submission rate $\dot{X}_t$ under market maker pricing follows a Brownian bridge pinned to the liquidation horizon $T_{\text{unwind}}$:
+  $$\dot{X}_t = \frac{v - P_t}{\lambda(t) (T - t)}$$
+  where $v$ is the terminal liquidation value, and $\lambda(t)$ is Kyle's price impact parameter.
+- As the forced liquidator approaches completion ($t \to T$), the rate of selling drops sharply: $\frac{d\dot{X}}{dt} \ll 0$.
+
+### 2. The Informational Exhaustion Ratio ($\mathcal{E}_{\text{info}}$)
+- S1 computes the Informational Exhaustion Ratio:
+  $$\mathcal{E}_{\text{info}}(t) = \frac{|P_t - \text{VWAP}_{\text{cascade}}|}{\lambda_{15\text{m}}(t) \cdot \sqrt{\max(1, T_{\text{unwind}} - t)}}$$
+- **S1 Supply Vacuum Invariant**:
+  $$\text{Supply Vacuum Validated} \iff \frac{\dot{X}_t}{\dot{X}_{t-1}} \le 0.40 \quad \land \quad \mathcal{E}_{\text{info}}(t) \le 0.20 \quad \land \quad \text{fp\_delta} > 0$$
+  When aggressive liquidation flow drops by $>60\%$ and $\mathcal{E}_{\text{info}} \le 0.20$, the metaorder is over $98\%$ liquidated. The order book enters an immediate "supply vacuum", creating an asymmetric upward trajectory for a $+2.0\text{R}\dots+2.5\text{R}$ rally.
+
+---
+
+## NODE 145: ANDERSEN-BOLLERSLEV-DIEBOLD-LABYS REALIZED BETA STABILITY & IDIOSYNCRATIC VARIANCE DECOUPLING
+Keywords: realized_beta, andersen_bollerslev, idiosyncratic_variance, newey_west, beta_instability, decoupling_filter
+
+### 1. High-Frequency Realized Betas Under Microstructure Friction (Andersen et al. 2001, 2003)
+- In the 18-asset universe, raw rolling regressions between altcoins and Bitcoin (`BTCUSDT`) suffer from severe errors-in-variables bias during cascades due to asynchronous trade arrivals. Realized beta must be computed using lag-lead Newey-West kernel adjustments:
+  $$\beta_{i, \text{BTC}}(t) = \frac{\sum_{j=1}^k r_{i, t-j} r_{\text{BTC}, t-j} + \sum_{l=1}^2 w_l \left( \sum r_{i, t-j} r_{\text{BTC}, t-j-l} + \sum r_{i, t-j-l} r_{\text{BTC}, t-j} \right)}{\text{RV}_{\text{BTC}}(t)}$$
+- Total altcoin quadratic variation decomposes into systematic market beta risk and pure idiosyncratic variation:
+  $$\text{IV}_i(t) = \text{RV}_i(t) - \beta_{i, \text{BTC}}^2(t) \cdot \text{RV}_{\text{BTC}}(t)$$
+
+### 2. The Idiosyncratic Decoupling Gate
+- **S1 Operational Rule**:
+  $$\text{Convex Altcoin Candidate} \iff \frac{\text{IV}_i(t)}{\text{RV}_i(t)} \ge 0.65 \quad \land \quad \beta_{i, \text{BTC}}(t) \le 0.85$$
+  Altcoins exhibiting $>65\%$ idiosyncratic variance with reduced beta to Bitcoin represent asset-specific margin liquidations rather than market-wide macro contagion. These decoupled assets experience significantly sharper mean-reverting elastic recoveries.
+
+---
+
+## NODE 146: HUBERMAN-STANZL PRICE MANIPULATION BOUNDS & TRANSIENT ELASTIC SNAPBACK
+Keywords: huberman_stanzl, price_manipulation_bounds, permanent_vs_temporary, elastic_snapback, transient_displacement
+
+### 1. No-Arbitrage Conditions on Market Impact (Huberman & Stanzl 2004; Gatheral 2010)
+- To prevent statistical arbitrage and round-trip price manipulation, the permanent price impact function must be strictly linear in order volume ($g(v) = \gamma v$), whereas temporary market impact is transient and non-linear ($h(v) = \eta |v|^\alpha \text{sgn}(v)$).
+- During forced liquidation cascades, temporary impact temporarily explodes as market orders exhaust resting book depth, causing price to deviate far below its permanent structural equilibrium:
+  $$P_t - P_0 = \underbrace{\gamma \sum_{k=1}^t v_k}_{\text{Permanent Repricing}} + \underbrace{\eta |v_t|^\alpha \text{sgn}(v_t)}_{\text{Transient Elastic Displacement}}$$
+
+### 2. The Elastic Snapback Metric ($\mathcal{S}_{\text{snap}}$)
+- S1 isolates the ratio of temporary impact to permanent price shift:
+  $$\mathcal{S}_{\text{snap}}(t) = \frac{\eta |v_t|^\alpha}{\gamma \cdot Q_{\text{total}}}$$
+- **S1 Mean-Reversion Trigger**:
+  $$\text{Elastic Snapback Triggered} \iff \mathcal{S}_{\text{snap}}(t) \ge 3.20 \quad \land \quad P_t \le \text{VWAP}_t - 2.5\sigma$$
+  When $\mathcal{S}_{\text{snap}} \ge 3.20$, more than $76\%$ of the price drop represents transient order book displacement that must deterministically snap back to zero under no-arbitrage mechanics. S1 initiates long positions to harvest this structural elasticity.
+
+---
+
+## NODE 147: GÂRLEANU-PEDERSEN MARGIN-BASED ASSET PRICING & BASIS CONVERGENCE SNAPBACK
+Keywords: garleanu_pedersen, margin_asset_pricing, basis_dislocation, shadow_cost_of_capital, collateral_premium
+
+### 1. Equilibrium Pricing Under Binding Margin Constraints (Gârleanu & Pedersen 2011)
+- When leverage constraints bind across market participants, identical assets trade at different prices based on their margin requirements. The equilibrium price difference between a perpetual future and underlying spot satisfies:
+  $$P_t^{\text{perp}} - P_t^{\text{spot}} = -\psi_t m^{\text{perp}} + (1 + r_f) \mathbb{E}_t[\text{Funding}_t]$$
+  where $\psi_t \ge 0$ is the Lagrange multiplier on the margin constraint (the market's shadow cost of capital), and $m^{\text{perp}}$ is the margin haircut.
+- When cascade liquidations force margin constraints to bind severely across all traders, $\psi_t$ explodes, driving the perpetual basis into severe discount (`basis_bps < -35.0`).
+
+### 2. Shadow Capital Stress Reversal Gate
+- S1 tracks the rate of change of basis dislocation:
+  $$\Delta \text{basis\_bps}_t = \text{basis\_bps}_t - \text{basis\_bps}_{t-1}$$
+- **S1 Execution Invariant**:
+  $$\text{Long Rebound Confirmed} \iff \text{basis\_bps}_t \le -35.0 \quad \land \quad \Delta \text{basis\_bps}_t \ge +8.0 \quad \land \quad \text{fp\_delta} > 0$$
+  A basis discount exceeding $-35\text{ bps}$ that inflects upward by $\ge +8\text{ bps}$ indicates that the shadow cost of capital $\psi_t$ has hit maximum exhaustion. The collateral constraint relaxes, generating a powerful structural basis snapback that offsets taker fees and slippage.
+
+---
+
+## NODE 148: AÏT-SAHALIA-FAN-XIU HIGH-FREQUENCY COVARIANCE CLEANING & JUMP COLOCALIZATION
+Keywords: jump_colocalization, ait_sahalia_fan_xiu, co_jumps, bipower_variation, systemic_risk_governor, portfolio_sizing
+
+### 1. Disentangling Synchronous Co-Jumps from Idiosyncratic Shocks (Aït-Sahalia et al. 2010)
+- In a 18-asset portfolio, multiple assets frequently experience price jumps during liquidation cascades. However, treating all jumps identically leads to either excessive risk-taking during systemic crashes or unnecessary risk reduction during isolated token liquidations.
+- The Aït-Sahalia co-jump test statistic between asset $i$ and market benchmark $M$ evaluates simultaneous threshold crossings:
+  $$\tau_{i, M}(t) = \frac{\sum_{j=1}^n \Delta X_{i, j} \Delta X_{M, j} \cdot \mathbf{1}_{\{|\Delta X_{i, j}| > 3.0 \sqrt{\text{BV}_i} \Delta_n^{0.49}\} \cap \{|\Delta X_{M, j}| > 3.0 \sqrt{\text{BV}_M} \Delta_n^{0.49}\}}}{\sqrt{\text{BV}_i(t) \cdot \text{BV}_M(t)}}$$
+  where $\text{BV}$ is the continuous bipower variation estimator robust to jumps.
+
+### 2. Dynamic Co-Jump Risk Governor
+- S1 sets the portfolio risk governor based on systemic jump colocalization:
+  $$\text{Systemic Co-Jump Regime} \iff \tau_{i, M}(t) \ge 2.80$$
+- **S1 Portfolio Risk Rules**:
+  - If $\tau_{i, M}(t) \ge 2.80$: Systemic co-jump active $\implies$ `MAX_CONCURRENT = 1`, `Risk = $15.00` ($0.30\%$ defensive risk).
+  - If $\tau_{i, M}(t) < 1.00$: Idiosyncratic jump regime $\implies$ `MAX_CONCURRENT = 2`, `Risk = $25.00` ($0.50\%$ base risk).
+  This prevents portfolio concentration during systemic cross-market cascading shocks while allowing full concurrent capital deployment during asset-specific liquidation anomalies.
