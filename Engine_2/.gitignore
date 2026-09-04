@@ -8,8 +8,21 @@ data_cache/
 cache/
 .freebuff/
 graphify-out/
+*/graphify-out/cache/
+.agents/graphify-out/cache/
 
 # Logs and temp files
 *.log
 *.tmp
 temp_metrics.csv
+
+# Environment & Virtual environments
+.env
+*_secrets.*
+.venv/
+venv/
+
+# Heavy external suites & skills (canonical in Engine_1_arena_PR)
+.agents/skills/
+.agents/claude-code-leaked/
+.agents/fazxes-claude-code/
