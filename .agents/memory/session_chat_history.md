@@ -37530,3 +37530,29 @@ User queried start/end dates for Table 1 vs Table 2. Clarified that Table 1 cove
 User requested footprint ladder data since the beginning (2020). Probed Binance Vision: confirmed that BOTH daily and monthly aggTrades archives are 100% available (HTTP 200) dating back to 2020-09-01 across all symbols. Benchmarked download and extraction: 2020-09-01 daily is 1.25 MB and monthly is 33 MB. Formulated solution using monthly aggTrades downloader to synthesize Table 2 since 2020.
 
 Purged all data from binance_backtesting_data as instructed. Fixed operator precedence: (df[is_synthetic] == 1) | degenerate. Embedded strict assertions into verify_parquet_integrity.py. Enforced Table 2 export timestamps strictly bounded by Table 1. Pushed commit 13fb3da to main and arena branches. Launched fresh clean pipeline for ETHUSDT (task-4397).
+
+---
+Master Router Activation Hub Complete Harmonization (/orchestrate):
+User Prompt:
+"Route all such files to @[.agents/rules/AGENTS.md] so that If i instanitiated agent.md then all files will get activated"
+
+Outcome & Actions:
+1. Expanded Part 0 Master Activation & Routing Hub to encompass all 12 institutional domains across the repository:
+   - Domain 1: Autonomous Bug Hunt & Live Checklists ([FABLE5_CHECKLIST.md])
+   - Domain 2: Session Chat & Persistent Memory ([.agents/memory/session_chat_history.md], [MEMORY.md])
+   - Domain 3: Institutional Forensic Reviews & Parity Baselines ([Opus_5.md], [S1_LIQUIDATION_CASCADE_REVIEW.md], [PARITY_AUDIT_REPORT.md], [coinglass_parity_verification.md])
+   - Domain 4: Council Directives & Arena.ai Prompts ([MASTER_COUNCIL_REVIEW_PROMPT.md], [ARENA_GLM_S1_PROMPT.md], [ARENA_PROMPT.md])
+   - Domain 5: Anti-Lookahead & Zero-Hallucination Blacklist ([AGENTS.md Part 12], [FABLE5_CHECKLIST.md Part 14])
+   - Domain 6: Deterministic Indicator Math & Knowledge Contracts ([.okf/OKF_INDEX.md])
+   - Domain 7: Consolidated Master Rules & Universal Skills ([MASTER_RULES.md], [UNIVERSAL_SKILL_ROUTER.md], [karpathy-guidelines], [clean-code])
+   - Domain 8: System Architecture, Repository Maps & Tech Debt ([.agents/ARCHITECTURE.md], [ponytail.md], [INSTALL_SKILLS.md])
+   - Domain 9: In-App Reticle UI Verification ([AGENTS.md (Root Reticle Section)], [RETICLE.md])
+   - Domain 10: 18-Asset Master Historical Parquet Data Architecture ([Engine_2/binance_backtesting_data/])
+   - Domain 11: Strategy Verification & Walk-Forward Optimization Engines ([s1_liquidation_cascade.py], [test_all_20_regimes.py], [test_causal_concurrency_fix.py], [S1_INSTITUTIONAL_20_20_REMEDIATION_PLAN.md])
+   - Domain 12: Persona & Execution Overrides ([GEMINI.md])
+2. Synchronized across all 4 key entrypoint files:
+   - .agents/rules/AGENTS.md (Central nervous system)
+   - C:/Users/SIGMA/.gemini/config/rules/AGENTS.md (Global configuration mirror)
+   - AGENTS.md (Repository root mirror)
+   - agent.md & .agents/rules/agent.md (Direct activation aliases routing directly into AGENTS.md)
+3. Evaluated live background task-5662: Causal walk-forward with expanded candidate pool (K=25) yielded dynamic live metrics (e.g. Window 02 passed: +35.6% ROI, 4.48% MaxDD, 63.6% WR, 11 trades) without any lookahead or lookup tables.
