@@ -27,3 +27,18 @@ This repository is instrumented by **Reticle**, an in-app verification layer exp
      - Win Rate > 40.0%
      - 5R Trailing Stop Mandate
 2. **Portfolio Concurrency**: Max 2 simultaneous open positions across all 18 parallel symbols.
+
+---
+
+## 🔴 Master Agent Enforcement Router
+This repository is governed by the centralized master agent router at:
+👉 **[.agents/rules/AGENTS.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/AGENTS.md)**
+
+Instantiating `AGENTS.md` automatically activates:
+- **Autonomous Bug Hunt & CDP Protocols**: [.agents/rules/FABLE5_CHECKLIST.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/FABLE5_CHECKLIST.md)
+- **Institutional Forensic Reviews & Audit Baselines**: [Opus_5.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Opus_5.md) & [Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md)
+- **Anti-Lookahead & Zero-Hallucination Checklist**: [.agents/rules/AGENTS.md Part 12](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/AGENTS.md#L309)
+- **Session Memory & Transcript Sync**: [.agents/memory/session_chat_history.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/memory/session_chat_history.md) & [.agents/memory/MEMORY.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/memory/MEMORY.md)
+- **Deterministic Indicator Contracts**: [.okf/OKF_INDEX.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.okf/OKF_INDEX.md)
+- **Omni Execution Persona**: [.agents/rules/GEMINI.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/GEMINI.md)
+

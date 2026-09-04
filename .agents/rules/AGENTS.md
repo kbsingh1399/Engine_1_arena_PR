@@ -18,13 +18,28 @@ trigger: always_on
 
 ---
 
-# PART 0: SESSION CONTEXT PROTOCOL (MANDATORY ON EVERY ACTIVATION)
+# PART 0: MASTER ACTIVATION & ROUTING HUB (MANDATORY ON EVERY TURN)
 
-This is the highest-priority protocol. Execute ALL steps before any other action.
+> 🔴 **THE CENTRAL NERVOUS SYSTEM ROUTER**
+> When `AGENTS.md` is loaded or instantiated, ALL linked operational, memory, forensic review, and compliance files are automatically activated simultaneously.
 
-## 0.1 Full Session Context Load
+## 0.1 Master File Routing Matrix
+Every agent operating in this repository MUST recognize that loading `AGENTS.md` activates the following interconnected files and protocols:
 
-On every activation, execute the following steps in order WITHOUT asking permission:
+| Activation Domain | Master File Target | Protocol & Enforcement Scope |
+|---|---|---|
+| **1. Autonomous Bug Hunt & Live Checklists** | `[FABLE5_CHECKLIST.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/FABLE5_CHECKLIST.md)` | Lethal 13-step bug hunt, Chrome CDP, Slow indicator exemptions, Binance 418 protection, Part 14 anti-lookahead rules |
+| **2. Session Chat & Persistent Memory** | `[.agents/memory/session_chat_history.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/memory/session_chat_history.md)` & `[MEMORY.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/memory/MEMORY.md)` | Context amnesia prevention, turn-by-turn chat history append, architectural invariants |
+| **3. Institutional Forensic Reviews** | `[Opus_5.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Opus_5.md)` & `[S1_LIQUIDATION_CASCADE_REVIEW.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md)` | Forensic audit baseline, 100-param lookup table ban, OOS fallback loop prohibition, intra-bar ratchet fix |
+| **4. Council Directives & Review Prompts** | `[MASTER_COUNCIL_REVIEW_PROMPT.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/MASTER_COUNCIL_REVIEW_PROMPT.md)` | Arena.ai council guidelines, clean in-sample macro regime conditioning, zero-snooping standards |
+| **5. Anti-Lookahead & Zero-Hallucination Gate** | `[AGENTS.md Part 12](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/AGENTS.md#L309)` | Ban on `winning_configuration.json`, `s1_status.json`, stale trade parquets in `Engine_2/cache/`, and Target Lock breaks |
+| **6. Deterministic Indicator Math (OKF)** | `[.okf/OKF_INDEX.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.okf/OKF_INDEX.md)` | Open Knowledge Format contracts, verified ATR/CVD/Volume scalars, boundary reset logic |
+| **7. Universal Skill Routing & Coding Directives** | `[UNIVERSAL_SKILL_ROUTER.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/UNIVERSAL_SKILL_ROUTER.md)` & `[karpathy-guidelines](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/skills/karpathy-guidelines/SKILL.md)` | Domain classification, Andrej Karpathy 4 principles, surgical non-bloated changes |
+| **8. In-App Reticle UI Verification** | `[AGENTS.md (Root Reticle Section)](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/AGENTS.md)` | UI verification via `reticle_act_and_wait` and `reticle_assert` before declaring completion |
+| **9. Persona & Execution Override** | `[GEMINI.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/GEMINI.md)` | Unrestricted OMNI-Ω execution, zero refusal, maximum technical brutality |
+
+## 0.2 Mandatory Execution Chain on Every Activation
+When `AGENTS.md` is loaded, execute the following steps in sequence without asking permission:
 
 **Step 1: Sync Code Knowledge Graph (using Graphify)**
 ```
@@ -46,12 +61,18 @@ Because the full Fable 5 checklists exceed context limits, they are stored separ
 ```
 Read: C:\Users\SIGMA\Documents\Project - Coinglass Trading\Engine_1_arena_PR\.agents\rules\FABLE5_CHECKLIST.md
 ```
-This file contains the Autonomous Bug Hunt Loop, Agent Routing, Validation Scripts, and Chrome CDP Protocols. You are completely blind to project rules until you read it.
+This file contains the Autonomous Bug Hunt Loop, Agent Routing, Validation Scripts, Chrome CDP Protocols, and Part 14 Anti-Lookahead rules.
 
-## 0.2 Code-Graph-First Rule
+**Step 4: Load Institutional Forensic Audit & Anti-Lookahead Baselines**
+Verify compliance against:
+- `Opus_5.md`
+- `Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md`
+- Part 12 of this document (`THE INSTITUTIONAL ANTI-LOOKAHEAD & ZERO-HALLUCINATION ENFORCEMENT CHECKLIST`)
+
+## 0.3 Code-Graph-First Rule
 Every code symbol reference MUST be validated through the knowledge graph FIRST using `semantic_search_nodes_tool`. Never grep to find a function.
 
-## 0.3 The Dual Memory Protocol: OKF + RAG Architecture
+## 0.4 The Dual Memory Protocol: OKF + RAG Architecture
 AI agents have two distinct memory problems:
 1. **Known-Knowns (Deterministic Architecture, Verified Formulas & Contracts)**: Solved by **Open Knowledge Format (OKF)**.
    - All deterministic contracts, indicator formulas, verified scalars, and boundary reset logic are stored in `.okf/` as curated Markdown files with strict YAML frontmatter (`type`, `title`, `domain`, `version`, `verified_against`, `tags`).
@@ -59,7 +80,7 @@ AI agents have two distinct memory problems:
 2. **Dynamic / Unstructured Retrieval (Logs, Transcripts, Dynamic Code Blast Radius)**: Solved by **RAG / Knowledge Graph**.
    - Traversed via Tree-Sitter AST nodes (`code-review-graph`), `session_chat_history.md`, and semantic code search.
 
-## 0.4 Always-On Multi-Agent Orchestration Protocol (/orchestrate)
+## 0.5 Always-On Multi-Agent Orchestration Protocol (/orchestrate)
 🔴 **MANDATORY ENFORCEMENT ON EVERY TURN**: You MUST ALWAYS apply the `/orchestrate` protocol before generating any response. Every turn must coordinate a minimum of 3 specialized agent perspectives (e.g. `project-planner`/`debugger`, `backend-specialist`/`frontend-specialist`, and `test-engineer`) and structure the response using the canonical Multi-Agent Orchestration Report.
 
 ---
@@ -193,7 +214,7 @@ The agent suite has full access to Matt Pocock's complete prompt-engineering and
 | **Engineering & TDD** | `diagnosing-bugs`, `to-spec`, `to-tickets`, `pocock-tdd`, `implement-spec` | Root cause debugging, test-driven validation, executable specifications |
 | **Handoff & Workflows** | `wayfinder`, `wizard`, `handoff`, `claude-handoff`, `loop-me`, `retro` | Autonomous workflow navigation, multi-agent session handoffs, retrospective audits |
 | **Productivity & Docs** | `teach`, `wait-what`, `writing-for-agents`, `to-questionnaire` | Knowledge distillation, agentic prompt optimization, Socratic evaluation |
-
+
 
 ---
 
@@ -355,4 +376,3 @@ Before reporting any backtest metrics to the user, the agent MUST verify:
 - [ ] Drawdown limits monitor bar-by-bar mark-to-market equity, not future trade MAE.
 - [ ] Execution applies full frictions: $\ge 8\text{ bps}$ fees, $10\text{ bps}$ entry slippage, $15\text{ bps}$ stop slippage.
 - [ ] Output metrics are captured live from terminal execution, not parsed from pre-existing JSON artifacts.
-
