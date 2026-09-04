@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cache directories
+data_cache/
+cache/
+.freebuff/
+graphify-out/
+
+# Logs and temp files
+*.log
+*.tmp
+temp_metrics.csv

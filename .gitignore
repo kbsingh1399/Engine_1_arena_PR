@@ -68,3 +68,8 @@ frame_*.txt
 Engine_2/.freebuff/
 gemini-web2api/
 .karan_cache/
+
+# Graphify internal cache
+graphify-out/cache/
+*/graphify-out/cache/
+.agents/graphify-out/cache/

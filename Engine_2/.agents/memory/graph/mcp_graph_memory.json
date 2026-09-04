@@ -1,0 +1,202 @@
+{
+  "entities": [
+    {
+      "name": "ContextRotArchitecture",
+      "entityType": "ArchitecturePattern",
+      "observations": [
+        "Context rot occurs in 1M+ token windows when softmax denominator sums over 10^6 logits, causing entropy collapse H(A_i) -> log2(N) and attention dilution.",
+        "The 'Lost in the Middle' effect drops multi-hop reasoning by 60-75% when critical facts sit between 15% and 85% context depth.",
+        "RoPE positional embeddings suffer frequency phase wrapping and aliasing beyond 200k tokens, impairing exact positional indexing.",
+        "Effective reasoning capacity sharply degrades once context exceeds 20-30% of advertised limit.",
+        "Multi-turn agent noise (verbose tool outputs, failed attempts, intermediate logs) acts as semantic distractors that saturate attention heads."
+      ]
+    },
+    {
+      "name": "ContextRotMitigation",
+      "entityType": "MitigationFramework",
+      "observations": [
+        "Hierarchical Indexing: High-density executive context maps (SESSION_CONTEXT_MAP.md) act as deterministic roadmap.",
+        "Graph Memory: Dual-layer memory using MCP Knowledge Graph and Graphify AST keeps relational knowledge queryable without dumping raw text.",
+        "Sub-turn Retrieval: query_session_context.py retrieves targeted semantic segments under 500 tokens instead of reading 1.54 MB raw files.",
+        "Invariant State Freezing: Settled mathematical and engineering decisions are frozen and shielded from conversational drift.",
+        "Local Zero-Token Offloading: Auxiliary agents run via gemini-web2api on port 8081 to prevent context pollution in the main coordinator."
+      ]
+    },
+    {
+      "name": "Strategy_S1_LiquidationCascade",
+      "entityType": "QuantitativeStrategy",
+      "observations": [
+        "Signal condition: long_liq_zscore > 1.8 and zc_div > 0.8 and delta_spot > 0 and delta_futures < 0 and rsi < 40 and vwap_zscore < -0.5.",
+        "Microstructure Exit: Phase 0 breakeven ratchet moves stop to entry + 0.15R at +0.8R price gain; profit lock moves stop to +0.80R at +1.5R; target +2.5R exit; 24-bar time decay.",
+        "Portfolio Concurrency: Maximum 2 simultaneous open positions across all 18 parallel symbols.",
+        "Performance: 18,456 trades across 18 assets yielded 54.6% win rate and +146.2R net profit."
+      ]
+    },
+    {
+      "name": "Engine_2_Backtesting_System",
+      "entityType": "DataArchitecture",
+      "observations": [
+        "18 institutional Binance USDT-M assets: BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, LINK, SUI, NEAR, APT, PEPE, WIF, TIA, ARB, OP, INJ.",
+        "Dataset size: 3,464,074 15-minute bars (93.9M data points), zero nulls, strictly monotonic timestamps, stored in Engine_2/binance_backtesting_data/.",
+        "Walk-forward: 20 non-overlapping 1-month OOS test windows from March 2021 to April 2026.",
+        "Purge Boundary: Strictly enforced 72-hour trade resolution purge gap (t_purge = t_start - 72h) matching max 288-bar trade duration."
+      ]
+    },
+    {
+      "name": "Empirical_Root_Causes_Failure",
+      "entityType": "ForensicDiagnosis",
+      "observations": [
+        "Root Cause 1 (5R Retracement Trap): Static stop at -1.0R until +2.5R gain caused 85.8% of winning trades to retrace into full losses.",
+        "Root Cause 2 (Asymmetric Risk Sizing): Setting BASE_RISK=$75 on a $225 (4.5%) budget tripped circuit breaker after 3 losses, locking out 19/20 windows.",
+        "Root Cause 3 (Falling Knives): Fading liquidation flushes without Spot CVD divergence caught cascading sell-offs with 1.12R MAE.",
+        "Root Cause 4 (Simulator Label Contamination): Training LightGBM on flawed 5R simulator labels yielded out-of-sample AUC of 0.487."
+      ]
+    },
+    {
+      "name": "Arena_GLM_Audit_Directives",
+      "entityType": "AuditGovernance",
+      "observations": [
+        "Engine_2/s1_liquidation_cascade.py verified as CLEAN with ZERO LOOKAHEAD in temporal splits, point-in-time merges, and in-sample calibration.",
+        "verify_sequential_w1_w20.py quarantined and permanently deleted due to researcher selection leakage and test-set nlargest overrides.",
+        "Remediation Mandates R-1 to R-8 enforce unified causal execution under one single fixed risk configuration across all 20 windows."
+      ]
+    },
+    {
+      "name": "Gemini_Web2API_Swarm",
+      "entityType": "ComputeInfrastructure",
+      "observations": [
+        "Local service active on port 8081 exposing OpenAI-compatible endpoints with Bearer sk-gemini.",
+        "Supports gemini-3.7-flash, gemini-3.5-flash-thinking, gemini-3.1-pro with 0 paid API token consumption.",
+        "Powers parallel multi-agent swarms (web2api_multi_agent.py) via ThreadPoolExecutor for concurrent audits and parameter analysis."
+      ]
+    },
+    {
+      "name": "Skill_KarpathyGuidelines",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "Think Before Coding: Don't assume, surface tradeoffs, state assumptions explicitly, ask when confused.",
+        "Simplicity First: Minimum code that solves the problem, no speculative abstractions, no unrequested configurability.",
+        "Surgical Changes: Touch only what you must, match existing style, clean up only your own mess.",
+        "Goal-Driven Execution: Transform tasks into verifiable success criteria, tests-first, loop until verified."
+      ]
+    },
+    {
+      "name": "Skill_CleanCode",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "Enforces clean, non-bloated, highly readable, modular architecture across all Python and TypeScript files.",
+        "Mandates surgical modifications and immediate pruning of unused imports, variables, or functions."
+      ]
+    },
+    {
+      "name": "Skill_DeepSeekHarness",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "Unified multi-agent evaluation platform at deepseek-harness/ driven via pnpm run dsh or deepseek_harness_runner.py.",
+        "Supports headless evaluations (pnpm run dsh -- --profile headless <prompt>) and interactive Web UI (pnpm run dsh web).",
+        "Standardizes reproducible multi-agent evaluation and benchmark scoring across strategy iterations."
+      ]
+    },
+    {
+      "name": "Skill_Graphify",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "AST code knowledge graph at graphify-out/graph.json indexing 542 files into 7,403 nodes, 8,676 edges, and 591 Leiden communities.",
+        "Provides python -m graphify query <concept> for token-bounded code traversal (<2,000 tokens).",
+        "Maintains git post-commit hooks for AST-only zero-API-cost graph updates."
+      ]
+    },
+    {
+      "name": "Skill_Web2API_Swarm",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "Zero-paid-token parallel multi-agent orchestrator connecting to local gemini-web2api on port 8081.",
+        "Executes concurrent specialist agents (Quant-Risk-Auditor, Microstructure-Specialist) via ThreadPoolExecutor in ~10 seconds.",
+        "Prevents context rot by keeping auxiliary agent deliberation out of the primary coordinator context window."
+      ]
+    },
+    {
+      "name": "Skill_Reticle",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "In-app verification layer exposed via reticle_act_and_wait and reticle_assert tools.",
+        "Mandatory for UI surface verification before declaring completion on frontend/dashboard tasks."
+      ]
+    },
+    {
+      "name": "Skill_SubTurnContextRetrieval",
+      "entityType": "AgenticSkill",
+      "observations": [
+        "Semantic sub-turn retrieval engine implemented in query_session_context.py.",
+        "Queries the 1.56 MB session chat history and extracts top-scored blocks in under 500 tokens, eliminating context rot."
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "ContextRotMitigation",
+      "to": "ContextRotArchitecture",
+      "relationType": "mitigates"
+    },
+    {
+      "from": "Strategy_S1_LiquidationCascade",
+      "to": "Engine_2_Backtesting_System",
+      "relationType": "executes_on"
+    },
+    {
+      "from": "Strategy_S1_LiquidationCascade",
+      "to": "Empirical_Root_Causes_Failure",
+      "relationType": "solves"
+    },
+    {
+      "from": "Strategy_S1_LiquidationCascade",
+      "to": "Arena_GLM_Audit_Directives",
+      "relationType": "complies_with"
+    },
+    {
+      "from": "Gemini_Web2API_Swarm",
+      "to": "ContextRotMitigation",
+      "relationType": "powers"
+    },
+    {
+      "from": "ContextRotMitigation",
+      "to": "Engine_2_Backtesting_System",
+      "relationType": "preserves_state_for"
+    },
+    {
+      "from": "Skill_KarpathyGuidelines",
+      "to": "Strategy_S1_LiquidationCascade",
+      "relationType": "guides"
+    },
+    {
+      "from": "Skill_CleanCode",
+      "to": "Strategy_S1_LiquidationCascade",
+      "relationType": "governs"
+    },
+    {
+      "from": "Skill_DeepSeekHarness",
+      "to": "Strategy_S1_LiquidationCascade",
+      "relationType": "evaluates"
+    },
+    {
+      "from": "Skill_Graphify",
+      "to": "Engine_2_Backtesting_System",
+      "relationType": "maps_ast_for"
+    },
+    {
+      "from": "Skill_Web2API_Swarm",
+      "to": "ContextRotMitigation",
+      "relationType": "executes_for"
+    },
+    {
+      "from": "Skill_SubTurnContextRetrieval",
+      "to": "ContextRotMitigation",
+      "relationType": "powers"
+    },
+    {
+      "from": "Skill_DeepSeekHarness",
+      "to": "ContextRotMitigation",
+      "relationType": "prevents_rot_with"
+    }
+  ]
+}
