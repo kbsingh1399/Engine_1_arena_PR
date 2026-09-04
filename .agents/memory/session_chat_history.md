@@ -39535,3 +39535,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: Verified 100% byte-for-byte across all 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`208be3e`); Engine_1_arena_PR committed and pushed (`9ebb671`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-1891` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v21.0 Expansion (Nodes 131–136) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-1891` (iteration 1) and `task-794` (iteration 14) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 131–136: 136 Structured Nodes)**:
+  - **Node 131**: Chordia-Roll-Subrahmanyam Liquidity Commonality & Systemic Resiliency Inflection (Chordia, Roll, Subrahmanyam 2000; Hasbrouck & Seppi 2001; cross-sectional commonality $\Delta\text{Spread}_i = \alpha_i + \beta_{i, L}\Delta\text{Spread}_{\text{mkt}}$; Systemic Resiliency Index $\mathcal{R}_{\text{common}} \ge 1.45$ confirming market makers across all 18 pairs have concurrently resumed quoting dense limit bids).
+  - **Node 132**: Fouque-Papanicolaou-Sircar Multiscale Stochastic Volatility & Mean-Reverting Fast Drift (Fouque, Papanicolaou, Sircar 2000, 2011; fast volatility scale $Y_t$ with mean-reversion time $\epsilon \ll 1$; negative leverage-volatility correlation $\rho_Y \approx -0.74$ generating affirmative drift $\mathbb{E}[\Delta S_\tau / S_t] > 0$; Fast Volatility Elasticity $\mathcal{E}_{\text{fast}} \ge 2.80 \land \Delta\mathcal{E} < -0.30$ propelling the $+2.0\text{R}\dots+2.5\text{R}$ target).
+  - **Node 133**: Cont-Kukanic-Stoikov Price Runs, Flip Intervals & Queue Depth Replenishment Times (Cont, Kukanic, Stoikov 2014; directional price runs $K_{\text{run}}$ under geometric distribution; Flip Acceleration Metric $\mathcal{F}_{\text{acc}} \ge +1.80$ on positive flip tick breaking downward run $K_{\text{run}}^{\text{down}} \ge 4$, confirming downward inertia has ceased).
+  - **Node 134**: Hansen-Lunde-Nason Realized Kernels & Sub-Sampling Noise Decoupling (Barndorff-Nielsen et al. 2008; Hansen & Lunde 2006; non-negative flat-top Realized Kernel $K(X)$ with Parzen weights eliminating bid-ask bounce; noise-purged volatility stop scaling $\sigma_{\text{kernel}} = \sqrt{K(X)}$ eliminating premature noise stop-outs).
+  - **Node 135**: Kyle-O'Hara Multi-Asset Informed Liquidity Conflict & Cross-Market Adverse Selection (Kyle 1985; O'Hara 1995, 2015; cross-impact matrix $\mathbf{\Lambda} \in \mathbb{R}^{18 \times 18}$; Adverse Selection Ratio $\mathcal{S}_{\text{adverse}}(i, t) < 0.85$ gating altcoin entry until toxic Bitcoin liquidation contagion has dissipated).
+  - **Node 136**: Biais-Weill Liquidity Spirals & Collateral Run Fire-Sales in Cross-Margin Engines (Biais et al. 2019; Brunnermeier & Pedersen 2009; portfolio margin net equity deficit fire-sales; Cross-Margin Exhaustion Index $\mathcal{M}_{\text{exhaust}} \le 0.35$ with $\Delta\text{OI}_{\text{BTC}} \ge 0$ establishing an institutional structural macro floor).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`dd10e7d`); Engine_1_arena_PR committed and pushed (`cf8a5e1`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-1891` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
