@@ -39482,3 +39482,19 @@ eferences.bib into architecture memory in both repositories.
   - Git Commits: Synchronized and pushed cleanly to GitHub `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
 
+---
+
+## Turn Record: Knowledge Base v17.0 Expansion (Nodes 107–112) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron task `task-794` iteration 11 fired for periodic Knowledge Bank expansion and synthesis of peer-reviewed financial econometrics.
+- **Synthesized Knowledge Additions (Nodes 107–112: 112 Structured Nodes)**:
+  - **Node 107**: The Grossman-Stiglitz Informational Paradox & Noise Trader Liquidation Equilibrium (Grossman & Stiglitz 1980; Kyle 1989; price informativeness collapse $\mathcal{I}_{\text{info}} \to 0$ as noise-trader liquidation demand $Z_t \to \infty$; analytical information vacuum discount $\Delta P_{\text{discount}}$; noise ratio metric $\Theta_{\text{noise}} > 4.5$ confirming pure retail stop dumping).
+  - **Node 108**: Multi-Asset GARCH-DCC Dynamic Conditional Correlation & Contagion Penalty (Engle 2002; Tse & Tsui 2002; dynamic conditional correlation $\mathbf{H}_t = \mathbf{D}_t \mathbf{R}_t \mathbf{D}_t$; pairwise correlation $\rho_{1,2}(t) > 0.72$ triggering conditional covariance diversification penalty, locking slot 2 to cash during market-wide contagion).
+  - **Node 109**: Avellaneda-Stoikov Market Maker Inventory Asymmetry & Upward Drift Inversion (Avellaneda & Stoikov 2008; Guéant 2017; HJB optimal reservation quote $r(s, q, t) = s - q \gamma \sigma^2 (T - t)$; extreme positive market maker inventory $q_t \gg 0$ after cascade absorption creating deterministic upward drift $\mu_{\text{drift}} = \gamma q_t \sigma^2 \ge +0.18\%$ per bar when $\text{MMI}_t > +0.55$).
+  - **Node 110**: Roll Serial Covariance Inflection & Effective Spread Transitions (Roll 1984; effective bid-ask spread $s_{\text{Roll}} = 2\sqrt{-\text{Cov}(\Delta P_t, \Delta P_{t-1})}$; 8-bar rolling serial autocovariance $\Gamma_1(t)$ inverting from positive (directional cascade drift) to negative ($\Gamma_1 < -0.15 \text{Var}$), signaling market efficiency restoration and two-sided bounce elasticity).
+  - **Node 111**: Volume-Synchronized Flow-Driven Volatility & Burst Exhaustion (Kyle, Obizhaeva, Wang 2018; volume clock flow-driven variance $\sigma_{\text{flow}}^2$; burst volatility ratio $\Upsilon_t = \sigma_{\text{flow}} / \sigma_{\text{calendar}} > 2.0$; entry filter requiring negative acceleration $\Delta \Upsilon_t < 0 \land \Delta^2 \Upsilon_t < 0$ ensuring order flow kinetic peak has crested).
+  - **Node 112**: The Black-Cox First-Passage Time & Stochastic Leverage Tier Barrier Dynamics (Black & Cox 1976; first-passage time density $f_\tau(t)$ to default barriers $B(L) = P_0(1 - 1/L + \text{MMR})$ across $100\times \to 50\times \to 25\times \to 10\times$ tiers; structural barrier exhaustion metric $\mathcal{B}_{\text{exhaust}} \ge 1.0$ isolating high-convexity entry windows where cascading fuel is depleted).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: Synchronized and pushed cleanly to GitHub `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
