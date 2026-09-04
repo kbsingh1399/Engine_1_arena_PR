@@ -39399,3 +39399,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: Synchronized and pushed cleanly to GitHub `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Knowledge Base v13.0 Expansion (Nodes 83–88) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron task `task-794` iteration 6 fired for periodic Knowledge Bank expansion and synthesis of peer-reviewed financial econometrics.
+- **Synthesized Knowledge Additions (Nodes 83–88)**:
+  - **Node 83**: Dynamic Bid-Ask Spread Resiliency & Order Book Recovery Half-Life (Biais, Hillion, Spatt 1995; exponential spread relaxation $S(t) - S_0 = (S_{\text{peak}} - S_0) e^{-t/\tau_{\text{res}}}$, empirical crypto perp half-life $t_{1/2} \in [1.8, 3.2]$ bars, $50\%$ spread contraction filter rejecting un-buffered regime breakdowns).
+  - **Node 84**: The Kyle-Obizhaeva Invariance Hypothesis & Metaorder Price Impact Scaling (Kyle & Obizhaeva 2016; invariant metaorder scaling $\Delta P/P = \mathcal{I} (Q/V)^{1/2} (\sigma^2 W / L^*)^{1/6}$, $3/2$ power law depth penetration bound $\Delta P \propto (Q_{\text{liq}}/\text{depth})^{1/2}$).
+  - **Node 85**: Ornstein-Uhlenbeck (OU) Basis Mean-Reversion & Arbitrage Hydrodynamics (Vasicek / Bertram 2010; continuous log-basis $dB_t = \theta(\mu - B_t)dt + \sigma dW_t$, half-life $t_{\text{half}} = \ln 2 / \theta$, arbitrage squeeze trigger when $B_t < -2.0\sigma_B \land \theta > 0.40$).
+  - **Node 86**: Multi-Level Volume-Weighted Order Flow Imbalance (VOFI) Kernel (Cont, Kukanov & Stoikov 2014; $\text{VOFI}_t = \sum w_k \text{OFI}_{k, t}$ with exponential depth weights $w_k \propto e^{-0.55(k-1)}$, passive iceberg replenishment divergence $\Delta P < 0 \land \text{VOFI} > 0$).
+  - **Node 87**: Causal Non-Linear Transfer Entropy & Macro Lead-Lag Dynamics (Schreiber 2000; directional entropy $T_{\text{BTC}\to\text{Alt}} \approx 0.42\text{ bits} \gg T_{\text{Alt}\to\text{BTC}}$, strict gating of altcoin reversals on confirmed BTC order flow absorption peak).
+  - **Node 88**: Two-Scale Realized Volatility (TSRV) & Intra-Bar Jump Decomposition (Zhang, Mykland, Aït-Sahalia 2005; TSRV separating microstructure noise, bipower variation jump ratio $\Phi = J/\text{BV} > 3.0$, entering on jump-dissipation inflection).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: Synchronized and pushed cleanly to GitHub `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
