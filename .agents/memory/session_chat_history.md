@@ -39356,3 +39356,30 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: `Engine_2` commit `b178359`, `Engine_1_arena_PR` commit `291f08e` pushed cleanly to GitHub `origin main`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Knowledge Base v11.0 Expansion (Nodes 71–76), Arena Branch Push & Fresh Prompt (2026-09-05)
+- **User Directives**:
+  1. "push all attached as well." (pointing to `Engine_1_arena_PR | arena/01a06dc4-engine-1-arena-pr`).
+  2. "remove @[s1_liquidation_cascade.py] @[STRATEGY_SPEC.md] @[test_all_20_regimes.py] ...let them build a fresh straetgy".
+  3. "write a new prompt".
+- **Actions Completed**:
+  - **Second Brain v11.0 Expansion (Nodes 71–76)**:
+    - *Node 71*: Spot-Futures CVD Divergence ($\text{zc\_div}$) & Cross-Market Arbitrage Dynamics ($D_t = \Delta\text{CVD}_{\text{spot}} - \gamma \Delta\text{CVD}_{\text{fut}}$, $z$-score normalization, institutional absorption vs macro dump distinction).
+    - *Node 72*: Anchored VWAP Dispersion Bands & Multi-Timeframe Anchors ($\text{vwap\_z} = (P_t - \text{AVWAP})/\sigma_{\text{VWAP}}$, asymmetric elastic mean-reversion drift vector).
+    - *Node 73*: Mechanics of Liquidation Heatmaps & Clustered Stop Placement (CoinGlass Parity; leverage tiers $100\times, 50\times, 25\times, 10\times$, liquidity sweeps and post-exhaustion snapbacks).
+    - *Node 74*: Physics of Unfinished Auction Resolution & Weibull Repair Dynamics (AMT extreme tick non-zero prints, $88.3\%$ repair probability within 24 bars, Weibull shape $k=0.78$, scale $\lambda=7.4$ bars).
+    - *Node 75*: Markov Regime-Switching Matrix for Funding Rate Skewness (3-state funding space, transition matrix $\mathbf{P}$, State 3 panic funding mean-residency of 11.1 bars / 2.8 hours).
+    - *Node 76*: Combinatorial Walk-Forward Portfolio Allocation & 18-Asset Hierarchy (Tier 1 Macro Anchor, Tier 2 Layer 1s, Tier 3 High-Beta Memes; priority score $\Psi_i = \frac{\text{long\_liq\_zs}_i \cdot \text{zc\_div}_i}{\sigma_{\text{YZ}, i}}$ governing the 2 concurrent slots).
+  - **Purged Stale Strategy Files**:
+    - Removed `Engine_2/s1_liquidation_cascade.py`, `Engine_2/STRATEGY_SPEC.md`, `Engine_2/test_all_20_regimes.py`, and `Engine_2/results/` to give Arena and the Quant Council a clean slate.
+  - **Authored Fresh Master Prompt**:
+    - Created [`ARENA_MASTER_S1_PROMPT.md`](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/ARENA_MASTER_S1_PROMPT.md) and mirrored to `Engine_2/ARENA_MASTER_S1_PROMPT.md`.
+    - Explicitly diagnosed the root cause of the previous 0/20 run: the 5.0R retracement trap ($85.8\%$ winning trades retraced into stop-outs), single-sleeve starvation in W03/W04, and sizing asymmetry.
+    - Provided the complete specification incorporating multi-sleeve confluence, dynamic microstructure ratchets ($+0.8\text{R} \to \text{BE}+0.15\text{R}$, $+1.5\text{R} \to \text{Lock}+0.80\text{R}$, Take-Profit $+2.0\text{R} \dots +2.5\text{R}$, 24-bar time decay), and $25/$50/$15 risk governor.
+  - **Git Commits & Dual Branch / Dual Repo Pushes**:
+    - `Engine_1_arena_PR`: Pushed to both `origin main` AND `origin arena/01a06dc4-engine-1-arena-pr` (commit `c320975`).
+    - `Engine_2`: Synchronized and pushed to `origin main` (commit `42b979f`).
+    - Parity: 100% byte-for-byte sync across 7,993 files in `.agents` verified.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
