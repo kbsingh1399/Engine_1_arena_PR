@@ -37556,3 +37556,466 @@ Outcome & Actions:
    - AGENTS.md (Repository root mirror)
    - agent.md & .agents/rules/agent.md (Direct activation aliases routing directly into AGENTS.md)
 3. Evaluated live background task-5662: Causal walk-forward with expanded candidate pool (K=25) yielded dynamic live metrics (e.g. Window 02 passed: +35.6% ROI, 4.48% MaxDD, 63.6% WR, 11 trades) without any lookahead or lookup tables.
+
+### Turn (2026-09-03): S1 Funding/Basis Arb — real walk-forward built, 0/20 OOS gates passed (honest)
+**User:** Build `run_real_S1_funding_arb.py` (multi-model ensemble, IS freezing, 20 OOS windows) and deliver only if all 20 windows pass ROI>=20% / DD<4.75% / WR>=40% / >=5 trades / winners >=5R with zero lookahead.
+
+**Delivered:** `run_real_S1_funding_arb.py` (standalone, deterministic, seed 20260903) + `Engine_2/S1_FUNDING_ARB_RESULT.md` + `Engine_2/S1_WALKFORWARD_RUN_LOG.txt`.
+
+**Result: 0/20 windows pass.** mean ROI -5.07%, median -10.65%, worst -25.91%, worst MaxDD 31.28%. Per-gate: ROI>=20% in 1/20 (W05 +25.39%); MaxDD<4.75% in 0/20 (best 5.12%, W09); WR>=40% in 0/20 (best 30.6%, W05); trades>=5 in 20/20; winners>=5R net in 0/20 (avg winner 2.8-4.0R).
+
+**Root cause (measured, not asserted):** ensemble IS-cal AUC 0.5095-0.6139 across the 20 windows against an unconditional base rate of ~13% for "+5R before -1R in 48h". Gate math Monte Carlo (wins +5R / losses -1R): at p=0.13 P(passing 20/20)=9e-73; at the 40% WR gate it is still only 0.19; a sustained ~50% hit rate (4x base rate) is needed before 20/20 is more likely than not.
+
+**Data correction:** `UNIUSDT`, `XLMUSDT`, `PEPEUSDT`, `1000SHIBUSDT` do NOT exist in `Engine_2/binance_backtesting_data`. The real 18 are ADA APT ARB AVAX BCH BNB BTC DOGE DOT ETH LINK LTC NEAR OP SOL SUI TRX XRP. Script auto-discovers.
+
+**Bugs found & fixed (each caught by measurement):**
+1. Label used `net_r >= 5.0` but net_r is net of the 14bps cost stack, so a +5R gross hit nets ~4.8R and was labelled 0 -> base rate crushed 13.8% -> 3.5%, model flattened. Fixed to label the path event (`reason == trail`). Verified 13.08%.
+2. NaN equity poisoning: LTC/TRX/XRP/SOL/NEAR each have 480 interior missing bars; a 48h time-stop landing on one gave `exit_px=nan` and silently froze the DD stat (W05 printed `ROI +nan%, DD 4.46%`). Fixed with gap-filled close for pricing + non-finite guard + fail-fast assert. Verified 0 non-finite exits / 13,540 trades.
+3. Config fallback picked the MOST levered config when nothing cleared the IS gates; changed to prefer smallest IS drawdown. All 20 windows then independently selected base=0.005.
+
+**Standing rule reinforced:** do not iterate until the scorecard passes. Re-running 20 windows and keeping the best-looking result is test-set selection regardless of in-sample discipline inside each run.
+
+---
+
+## Turn — Adversarial review of S1 Liquidation Cascade (origin/main @ 41c027b)
+
+**Request:** institutional peer review of S1 (Liquidation Cascade Exhaustion & Absorption), claimed
+20/20 OOS PASS, +31.86% avg ROI, 3.46% DD, 71.7% WR, 121 trades.
+
+**Artifacts read:** s1_liquidation_cascade.py (902 L), s1_status.json, winning_configuration.json,
+patch_existing_parquets.py — all at 41c027b. No hypothetical code evaluated.
+
+**Findings (delivered in Engine_2/S1_LIQUIDATION_CASCADE_REVIEW.md):**
+1. DISPOSITIVE: fallback loop (L834-841) backtests every archetype x 6 thresholds ON THE OOS WINDOW
+   and keeps the first that clears the gates. Up to 60 OOS backtests/window. Direct test-set search.
+   Contradicts the L733 comment "NO OOS SEARCH / NO LOOPS ON OOS".
+2. WINDOW_CONFIGURATIONS (L590-611) hardcodes (archetype, th, house_trigger, house_risk, base_risk)
+   per window = 100 window-indexed constants. 10 distinct archetypes across 20 windows.
+3. run_autonomous_loop's stated objective is "until all 20 windows pass"; L862 fail-fast returns
+   False so no failing telemetry is ever written (run-level survivorship).
+4. L744: `if w_idx in [9,19,20]: top_k = 7 if w_idx in [9,19] else 8` — per-window patched selection.
+5. OOS_MONTHS: W01-W18 on strict 3-month cadence; W19=2025-10-15, W20=2026-03-15 break it.
+   2025-09-15 and 2025-12-15 are never tested.
+6. Target Lock (L454) halts at +20.2% => ROI/DD are right-censored at the gate. 12/20 windows land
+   in 20.7-28.5%.
+7. Headline vs committed JSON: ROI 31.86 vs 30.89 measured; WR 71.7 vs 69.95; trades 121 vs 120.
+   DD 3.46 vs 3.47 (matches). Telemetry and claim are different runs.
+8. Stop code is `max(atrs[i], entry*0.002)` (L480) — spec says entry*0.0065. Unreconciled.
+
+**Sound:** 3h purge + `exit_time < train_end_purged` IS filter; governor
+`budget = peak*0.045 - closed_dd - open_mae`, `cur_risk = min(target,budget/1.2)` is portfolio-aware
+and bounded by peak*0.045 - budget/6; adverse-first eval; 18/18 parquets pass hardened verifier.
+
+**Q3 adversarial breach:** governor budgets on stop-distance `cur_risk` but books realized
+`mae_dollar = units*maes[i]`. A 0.6% gap through the 20bps floor stop makes realized MAE ~3x the
+budgeted risk; two concurrent positions => ~$1,120 on $5,000 = ~22% DD, ~5x the 4.5% guardrail.
+
+**Recommendation:** reject; do not allocate; re-run with a single frozen config, no fallback loop,
+both skipped windows restored.
+
+---
+
+## Turn — Institutional forensic review of S1 + live bridge (origin/main @ a4292b0)
+
+**Deliverable:** `S1_INSTITUTIONAL_FORENSIC_REVIEW.md`. Verdict: **REJECT**.
+
+**I EXECUTED their honest harness** (installed numba 0.67.0 + full stack per requirements-engine2.txt;
+extracted origin/main to /tmp/mainE, 750MB data):
+- `test_all_20_regimes.py` -> exit 0, **1/20 PASS**, W02 +52.5%/2.40%DD/80%WR/5tr.
+  Reproduces the user's claimed ground truth exactly. mean ROI +1.31%, median -3.85%, WR 24.8%,
+  mean DD 4.27%, 102 trades. ROI gate fails 19/20; **DD gate fails 0/20**; 7 windows at 0.0% WR.
+- Regime table: Crash/Flush n=1 +52.50% (1/1); Bull Mania n=1 +16.90% (0/1); Bear n=7 -1.70% (0/7);
+  Compression n=6 -2.10% (0/6); Bull Pullback n=5 -3.74% (0/5).
+
+**MY EXPERIMENT:** one-line `fee_rate=0.0008 -> 0.0033` (= 0.08% fees + 10bps entry + 15bps exit
+slippage, both notional-proportional). Result: 1/20, mean ROI **-0.68%**, max DD **5.93%**,
+**DD mandate (>=5%) breached in 3/20 (W14 5.77, W17 5.34, W19 5.93)**, 4.5% "hard clamp" breached
+in **15/20**. Empirical proof the clamp is not hard; worst offenders have only 2-3 trades.
+
+**Stop/slippage measurement (3,463,712 bars):** engine stop = max((high-low).roll(14).mean(),
+price*0.002). median stop 0.5622% of price; 20bps floor binds 5.6%. Mandated frictions cost
+**0.59R median/trade** (mean 0.69R), **1.65R** where floor binds. Spec says max(2.0xATR14,
+price*0.0065)+5bps — code has NO 2.0x, floor 0.002 not 0.0065, and ATR omits true-range gap terms.
+
+**REMEDIATION NEVER APPLIED to s1_liquidation_cascade.py:** WINDOW_CONFIGURATIONS at L590/674/705;
+OOS fallback loop L796-847 (for test_th in [0.54..0.44] at L834); per-window top_k L742-743;
+future-MAE clamp L494/500/475. **ZERO slippage code** — only match for "slip" is the comment on
+FEE_RATE L52. `fast_portfolio_backtest_numba` has no slippage param. test_all_20_regimes.py docstring
+FALSELY claims "Real slippage (10 bps entry, 15 bps exit)".
+
+**Telemetry:** s1_status.json and s2_status.json **byte-identical** (sha256 f51c277d...).
+s2_cvd_momentum.py uses archetype "S2_CVDMom" which appears nowhere in s2_status.json. Committed
+s1_status.json still shows the SNOOPED 20/20 (W02=76.87%, A1_VolBreakout), not the honest 1/20.
+
+**TRAIN/SERVE BREAK (Domain 1 headline):** historical long_liq_usd/short_liq_usd are SYNTHETIC —
+`liq_model.compute_vectorized(df)` (historical_metrics_processor.py L320-322) from
+core/mathematical_liquidation_engine.py, "calibrated against 7,234 Ground-Truth CoinGlass bars
+Jun-Aug 2026", inputs = OHLCV + taker delta + wick geometry. Live uses REAL Binance @forceOrder.
+Sign convention DOES match (-Long/+Short) - credit. LiquidationState keeps only current 15m candle
+(L546-549) -> no 24h buffer -> liq_zscore_24h not reproducible live. Live monitor imports ZERO
+shared derivation code.
+
+**No execution bridge:** binance_live_monitor.py has no HMAC/order path. binance_broker.py (913 L)
+has real signed orders (L108 hmac, L371 POST /fapi/v1/order) but is not wired to the monitor.
+
+**Hardcoded fallbacks in compute_snapshot:** close->77000.0, rsi->50.0, atr14->250.0, atr100->260.0,
+ls_ratio->1.0350, ls_ratio_top->2.0500, whale->"107.6900", oi_k->"127.500K",
+top_account_ratio->1.0500. BTC-specific constants in an 18-asset monitor; fire when WS stalls
+(i.e. during cascades). CoinGlass CDP bridge = Chrome debug port 19233, ONE symbol (Binance_BTCUSDT).
+
+**is_synthetic STILL inert:** patch script L42 now derives from volume_base==0, but measured
+is_synthetic.sum()==0 in all 18 parquets while zero-volume bars exist (ADA/ETH/SOL 10, BTC 15).
+So engine guard `sig[df['is_synthetic']==1]=0` never fires.
+
+**DATABOMB:** metrics_available==0 in **92.86%** of universe bars in W01 AND W02 (vs 0.00% in
+W10/W20). The single passing window ran with OI/funding/LS-ratio/whale as fallback constants.
+
+**KEY LOGICAL POINT:** the 20/20 mandate is SELF-CONTRADICTORY with regime gating - a month in cash
+earns 0% and fails ROI>=20%. Cascade regime occurred 1/20 windows, so a perfectly regime-aware
+strategy scores 1/20. Mandate must be abandoned, not engineered toward.
+
+**Unverified (stated in report):** live WS behaviour, CoinGlass CDP parity, order execution - cannot
+run here and the execution path does not exist in code.
+
+---
+
+## Turn — Review of S1 v2 remediated engine + VWAP sleeves (origin/main @ e7e7445)
+
+**Deliverable:** `S1_V2_INSTITUTIONAL_REVIEW.md`. Verdict: **REJECT** (but engineering genuinely improved).
+
+**GENUINELY FIXED (credit given):** WINDOW_CONFIGURATIONS gone; OOS fallback loop gone; per-window
+top_k gone (uniform K=8); **slippage now real** (L53-54 ENTRY_SLIPPAGE=0.0010/EXIT_SLIPPAGE=0.0015,
+applied L411, L354/L379); **stop now matches spec** (L334 `max(2.0*atr, entry*0.0065)`); new
+bar-by-bar `simulate_single_trade_path` (L324-397) with gap-aware fills; causal regime selection
+`classify_macro_regime_causal` (L639) + fixed 5-entry REGIME_ARCHETYPE_MAP (L631). Loop L745-835 is a
+genuine single pass - no search found.
+
+**STILL BROKEN:** Flaw C future-MAE clamp (L397->L420->L525 `mae_dollar=units*maes[i]`->L450/479
+open_mae_dollars->L506 budget). BUT it is CONSERVATIVE - overstates DD, shrinks sizing budget, cannot
+inflate ROI. It causes chronic under-sizing (7 windows fail >=5 trades). Fixing it is highest-EV change.
+
+**I RAN THE ENGINE.** exit 0, **0/20 PASS**. My run is **field-identical to committed
+s1_status.json across all 20 records (0 differences)** -> engine is honest AND reproducible.
+mean ROI -1.36%, median -2.54%, WR 27.7%, mean DD 4.47% (max 5.48%), 113 trades.
+ROI gate fails 20/20, DD 2/20, WR 13/20, trades 7/20. Lowering hurdle 20%->10% changed nothing.
+
+**USER CLAIMS CONTRADICTED:**
+- "W03 +18.72% / 3.73% / 50.0% / Calmar 189.28" -> actual **W03 -0.75% / 3.93% / 37.5% / Calmar -2.2**
+- "max observed DD 4.52%, clamped <5% all 20" -> actual **max DD 5.48% (W15), W10 5.45%; breached 2/20**
+- "1/20 pass" -> actual **0/20**
+
+**KEY SCIENTIFIC FINDING: the +52.5% W02 edge was an ARTIFACT.** Old engine W02 +52.5%/80%WR/5tr ->
+new engine **+4.69%/42.9%WR/7tr**. Verified not a sizing artifact (base_risk 75, house_risk 180,
+dd_limit 0.045, fee 0.0008, conc 2, lev 10 all identical; only house_trigger 30->50). Cause: old stop
+`max(atr, price*0.002)` median 0.5622% vs new `max(2.0*atr, price*0.0065)` median 1.1244% = **exactly
+2.00x wider** -> units=risk/stop_dist halves notional = hidden leverage; plus 0.22R/trade slippage
+old engine paid 0.00R; plus honest path sim.
+
+**CALMAR IS A CATEGORY ERROR.** L815-817 `ann_roi=(1+roi)**12.167-1; calmar=ann_roi/dd`. Reproduced
+roi=18.72%/dd=3.73% -> **189.5** (their 189.28, rounding). Compounds ONE month 12.167x. Real Calmar
+needs >=36mo. "Calmar>5" is met by any +6% month. Not enforced in status_pass (L819) anyway.
+
+**VWAP SLEEVES CANNOT RUN LIVE.** grep -i vwap binance_live_monitor.py = NOTHING. V1/V2 archetypes
+drive **12 of 20 windows (60%)** (Bull Mania W01; Bull Pullback W08,09,12,13,16; Compression
+W03,14,15,18,19,20). Monitor imports no shared derivation module.
+
+**VWAP DEGENERATE AT SESSION ANCHOR (measured, BTC, engine's own formula):** cum_vol~0 at day start
+-> vwap_std collapses -> z explodes. bar0: mean|z|=4.000, |z|>1.8 in **100%**, clipped at +-4.0.
+bars0-3: |z|>1.8 in 68.9%, 32.9% clipped. bars4-95: 14.0%, 0.02% clipped. V1 triggers on z<-1.8 so it
+fires on arithmetic not mean reversion for the first UTC hour (=05:30-06:30 IST).
+
+**s2_status.json STILL the discredited run:** sha256 f51c277d (= old snooped S1 20/20), 20/20 PASS,
+mean ROI 30.89%, S1 archetypes (A1/A2/A4/A5/A6/A7/N2/N4/N7/A10); s2_cvd_momentum.py uses "S2_CVDMom"
+which appears nowhere in it. S3 (22,577B) and S9 (23,310B) have NO telemetry.
+
+**DOMAIN 2 MATH:** diversification scales sd by 1/sqrt(n) but leaves MEAN unchanged -> compresses
+toward the mean -> makes +10%/mo HARDER. For P(20/20)=95% need z=2.80: at sd 3.51% (measured) mean
+must be **+19.8%/mo (~800%/yr) with <5% DD for 60 months**. "How many sleeves guarantee 20/20?" ->
+**none, at any n.** And measured single-sleeve mean is -1.36% (negative) so no construction helps.
+
+**UNCHANGED from prior round:** synthetic historical liquidations (liq_model.compute_vectorized,
+calibrated on 7,234 CoinGlass bars Jun-Aug 2026) vs real live @forceOrder; no execution bridge
+(binance_broker.py has signed orders but unwired); hardcoded fallbacks (close->77000.0, atr14->250.0,
+ls_ratio->1.0350, whale->"107.6900"); LiquidationState current-candle-only; CoinGlass CDP one symbol.
+
+**Unverified (stated):** live WS, CoinGlass CDP parity, order execution.
+
+---
+
+## Turn — Council review: Dual-Table Footprint Architecture (origin/main @ 396c04c)
+
+**Deliverable:** `FOOTPRINT_ARCHITECTURE_COUNCIL_REVIEW.md`. Verdict: **CONDITIONAL — do not run yet.**
+
+**BLOCKING FINDING: their launch command produces NO footprint ladder.**
+`run_historical_pipeline.py:105` gates the whole footprint branch on `if footprint_days > 0:`;
+`--footprint-days` default=0 (L205); main() passes args.footprint_days explicitly (L229/L258). Their
+command omits it -> else branch L123-124 sets empty DataFrames -> export guard L157
+`if not ladder_df.empty:` never fires. **`--all-footprint` is dead code without --footprint-days>0.**
+Fix: add `--footprint-days 2100`.
+
+**CLAIMS vs MEASURED:**
+- "ETHUSDT 210,607 rows x 62 cols" -> actual **210,587 rows x 59 cols**
+- schema.py declares 62; data has 59; missing exactly `fp_poc_vol_ratio, fp_stacked_buy_imb,
+  fp_stacked_sell_imb`
+- `ETHUSDT_15m_footprint_ladder.parquet` NOT in repo (only _15m_master_*.parquet + manifest, 36 files)
+- "3,812 rungs" ~= 370 bars at ETH's median 10.4 bins/bar = **~4 days, not 5 years**
+
+**SILENT ZERO-FILL TRAP:** historical_metrics_processor.py:226-228 writes fp_stacked_*=0.0 when
+footprint absent -> 62-col tables with 3 dead features, auditor passes. Same failure mode as inert
+is_synthetic. Must raise instead.
+
+**Q1 DEFECTS (measured in code):**
+- "diagonal" imbalance is INLINE: L146 `b_vol >= 3.0*s_vol` at SAME price_bin SAME bar. True diagonal
+  = bid at P vs ask at P±tick across adjacent levels. Mislabeled.
+- "stacked" is `sum(buy_imbalance)` = COUNT of imbalanced bins, no consecutive-run logic (L149-151).
+  Footprint "stacked" means >=3 CONSECUTIVE levels.
+- NO volume floor: `np.maximum(s_vol,1e-4)` = ~$0.30 for ETH -> any bin with ~$1 one-sided flow flags.
+- `is_poc` uses float `==` on price_bin built via round()*bin_step (L118) -> silent misses.
+- bid/ask naming inverted-but-correct (b_vol=taker buy -> ask_vol_coin); undocumented footgun.
+- Missing Table 2 fields: trade_count, notional_usd, first/last_ts_ms (can't sequence absorption vs
+  wick), cum_delta_coin, imbalance_ratio (bool only, can't rank), run_length, resting depth,
+  bins_populated.
+
+**Q2 BIN GRANULARITY - fixed dollar step is not scale-invariant (measured):**
+SOL $0.10: 3.4bps@$294 -> **908bps@$1.10 = 267x drift**. DOGE $0.0001: 1.36bps@$0.74 -> 407bps@$0.0025
+= **301x**. ADA 41x, XRP 21x, ETH 16x (2.02->31.8bps), BTC 13x. For SOL/DOGE the bin exceeds the whole
+15m bar range in early history -> ladder collapses to 1 rung. Recommend ATR14/40 rolling bin step.
+ETH sparsity at $1 step: p5=2.9, p25=6.0, p50=10.4, p75=17.3, p95=35.2 bins/bar; **12.0% of bars have
+<=4 bins, 1.2% have <=2**.
+
+**Q3 - CORRECTED THEIR PREMISE WITH MEASUREMENT.** "0% 5R trades" is false. Unconditional base rate
+for +1.75% (=5x0.35%) before -0.35% within 48h, entering at next bar open on EVERY bar:
+ETH 16.51% (n=166,756), BTC 16.50% (n=210,518), SOL 16.38% (n=166,755). ~1 in 6 at random.
+Breakeven at 5R:1R is p=1/6=16.67% -> base rate is JUST BELOW breakeven.
+Costs at 0.35% stop: 25bps slip + 8bps fees = 33bps = **0.94R per trade**. Net breakeven
+5p-(1-p)=0.94 -> **p=32.3%**, i.e. the absorption filter must ~DOUBLE the hit rate to break even.
+=> 0.35% stop is near-worst choice (cost ~ 1/stop). At 0.65% stop breakeven 25.2%; at 1.0%, 22.2%.
+=> Maker entries convert -0.94R to ~+0.1R, breakeven ~15% (below base rate).
+Gave 6-step Table 2 query spec: consecutive-run cluster in lower third + close back inside prior
+range; require cluster trade_count above bar median; sequence via first/last_ts (absorption must
+PRECEDE wick low); stop = cluster_low - 1 tick; gate on realized vol; validate lift vs 16.5% base.
+**s1_liquidation_cascade.py never reads the ladder** (grep for ladder|price_bin|is_buy_imbalance|
+stacked = nothing). Table 2 produced but not consumed.
+
+**Q4 SIZE:** source is data.binance.vision daily aggTrades zips (fetcher L83); 2,072 days x 18
+symbols = **37,296 files**. Could NOT measure sizes (network egress blocked: TLS EOF) -> 1-3 TB is an
+ESTIMATE, flagged as unverified. No Table 2 auditor exists (verify_parquet_integrity.py audits master
+only).
+
+**Unverified (stated):** Binance archive sizes/throughput (no network); their local ladder parquet
+(not committed).
+
+---
+
+## Turn — Gate-closure verification @ origin/main e39335c
+
+**Deliverable:** `FOOTPRINT_GATE_VERIFICATION_e39335c.md`.
+
+**GATE 1 CLOSED** - run_historical_pipeline.py:105 `should_fetch_fp = (footprint_days > 0) or all_footprint`;
+L142 `require_footprint=all_footprint`.
+
+**GATE 2 CLOSED** - historical_metrics_processor.py:225-226 raises RuntimeError. Zero-fill path
+survives at L227-232 but only reachable when footprint not requested (correct).
+
+**GATE 3 CLOSED, better than my spec.** `median_px` computed INSIDE _process_daily_ticks (L117) so
+bin step recomputed daily = 3.5bps of that day's median. I ran their rounding ladder across
+50-million-fold price range: DOGE@0.0025->4.00bps, SOL@1.10->3.50, ETH@314->3.50, ETH@4941->3.44,
+BTC@125986->3.57. **267x/301x drift ELIMINATED, within +-0.5bps.** fp_effective_bps recorded (L151).
+Design consequence (not defect): grid recomputed daily -> price_bin NOT comparable across days ->
+multi-day volume profiles / developing POC impossible off this table.
+
+**GATE 4: 3 of 4 CLOSED, one real defect.**
+- True diagonal structurally correct (L178-187, shift(1)/shift(-1) after sort by bin_idx). CLOSED.
+- Volume floor `max(total_vol_coin*0.005, 0.05)` (L175) applied both sides. CLOSED.
+- Exact POC `bin_idx == poc_bin_idx` (L224). CLOSED.
+- **4b DEFECT: "consecutive" = consecutive ROWS not consecutive PRICE LEVELS.** I RAN their
+  `_calc_consecutive_stacked`: bins [10,11,13] with 12 empty, all imbalanced -> returns **1**, true
+  answer 0. FALSE POSITIVE across the gap. Same defect hits the diagonal: with bins 10,12,13
+  populated, bin 12's s_vol_below is bin **10** (two levels away) so "P vs P-1" becomes "P vs P-2".
+  12% of bars have <=4 bins so gaps are common. Fix: require bin_idx.diff()==1 via .where(mask).
+- **4c:** `(runs>=3).sum()` returns sum over runs of max(0,L-2): run of 3->1, run of 5->3, two runs
+  of 3->4. A strength weight, not a cluster count. Rename or add boolean.
+
+**GATE 5 PARTIAL.** Auditor validates trade_count>0, price_bin>0, is_poc/is_buy/is_sell in {0,1};
+old total_records counter bug fixed (L102). BUT:
+- **ladder gap check is HARDCODED `num_gaps = 0` (L73-78)** -> their "Table 2: 0 Gaps [PASS]" is
+  VACUOUS, assigned not measured.
+- no referential integrity between tables.
+- `bins_populated` computed (L207) but never audited and NOT in Table 2 export list (L226-229).
+
+**CLAIMS vs REPO:** "Table 1 210,609 x 62" -> committed ETHUSDT is **210,587 x 59**. "Table 2 4,391
+rungs" -> **no ladder committed** (9-col list matches code). 4,391/10.4 bins = ~422 bars = **~4.4 days**
+- still too small to exercise Gate 3 at 2020 prices, the exact failure it prevents.
+
+**Still open:** s1_liquidation_cascade.py still never reads Table 2 (grep bins_populated|
+footprint_ladder -> only fetcher + pipeline runner). 32.3% break-even hit rate remains the target.
+
+**VERDICT:** Gates 1-3 closed and verified. Fix 4b (adjacency) BEFORE the full extraction - it is the
+only change altering data CONTENT, and retrofitting means re-running all 37,296 downloads.
+
+---
+
+## Turn — Forensic data audit @ origin/main b1a239e
+
+**Deliverable:** `ENGINE2_FORENSIC_DATA_AUDIT_b1a239e.md`. Verdict: **REJECT production / CONDITIONAL research.**
+
+**SCOPE: only 1 of 18 symbols committed** (ETHUSDT master 210,610 x 62). **No ladder table at all.**
+
+**PART A (measured, ETH):**
+- A.1 PASS: 0 nulls, 0 infs across all 62 cols.
+- A.2 PASS: 0 gaps, 0 non-monotonic at 900,000ms. Span 2020-09-01 -> 2026-09-03.
+- **A.3 FAIL:** `is_synthetic.sum()==0` but 10 degenerate maintenance bars exist (2021-03-02 01:15/30/45,
+  2022-05-01 22:30, 2022-05-28 16:45/17:00, 2024-10-28 20:00/15/30/45) all with open==high==low==close,
+  volume 0, trades 0. Root cause processor L57-68: flag only set INSIDE the reindex branch from
+  `close.isna()`; Binance delivers downtime bars with real timestamps+flat price so branch never runs.
+  ffill itself IS causal (L71, no bfill). **Third consecutive round is_synthetic is inert.**
+  Fix: `np.where(close.isna() | (volume_base==0) | (trade_count==0), 1, 0)`. dtype is int64 not int8.
+- A.4: rsi [4.13,95.62] OK; long_liq<=0 OK; short_liq>=0 OK; OI/funding/ratios/prices/atr OK;
+  session VAH/VAL correctly anchored 00:00 UTC OK.
+- **A.4 FAIL - depth columns FABRICATED:** canonical_indicators.py:174-184
+  `bid_depth_coin = base_vols*0.025; ask_depth_coin = -base_vols*0.025`. No order-book input at all;
+  4 cols are deterministic functions of volume_base & close = ZERO independent info; `atrs` param
+  UNUSED; `n=len(closes)` unused; docstring claims "empirical order book liquidity" = FALSE.
+- **A.4 FAIL - EMA warmup claim false:** data starts 2020-09-01, NO 2019 seed. canonical_indicators.py:36
+  "seeded from the first available bar". ema_800[0]=405.61 vs close[0]=432.52 = 6.22% off.
+  macro_spread/mc/p200 are seed artefacts for weeks.
+- oi_change_pct max 2239.82%; metrics_available==0 in 20.79% (43,776 bars).
+
+**PART B (code only - no Table 2 committed):**
+- **4b CLOSED:** bin_diff_below/above via diff, `.where(bin_diff==1, 0.0)` AND the imbalance test
+  itself requires `bin_diff==1`. Belt and braces.
+- **4c CLOSED - I RAN IT:** gap case [10,11,13] -> **0** (was 1 last round); [10,11,12] -> 1;
+  run of 5 -> **1** (was 3); two runs of 3 -> **2** (was 4). Now a true cluster count.
+- Integer POC CLOSED.
+- **B.4 referential integrity: CANNOT VERIFY** (no Table 2). Ladder gap check still hardcoded
+  `num_gaps = 0` (L73-78); bins_populated computed but not exported/audited.
+
+**PART C:**
+- **F1 (future MAE) NOT ELIMINATED:** L529 `mae_dollar = units*maes[i]` -> L535 booked at entry.
+  Conservative (overstates DD, shrinks budget) so cannot inflate ROI, but still present.
+- **F2 FIXED:** L355/L381 gap-aware fills; L193 true-range ATR with gap terms.
+- **F3 FIXED:** L823-826 `frozen_prob_threshold = np.percentile(is_probs,75)` clamped [0.50,0.65],
+  derived IN-SAMPLE and frozen; L833 `mask_oos = probs_oos >= threshold`. Causal, no future rank.
+- **FP_AbsorptionCluster (L635) wired to 2 of 5 regimes (L646-647: Crash/Flush + Compression = 7 of
+  20 windows) BUT CANNOT FIRE.** Triggers on fp_stacked_*>=1 (45 bars) OR fp_poc_vol_ratio>0.35
+  (61 bars) = **105 bars total = 0.050% of history**. TICK_EXACT provenance: **384 bars (0.182%),
+  span 2026-08-30 -> 2026-09-02 = 3d23h**, i.e. 5 months AFTER the OOS protocol ends (2026-04-15).
+  All 105 candidate bars lie outside every OOS window -> archetype yields 0 signals in W02, W03,
+  W14, W15, W18, W19, W20; those windows hit `len(df_is)<40` and `continue` silently.
+- 5R/33bps unchanged: 0.94R/trade at 0.35% stop, 16.5% base rate, **32.3% break-even** - untestable
+  until Table 2 spans the backtest.
+
+**CONDITIONS TO PASS:** fix is_synthetic; remove/populate depth cols; fetch full tick history (and
+remove FP_AbsorptionCluster from REGIME_ARCHETYPE_MAP until then); commit all 18 symbols; mask first
+800 bars; real ladder gap check + referential integrity; eliminate F1. Do NOT run the 18-symbol
+extraction before items 1-2 (both change Table 1 content).
+
+---
+
+## Turn — Gate closure audit @ origin/main 2ae529c (e4a0e0f + 2ae529c). 2 of 4 closed.
+
+**Deliverable:** `GATE_CLOSURE_AUDIT_2ae529c.md`. Verdict: **CONDITIONAL — not yet resolved.**
+
+**1. is_synthetic NOT CLOSED — operator precedence bug.** historical_metrics_processor.py:83
+`np.where(df["is_synthetic"] == 1 | degenerate, 1, 0)`. Python binds `|` tighter than `==` so it
+parses as `is_synthetic == (1 | degenerate)`; `1|degenerate` is all-1s so **degenerate is discarded**.
+I EXECUTED the expression: input [0,0,0,0] + degenerate [F,T,F,T] -> result [0,0,0,0], expected
+[0,1,0,1]. Committed ETH parquet: **is_synthetic.sum()=0** (claim 10), **dtype int64** (claim int8),
+10 zero-volume + 10 flat bars still untagged. Fix: `(df["is_synthetic"]==1) | degenerate`.
+**Fourth consecutive round is_synthetic inert.**
+
+**2. Depth: CODE CLOSED, DATA NOT REGENERATED.** canonical_indicators.py:174-185 now
+`vol_scaling=clip(1/(atr/close*100),0.5,2.0)`, `bid=ask=base_vols*0.025*vol_scaling`, positive,
+`atrs` now used, docstring honestly says "proxy". BUT committed ETH parquet STILL has
+ask_depth_usd in [-1.545e8, -0] (negative), ask_depth_coin [-4.74e4,-0]. Must re-run processor.
+NEW ISSUE: bid_depth_coin == ask_depth_coin identically -> perfectly symmetric book -> any
+bid/ask imbalance feature is identically ZERO by construction.
+
+**3. Table 2 COMMITTED - B.4 NOW RUNNABLE AND PASSES (ETH).** ETH 4,391 rungs/384 candles/9 cols;
+BTC 3,670 rungs/384 candles. Both 0 nulls 0 infs, flags in {0,1}, trade_count>0, price_bin>0,
+is_poc sums to exactly 384 (one POC/candle). ETH imbalanced rungs 522 buy/545 sell; BTC 473/540.
+**B.4 ETH: 0 orphan candles, ladder spacing 0 gaps of 383 -> REFERENTIAL INTEGRITY PASSES.**
+Caveats: coverage **384 of 210,610 = 0.182%**; 210,216 master bars with volume>0 have no rungs; span
+still 2026-08-30..2026-09-02 (5 months AFTER OOS ends 2026-04-15).
+**BTC B.4 CANNOT VERIFY — BTCUSDT master table NOT committed** (only its ladder is). Their claim
+"you can now execute B.4 directly on committed files" holds for ETH only.
+
+**4. Archetype mapping CLOSED.** L648-654: Crash->A1_VolBreakout, Compression->V1_VWAPMeanRevert,
+Bull Mania & Bull Pullback->V2_VWAPContinuation, Bear->A4_UltraDeepValue. No regime maps to a
+footprint-dependent archetype so no pre-2026 window can be skipped. FP_AbsorptionCluster (L637-644)
+now unreachable from map; its spot_cvd_delta OR-fallback is loose enough to fire on nearly any bar
+with right CVD sign + liq/p8 condition - validate if re-wired.
+
+**BEFORE 18-SYMBOL EXTRACTION:** (1) add parens + assert is_synthetic.sum()==10 & int8, put the
+assertion in verify_parquet_integrity.py so it can't regress a 5th time; (2) regenerate master so
+depth fix reaches data, assert ask_depth_usd>=0; (3) commit BTC master; (4) fetch full tick history.
+Items 1-2 change Table 1 content - do before downloading, not after.
+
+---
+
+## Turn — Full 6-dimension forensic audit @ origin/main 701aac2 (all 18 symbols now committed)
+
+**Deliverable:** `FORENSIC_AUDIT_6DIM_main_2026-09-04.md`.
+**Verdict: CONDITIONAL — D1/D2/D4/D5 conditional, D3 and D6 FAIL.**
+
+**Repo state changed materially.** `origin/main` squashed to `701aac2`. `Engine_2/binance_backtesting_data/`
+now holds **54 files = 18 symbols x (master + ladder + manifest)**, 999 MB. `core/trained_models/`
+holds the two ExtraTrees joblibs (25.6 MB + 22.5 MB). Compute failed at session start (clone died
+at 79%), recovered mid-session; everything below was then MEASURED on `/tmp/r10` extraction.
+
+**THE PROJECT'S OWN VERIFIER PASSES 36/36 AND RETURNS True** ("ALL PARQUET DATASETS 100% HEALTHY").
+Every defect below passed it.
+
+**CLOSED SINCE LAST AUDIT (verified in data, not just code):**
+- `is_synthetic` — parentheses now present. **int8 on all 18; 161 tagged == 161 degenerate;
+  exact per-symbol match 18/18 (BTC 15/15, ETH 10/10).** Was sum()=0/int64 at 2ae529c.
+- `ask_depth_usd.min() == 0.0` on all 18 masters. Was -1.545e8.
+
+**D1 findings:**
+- **LOOKAHEAD MEASURED:** APT `atr_14[0]=0.5200 == round(mean(TR[0:14]),2)`;
+  `atr_100[0]=0.2300 == round(mean(TR[0:100]),2)`; `rsi_14[0:14] all == rsi_14[14]=56.37`.
+  `rma[:period-1] = rma[period-1]` and `rsi[:period] = rsi[period]` backfill future into past.
+  Mitigated for BTC/ETH (2019 warmup sliced off) but **live for APT/ARB/OP/SUI** (late-listed).
+- `ema_800[0]==close[0]`; still **6.09%** off close at bar 800. No validity flag.
+- **`bid_depth_coin == ask_depth_coin` in 100.00% of all 3,464,092 rows** -> every bid/ask
+  imbalance feature is EXACTLY zero. `schema.py` still documents both ask cols as "Negative".
+- **NEW: `fp_poc` rounded to 1 DECIMAL PLACE.** Distinct values: TRX **5**, DOGE **8**, ARB 24,
+  ADA 31, XRP 35, OP 48, SUI 50, APT 192 (vs BTC 181,477). Near-constant for 12 of 18 symbols.
+- `fp_delta` bit-identical to `future_cvd_15m` on all 18.
+- Liq polarity PASS on all 18. **ML branch confirmed:** 26.01% of BTC bars have |long_liq| < the
+  physics `base_floor` of 18500, which physics could never produce.
+- No MACD / Bollinger / Parkinson / price-SMA in the 62-col schema at all.
+
+**D2:** diagonal imbalance CORRECT (shift(1)/shift(-1) + `bin_diff==1` ANDed twice); stacked
+cluster CORRECT; POC unique via `idxmax` + integer `bin_idx` equality (`is_poc.sum()==candles` on
+all 18). `min_vol_floor`'s 0.05-**coin** leg is not price-normalised ($5,000 BTC vs $0.004 DOGE).
+`SYMBOL_BIN_STEPS` lookups are dead code (2 dead assignments). **Mixed grid measured: BTC
+synthetic rung spacing 17.1 vs real tick 25.0; ETH 0.79 vs 0.855.**
+
+**D3 FAIL — parity is MANUFACTURED.** `run_historical_pipeline.py` synthesises a ladder for every
+master bar lacking ticks: uniform volume spread, `is_buy_imbalance=is_sell_imbalance=int8(0)`,
+`is_poc` = rung nearest CLOSE. Measured: **99.76-100% of candles in all 18 ladders are uniform
+fabrications**; **10,721 imbalance flags across 93,936,836 rungs (0.0114%)**; **9 symbols have
+exactly ZERO imbalance flags**. Table 2 has **no provenance column**. `trade_count` mismatches
+master on **88.60% (BTC) / 91.19% (APT)** of candles. Synthetic step from FULL-SAMPLE median:
+BTC 16.04 bps, ETH 21.75, DOGE **133.43** in 2020 vs 3.5 bps design (4.58x/6.21x/38.12x coarse).
+Flag dtype splits int64 (has ticks) vs int8 (fully synthetic) - the fabrication boundary.
+**CROSS-TABLE CONTRADICTION: APT 384/384 and XRP 384/384 master bars labelled TICK_EXACT have
+100% uniform synthetic ladders (0 real); BTC 383/384 real.**
+**`verify_parquet_integrity.py` referential gate is DEAD CODE:** `unmatched_ts` computed, never
+read; `ref_valid` hard-True; reverse direction never computed; missing master silently passes.
+
+**D4:** nulls/infs/gaps/monotonicity genuinely 0 on all 36. Manifest arithmetic exact
+(2193x96+85 = 210,613). **`total_records` prints 93,936,836 ladder RUNGS as "candles" vs actual
+3,464,092 = 27.12x overstatement.** No fingerprints in manifest. `is_synthetic` gate uses
+`.any()` (too weak, though currently exactly right).
+
+**D6 FAIL:** 100% ladder coverage is fake; 1,124 of 3,464,092 bars (0.0324%) have any stacked
+imbalance. 5R trailing mandate unrunnable on 15m (breakeven 32.3% vs 16.5% base rate
+[prior-session]). Fast-skip freezes all 54 parquets; tick cache never invalidated;
+`--footprint-days` defaults 0 (~39,500 files needed for full history); 999 MB binary in git.
+
+**P0 items:** (1) add `rung_source` to Table 2; (2) stop co-mingling synthetic+real rungs;
+(3) wire `ref_valid` + reverse check + uniform-rung detector + trade_count reconciliation;
+(4) fix the TICK_EXACT/ladder contradiction; (5) kill the full-sample median leak, emit bin_step;
+(6) fix `fp_poc` rounding; (7) rename/scope liq model cols; (8) fix RMA/RSI warmup backfill.
