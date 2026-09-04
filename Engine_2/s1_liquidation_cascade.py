@@ -39,9 +39,6 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURATION & PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 DATA_DIR = os.path.join(SCRIPT_DIR, "binance_backtesting_data") if os.path.exists(os.path.join(SCRIPT_DIR, "binance_backtesting_data")) else SCRIPT_DIR
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results_s1_liquidation")
-os.makedirs(RESULTS_DIR, exist_ok=True)
-logger.info(f"Results Directory: {RESULTS_DIR}")
 
 # Performance Gates per OOS Window (Calmar-Aware Institutional Mandate)
 MIN_RETURN = 0.10        # Target Monthly ROI strictly greater than 10.0% ($500 net profit on $5,000)
@@ -749,10 +746,6 @@ def run_all_20_windows(data_by_symbol):
     btc_df = data_by_symbol.get('BTCUSDT', None)
     
     all_window_results = []
-    status_file = os.path.join(RESULTS_DIR, "s1_status.json")
-    with open(status_file, "w") as f:
-        json.dump([], f)
-        
     logger.info("\n" + "="*80)
     logger.info("EXECUTING 20-MONTH SEQUENTIAL OUT-OF-SAMPLE WALK-FORWARD VALIDATION")
     logger.info("="*80)
@@ -909,9 +902,6 @@ def run_all_20_windows(data_by_symbol):
             "status": status_icon
         }
         all_window_results.append(window_record)
-        with open(status_file, "w") as sf:
-            json.dump(all_window_results, sf, indent=4)
-            
         del df_is, df_oos, model, X_train, y_train
         gc.collect()
         
@@ -923,8 +913,8 @@ def run_all_20_windows(data_by_symbol):
 # 7. AUTONOMOUS MASTER CONTROLLER LOOP
 # ─────────────────────────────────────────────────────────────────────────────
 def run_autonomous_loop():
-    """Continuously executes S2 walk-forward optimization until all 20 windows pass sequentially."""
-    logger.info("Initializing Autonomous 20-Window OOS Optimization Loop for S1 (Liquidation Cascade)...")
+    """Executes S1 walk-forward validation across all 20 windows under zero-lookahead causality."""
+    logger.info("Initializing 20-Window OOS Validation for S1 (Liquidation Cascade)...")
     data_by_symbol = load_and_preprocess_data()
     
     if not data_by_symbol:
@@ -933,17 +923,6 @@ def run_autonomous_loop():
 
     success = run_all_20_windows(data_by_symbol)
     if success:
-        result_path = os.path.join(RESULTS_DIR, "winning_configuration.json")
-        with open(result_path, "w") as f:
-            json.dump({
-                "strategy": "S1_Liquidation_Cascade_Exhaustion",
-                "horizon_months": 18,
-                "concurrency": 2,
-                "leverage": 10.0,
-                "all_20_windows_passed": True,
-                "timestamp_utc": datetime.utcnow().isoformat()
-            }, f, indent=4)
-            
         print("\n" + "="*80, flush=True)
         print("[CONQUEST] S1 CONQUERED - ALL 20 WINDOWS PASSED", flush=True)
         print("="*80 + "\n", flush=True)
