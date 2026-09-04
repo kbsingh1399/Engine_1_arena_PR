@@ -1,7 +1,7 @@
 {
   "symbol": "ARBUSDT",
   "timeframe": "15m",
-  "total_rows": 120987,
+  "total_rows": 120900,
   "columns": [
     "open_time_ms",
     "close_time_ms",
@@ -68,8 +68,8 @@
   ],
   "column_count": 62,
   "start_time_utc": "2023-03-23 15:00:00",
-  "end_time_utc": "2026-09-03 21:30:00",
-  "exported_at_utc": "2026-09-03T21:47:23.506227+00:00",
+  "end_time_utc": "2026-09-02 23:45:00",
+  "exported_at_utc": "2026-09-04T05:14:12.097934+00:00",
   "master_file": "ARBUSDT_15m_master_2020_2026.parquet",
-  "master_size_mb": 27.74
+  "master_size_mb": 27.68
 }
