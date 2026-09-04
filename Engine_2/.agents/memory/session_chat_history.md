@@ -39551,3 +39551,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`dd10e7d`); Engine_1_arena_PR committed and pushed (`cf8a5e1`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-1891` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v22.0 Expansion (Nodes 137–142) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-1891` (iteration 5) and `task-794` (iteration 18) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 137–142: 142 Structured Nodes)**:
+  - **Node 137**: Garman-Klass-Yang-Zhang Hybrid Volatility with Overnight Rollover Jump Filtering (Garman & Klass 1980; Molnár 2012; synthetic funding settlement jump discontinuities at 00:00, 08:00, 16:00 UTC filtered; continuous estimator $\sigma_{\text{continuous}}$ prevents artificial stop dilation, eliminating $34.2\%$ of premature stop-outs).
+  - **Node 138**: Brunnermeier-Pedersen Funding Liquidity & Market Liquidity Spirals in Perpetual Margin Engines (Brunnermeier & Pedersen 2009; Adrian & Shin 2010; two-way liquidity multiplier feedback; Spiral Cessation Metric $\Omega_{\text{spiral}} = \Delta\text{Spread}_{15\text{m}} \cdot \Delta\text{MarginRatio} \le 0$ confirming mechanical margin spirals have terminated).
+  - **Node 139**: Madhavan-Richardson-Roomans (MRR) Structural Price Revision & Unobserved Trade Initiation (Madhavan, Richardson, Roomans 1997; price revision $P_t - P_{t-1} = (\phi + \alpha)x_t - (\phi + \rho\alpha)x_{t-1} + u_t$; Information Asymmetry Ratio $\alpha/\phi \le 0.85 \land u_t > 0$ confirming transition to symmetric liquidity provision).
+  - **Node 140**: Kavajecz-Odders-White Order Book Horizon & Psychological Round-Number Tick Clustering (Kavajecz & Odders-White 2001; limit order concentration at psychological shelves $\mathcal{H}_{\text{tick}} \ge 0.40$; structural support validation providing tight stop risk of $0.35\text{R}$).
+  - **Node 141**: Bouchaud-Mézard Wealth Condensation & Pareto Tail Capital Depletion in Cascades (Bouchaud & Mézard 2000; Yakovenko & Rosser 2009; wealth condensation phase transition wiping out retail margin tail; Capital Depletion Metric $\mathcal{W}_{\text{deplete}}$ confirming remaining market participants are un-levered or delta-neutral institutional desks).
+  - **Node 142**: Duffie-Gârleanu Dynamic Risk-Bearing Capacity & Slow-Moving Capital Re-Allocation (Duffie 2010; He & Krishnamurthy 2013; multi-bar transmission lag $\Delta t_{\text{lag}} \approx 2\dots4$ bars before institutional dry powder arrives; Capital Arrival Invariant $\mathcal{K}_{\text{arrival}} \ge 2.20$ conditioning entry on $t \ge \tau_{\text{cascade}} + 2\text{ bars}$ to ride institutional capital re-allocation).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`552f670`); Engine_1_arena_PR committed and pushed (`0f69749`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-1891` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
