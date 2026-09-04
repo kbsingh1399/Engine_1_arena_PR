@@ -39268,3 +39268,20 @@ eferences.bib into architecture memory in both repositories.
      - **Node 36**: Practical Microstructure & Backtest Realism (Reddit r/algotrading consensus on FIFO queue position delusions, MBO/MBP fill probability modeling, toxic adverse selection on resting orders, S1's taker execution and 8 bps fee / 10-15 bps slippage haircuts, and CPCV 72-hour causal embargo).
   3. **Dual-Repository Parity**: Executed `verify_and_sync_agents.py` achieving 100% byte-for-byte synchronization across all 7,993 files in both repositories.
 
+---
+
+## Turn Record: Knowledge Base v5.0 Expansion (Nodes 37–42) & Advanced Parquet Alignment (2026-09-05)
+- **User Request**: ensure to keep searching for most advanced techniques of trading based on data we have... also no repeat.
+- **Data Inventory Inspected**:
+  - Table 1 (18 assets, 3.46M rows): 61 columns including Spot/Futures CVD (15m, session, lifetime), Funding rate, Basis, Open interest delta, Liquidation volume, Top account L/S ratio, Whale index, Average trade size, Order book depth (`bid_depth_usd`, `ask_depth_usd`), Footprint delta, POC volume ratio, and stacked imbalances.
+  - Table 2 (Footprint Ladders, 11.3M+ rows per asset): `open_time_ms`, `price_bin`, `bid_vol_coin`, `ask_vol_coin`, `net_delta_coin`, `is_buy_imbalance`, `is_sell_imbalance`, `is_poc`, `trade_count`.
+- **Knowledge Base Expansion (Nodes 37–42)**:
+  - **Node 37**: Perpetual Basis, Funding Hydrodynamics & Cash-and-Carry Dislocations (Binance 8h TWAP formula, Ethena delta-neutral basis flows, post-cascade funding inversions as short squeeze catalysts).
+  - **Node 38**: Macro Regime Classification & Why Hidden Markov Models Overfit (Ernie Chan empirical doctrine, regime classification lag, invariant multi-confluence vs fragile state machines, Bollerslev GARCH volatility clustering).
+  - **Node 39**: Cross-Asset Order Flow Lead-Lag & Cross-Impact Dynamics (Albers, Cucuringu & Howison 2022, cross-impact OFI matrices, BTC-to-altcoin contagion delay windows).
+  - **Node 40**: Fractional Kelly Capital Allocation & Drawdown Mitigation (Edward Thorp & Ralph Vince, Full Kelly estimation ruin vs Half/Quarter-Kelly growth rate preservation, S1's $5,000 / $25 base / $50 house money realization).
+  - **Node 41**: Multi-Level Footprint Ladders & Stacked Diagonal Imbalances (Table 2 parquet alignment, diagonal 300% ratio tests, 3+ stacked buying imbalance defense zones, unfinished auction zero-prints).
+  - **Node 42**: Whale Aggression, Block-Size Power Laws & Order Book Depth Imbalance (Gabaix power law $S^{-\zeta}$, `whale_index` & `avg_trade_size_usd` divergence, OBI depth cushion formula $\frac{\text{Bid} - \text{Ask}}{\text{Bid} + \text{Ask}} > +0.35$).
+- **Parity & Mirroring**: Both repositories synchronized to 7,993 files and pushed cleanly to remote origins.
+
+
