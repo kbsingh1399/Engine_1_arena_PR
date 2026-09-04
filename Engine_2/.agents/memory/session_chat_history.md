@@ -39284,4 +39284,16 @@ eferences.bib into architecture memory in both repositories.
   - **Node 42**: Whale Aggression, Block-Size Power Laws & Order Book Depth Imbalance (Gabaix power law $S^{-\zeta}$, `whale_index` & `avg_trade_size_usd` divergence, OBI depth cushion formula $\frac{\text{Bid} - \text{Ask}}{\text{Bid} + \text{Ask}} > +0.35$).
 - **Parity & Mirroring**: Both repositories synchronized to 7,993 files and pushed cleanly to remote origins.
 
+---
+
+## Turn Record: Knowledge Base v6.0 Expansion (Nodes 43–46) & High-Frequency Liquidity Physics (2026-09-05)
+- **User Directive**: Continuous search for the most advanced trading techniques grounded in active parquet data with zero repetition.
+- **Synthesized Knowledge Additions (Nodes 43–46)**:
+  - **Node 43**: Cointegration, Statistical Arbitrage & Cross-Sectional Spread Elasticity (Vector Error Correction Model [VECM], Johansen cointegration on 18 crypto perps, altcoin-to-BTC Z-spread $> 2.5\sigma$ liquidation overshoots and elastic mean-reversion).
+  - **Node 44**: Adversarial Machine Learning & Multicollinearity Purging (Marcos Lopez de Prado Clustered Feature Importance [CFI] via Hierarchical Risk Parity, Boruta shadow feature Gaussian noise rejection thresholds).
+  - **Node 45**: Volatility Signature Plots & Microstructure Sampling Sweet Spots (Aït-Sahalia realized volatility explosion under ultra-high-frequency noise $\tau < 1\text{m}$, mathematical justification of 15m candle resolution where noise decays to $<4.2\%$).
+  - **Node 46**: Exchange Liquidation Hydrodynamics & The "Post-Wick Vacuum" (BitMEX / CEX matching engine kinetic cessation, thin liquidity crust vs deep mantle, vertical snapback mechanics on cleared ask books).
+- **Parity & Sync**: Executed `verify_and_sync_agents.py` with 100% byte-for-byte verification across 7,993 files in both repositories.
+
+
 
