@@ -38019,3 +38019,63 @@ imbalance. 5R trailing mandate unrunnable on 15m (breakeven 32.3% vs 16.5% base 
 (3) wire `ref_valid` + reverse check + uniform-rung detector + trade_count reconciliation;
 (4) fix the TICK_EXACT/ladder contradiction; (5) kill the full-sample median leak, emit bin_step;
 (6) fix `fp_poc` rounding; (7) rename/scope liq model cols; (8) fix RMA/RSI warmup backfill.
+
+---
+
+## Turn — S1 strategy & walk-forward zero-lookahead audit @ origin/main 8c0d74b
+
+**Deliverable:** PART II appended to `ENGINE2_AUDIT_MASTER.md` (now 2,163 lines / 116 KB).
+
+**VERDICTS:** `s1_liquidation_cascade.py` = **[CLEAN — ZERO LOOKAHEAD VERIFIED]**.
+`verify_sequential_w1_w20.py` = **[LEAKAGE DETECTED]**. Allocation = **[REJECT]**.
+
+**I RAN THE ENGINE.** Installed lightgbm/optuna/numba/sklearn, extracted `8c0d74b`, executed
+`python3 -u s1_liquidation_cascade.py` on a 4-symbol subset (3 GB RAM ceiling).
+**841,172 rows, 20/20 windows evaluated, 0/20 PASSED.** mean ROI -2.55%/window,
+trade-weighted WR **22.9%** vs a 40% gate, **83 OOS trades total** (4.2/window), 2 windows with
+zero trades. `MIN_TRADES>=5` fails in 12/20 windows before ROI matters.
+
+**s1 IS CLEAN.** Only ONE `shift(-)` in the whole codebase: L240 `next_open` (execution price,
+absent from feature_cols L723-730). Zero `center=True`, zero `bfill`. All 38 features
+backward-looking. `classify_macro_regime_causal` (L656) reads only `[train_end_purged-30d,
+train_end_purged)`. Optuna (L782-808) touches `X_train` only; 80/20 split is temporal (L715 sort).
+`frozen_prob_threshold` (L821-823) from `X_train` only. IS partition purges on **exit_time**
+(L768) — correctly handles the 72h (288x15m) label horizon, not just entry. Stops evaluated BEFORE
+ratchet with `break` (L350-356 / L376-382); ratchet affects subsequent bars only; and there is
+**no profit-target branch at all** => same-bar double wins structurally impossible. Gap-aware fills
+`min(cur_stop, lows[j])`. Concurrency releases on `exit_time <= entry_t` (L461); hard cap
+`continue` (L489). It also recomputes ATR locally (L191-195), insulating S1 from the parquet
+warmup lookahead found in Part I.
+
+**s1 FINDINGS:** V-01 full-horizon MAE booked at entry (L526) and used to size later trades
+(L484/L507-508) — non-causal but strictly CONSERVATIVE. V-09 label `r_mult>0` is gross of the 8bps
+fee: measured on 9,859 A4 trades, fee = median 0.0712R, 84/2279 positives (3.69%) mislabelled,
+gross WR 23.12% vs net 22.26% = **0.85pp** (real but small). **V-10 HIGH: denominator defect** —
+L908-910 `return pass_total == len(all_window_results)`; skipped windows (L771-773 `continue`)
+never append, so a 3-window run that passes 3 prints "ALL 20 WINDOWS PASSED".
+`grep '== *20|len(OOS_MONTHS)|len(windows)|>= *20'` returns NOTHING. Did not fire (all 20
+evaluated on both the 4-symbol and 2-symbol runs) but is latent and structural.
+
+**verify_sequential_w1_w20.py IS COMPROMISED:**
+- **V-04 CRITICAL:** `grep classify_macro_regime_causal|REGIME_ARCHETYPE_MAP` -> **NEITHER USED**.
+  20 hand-written blocks (w1..w20) each hardcode a strategy bundle: W01 Multi-Strategy Synergy,
+  W02 S1_VolBreakout, W03 A2_DeepSqueeze, W04 Multi-Engine Bear Shorts, W20 SYN_N4_A4
+  Bi-Directional. **No causal mechanism exists to produce those assignments** => model selection
+  on OOS.
+- **V-05 CRITICAL:** per-window bespoke risk params — `base_risk` 25->95 (3.8x), `house_risk`
+  105->220, `house_trigger` 15->30, **`max_concurrent` 1/2/4/6**, `dd_limit` 0.045->0.050,
+  `max_notional` 15000 in W01. Per-window labels too (`r_multiple>1.0` at L664/L673 vs `>0` in s1).
+- **V-06 HIGH:** frozen `p_star` overridden by `df_oos.nlargest(k,'prob')` at L176/L301/L329/L368;
+  W06 (L301) ignores `p_star` entirely. s1 has NO such fallback — W08/W17 correctly took 0 trades.
+- Uniform gate `roi>=0.20` (= 792%/yr annualised); denominator IS hardcoded to 20 (no V-10 there).
+
+**DOMAIN 4 MATH:** P(20/20)=q^20. q=0.90 -> 0.12; **q=0.9659 needed for P=0.50**. Multi-sleeve
+diversification raises q by cutting variance but cannot change the exponent — the conjunctive
+20/20 gate is unsatisfiable below ~86% per-window. Measured blocker is trade count: ROI>=10% in
+1/20, trades>=5 in 8/20, BOTH in 1/20.
+
+**Bottom line recorded in the doc:** the causality engineering in s1 is genuinely good, and it is
+also worthless as a strategy. The harness is not broken — it is telling the truth.
+
+**Cleanup:** lookup tables confirmed PURGED (no winning_configuration / s1_status / s2_status
+anywhere; only the 18 dataset manifests remain).

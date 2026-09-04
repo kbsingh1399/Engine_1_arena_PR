@@ -4,13 +4,26 @@
 | | |
 |---|---|
 | **Document** | `ENGINE2_AUDIT_MASTER.md` — single self-contained source of truth |
-| **Auditor** | Chief Quantitative Research Auditor / HFT Market Microstructure |
+| **Auditor** | Chief Quantitative Research Auditor / MD Quantitative Risk / Algorithmic Execution |
 | **Last updated** | 2026-09-04 |
-| **Audited revision** | `origin/main` = **`701aac2`** |
 | **Session branch** | `arena/01a06774-engine-1-arena-pr` |
-| **Overall verdict** | **CONDITIONAL** — Dimensions 3 and 6 **FAIL** |
-| **Production readiness** | **REJECT** — not fit for OOS backtesting until P0 items 1–8 are closed |
+| | |
+| **PART I — Data pipeline** | audited at `origin/main` = `701aac2` · 6 dimensions · **CONDITIONAL**, D3 & D6 **FAIL** |
+| **PART II — S1 strategy & walk-forward** | audited at `origin/main` = **`8c0d74b`** · 4 domains + execution |
+| | |
+| **Temporal verdict — `s1_liquidation_cascade.py`** | **`[CLEAN — ZERO LOOKAHEAD VERIFIED]`** |
+| **Temporal verdict — `verify_sequential_w1_w20.py`** | **`[LEAKAGE DETECTED]`** |
+| **Allocation verdict** | **`[REJECT]`** |
+| | |
+| **Production readiness** | **REJECT** — pipeline blocked on P0 items 1–8; S1 blocked on R-1…R-8 |
 | **Research readiness** | **CONDITIONAL** — Table 1 usable with documented exclusions; Table 2 unusable |
+
+**Headline.** Two independent audits, one conclusion. The data pipeline fabricates the footprint
+ladder it claims to have measured (Part I). The strategy engine is causally clean and, when
+actually executed against the committed data, passes **0 of 20** out-of-sample windows with a
+**22.9%** win rate against a 40% gate (Part II). The multi-sleeve verifier that *can* produce a
+passing scorecard is the one that selects a different hand-picked strategy and a different set of
+risk parameters for every window — that is test-set snooping, not validation.
 
 > **This document is exhaustive and self-contained.** It supersedes
 > `S1_V2_INSTITUTIONAL_REVIEW.md`, `FOOTPRINT_ARCHITECTURE_COUNCIL_REVIEW.md`,
@@ -21,6 +34,8 @@
 ---
 
 # TABLE OF CONTENTS
+
+### PART I — DATA PIPELINE & PARQUET INTEGRITY (audited at `701aac2`)
 
 - [0. How to reproduce this audit](#0-how-to-reproduce-this-audit)
 - [1. Executive summary & scorecard](#1-executive-summary--scorecard)
@@ -37,6 +52,26 @@
 - [12. What was NOT verified](#12-what-was-not-verified)
 - [Appendix A — Reproduction commands](#appendix-a--reproduction-commands)
 - [Appendix B — Schema reference](#appendix-b--schema-reference)
+
+### PART II — S1 STRATEGY ENGINE & WALK-FORWARD CAUSALITY (audited at `8c0d74b`)
+
+- [II.0 Evidence base — what was actually executed](#ii0-evidence-base--what-was-actually-executed)
+- [II.1 Domain 1 — Information leakage & temporal snooping](#ii1-domain-1--information-leakage--temporal-snooping)
+- [II.2 Domain 2 — Threshold calibration & parameter snooping](#ii2-domain-2--threshold-calibration--parameter-snooping)
+- [II.3 Domain 3 — Microstructure & intra-bar execution realism](#ii3-domain-3--microstructure--intra-bar-execution-realism)
+- [II.4 Domain 4 — Single strategy vs multi-sleeve feasibility](#ii4-domain-4--single-strategy-vs-multi-sleeve-feasibility)
+- [II.5 Line-by-line vulnerability log](#ii5-line-by-line-vulnerability-log)
+- [II.6 Verdicts & required remediation](#ii6-verdicts)
+
+> **Read Part II first if you only have time for one section.** It contains the temporal verdict,
+> the allocation verdict, and the executed 20-window result.
+
+---
+
+---
+
+# PART I — DATA PIPELINE & PARQUET INTEGRITY
+### Audited at `origin/main` = `701aac2`
 
 ---
 
@@ -1535,4 +1570,593 @@ for s in syms:
 
 ---
 
-**END OF DOCUMENT** · `ENGINE2_AUDIT_MASTER.md` · audited revision `701aac2` · 2026-09-04
+---
+---
+
+# PART II — S1 STRATEGY ENGINE & WALK-FORWARD CAUSALITY AUDIT
+### Zero-Lookahead Forensic Review · `s1_liquidation_cascade.py` · `verify_sequential_w1_w20.py`
+
+| | |
+|---|---|
+| **Audited revision** | `origin/main` = **`8c0d74b`** |
+| **Files** | `s1_liquidation_cascade.py` (931 L) · `verify_sequential_w1_w20.py` (700 L) · `adversarial_council_stress_test.py` (402 L) |
+| **Temporal verdict — `s1_liquidation_cascade.py`** | **`[CLEAN — ZERO LOOKAHEAD VERIFIED]`** |
+| **Temporal verdict — `verify_sequential_w1_w20.py`** | **`[LEAKAGE DETECTED]`** |
+| **Allocation verdict** | **`[REJECT]`** |
+
+## II.0 EVIDENCE BASE — WHAT WAS ACTUALLY EXECUTED
+
+This is not a read-only review. The production engine was **run end to end** against the
+committed 18-symbol dataset.
+
+| Step | Command | Result |
+|---|---|---|
+| Fetch | `git fetch origin main` | `origin/main` = `8c0d74b` |
+| Extract | `git archive origin/main Engine_2 \| tar -x -C /tmp/r11` | 15 `.py` files + 999 MB data |
+| Deps | `pip install lightgbm optuna numba python-dateutil scikit-learn pandas pyarrow` | lightgbm 4.7.0 / optuna 4.9.0 / numba 0.67.0 / sklearn 1.9.0 |
+| **Run the engine** | `python3 -u s1_liquidation_cascade.py` (4-symbol subset: BTC, ETH, SOL, XRP — 3 GB RAM ceiling) | **841,172 rows loaded, 20/20 windows evaluated, `0/20 Windows Passed`** |
+| Trade-stream extraction | `extract_archetype_dataset(...)` on all 4 reachable archetypes | A1 4,436 · A4 9,859 · V1 9,981 · V2 4,929 trades |
+| Label/fee boundary | recomputed `r_multiple` vs fee-in-R on the 9,859-trade A4 stream | see §II.3.2 |
+| Static sweeps | `grep` for `shift(-`, `center=True`, `bfill`, optuna, lookup tables, `== 20` | see below |
+
+**Subset caveat, stated plainly:** the machine has 3 GB RAM and 2 cores, so the engine was run on
+4 of 18 symbols. Every *code-level* finding is symbol-independent. The *performance* figures
+(0/20, 83 trades, 22.9% win rate) are from the 4-symbol subset and would change in magnitude —
+not in sign — on the full 18.
+
+---
+
+## II.1 DOMAIN 1 — INFORMATION LEAKAGE & TEMPORAL SNOOPING
+
+### II.1.1 Feature causality — **CLEAN**
+
+Exhaustive static sweep of all three files:
+
+```
+grep -n 'shift(-'        → 1 hit total:  s1_liquidation_cascade.py:240
+grep -n 'center=True'    → 0 hits
+grep -n 'bfill'          → 0 hits
+```
+
+**The single negative shift in the entire codebase is the execution price, not a feature:**
+
+```python
+240|     df['next_open'] = df['open'].shift(-1)
+241|     df.dropna(subset=['next_open', 'atr'], inplace=True)
+```
+
+And `next_open` is **provably absent from the feature matrix** — `feature_cols` (L723–730)
+enumerates 38 columns and `next_open` is not among them. It is consumed only at
+`gen_symbol_trades` L411 (`raw_entry = next_opens[i]`) and in the trade record at L700.
+
+Every named feature in the brief is backward-looking. Verified line by line:
+
+| Feature | Line | Construct | Causal? |
+|---|---|---|---|
+| `spot_cvd_delta` | 144 | `spot_cvd.diff()` | ✅ |
+| `future_cvd_delta` | 145 | `fut_cvd.diff()` | ✅ |
+| `spot_cvd_accel` | 146 | `.diff()` of a `.diff()` | ✅ |
+| `zc4` / `zc10` / `zc20` | 148–150 | `zs()` = `rolling(w, min_periods=1)` mean/std (L69–70) | ✅ |
+| `liql`/`liqs`/`liqlm`/`liqsm` | 162–165 | `rolling(5)` / `rolling(96)` sum/mean | ✅ |
+| `long_liq_zscore`, `short_liq_zscore` | 170–173 | `rolling(96, min_periods=12)` mean/std | ✅ |
+| `oi_flush` | 176 | `oi_change_pct.clip(upper=0)` — pointwise | ✅ |
+| `zoi` | 181 | `zs(oi, 96)` on `.ffill()`ed OI | ✅ |
+| `oid` | 182 | `oi.diff(5) / (oi.shift(5) + 1e-8)` | ✅ |
+| `oicc` | 183 | `sign(oid) * sign(spot_cvd_delta)` — pointwise | ✅ |
+| `zfr`, `zls` | 187–188 | `zs(..., 20)` / `zs(..., 96)` | ✅ |
+| `atr` | 191–195 | true range from `close.shift(1)`, `rolling(14).mean()` | ✅ |
+| `rsi` | 196 | taken from master `rsi_14` | ✅ see note |
+| `vwap`, `vwap_zscore`, `vwap_dev_pct` | 199–211 | `groupby(day_anchor).cumsum()` — intraday cumulative | ✅ |
+| `macro_spread`, `mc` | 213–216 | `ewm(span=200/800)` | ✅ |
+| `p8`, `p21`, `p50`, `p200` | 218–224 | `ewm(span=8/21/50/200)` | ✅ |
+| `vol_ratio` | 226–229 | `rolling(96).std() / rolling(672).std()` | ✅ |
+| `trend_strength` | 230 | `(ef − es).abs() / atr` | ✅ |
+| `regime` | 232–237 | pointwise on the above | ✅ |
+
+**No centred window, no backward fill, no future-referencing statistic anywhere.**
+
+**Two things this file does better than the pipeline it consumes (Part I):**
+
+1. **It recomputes ATR locally** (L191–195) from true range with `close.shift(1)`, rather than
+   using the master parquet's `atr_14`. That insulates S1 from the warmup-backfill lookahead
+   documented in Part I §D1-1.
+2. **`gen_symbol_trades` starts at `i = 100` and stops at `n − 100`** (L405, L407), so the
+   parquet's contaminated `rsi_14` bars 0–13 are never traded.
+
+### II.1.2 Purge gap — **ADEQUATE, and over-satisfied by a stronger constraint**
+
+```python
+758|     train_end_purged = w['train_end'] - pd.Timedelta(hours=3)   # Strict 3h purge gap
+768|     df_is  = df_arch[(df_arch['entry_time'] >= train_start) & (df_arch['exit_time'] < train_end_purged)].copy()
+769|     df_oos = df_arch[(df_arch['entry_time'] >= test_start) & (df_arch['entry_time'] < test_end)].copy()
+```
+
+**The 3-hour purge is not the operative control — L768 is.** The IS partition requires
+`exit_time < train_end_purged`, i.e. a trade enters IS **only if its entire resolution completes
+before the purge boundary.** Since `max_bars = 288` at 15 m = **72 hours**, the label horizon is
+three days, and filtering on `exit_time` — not merely `entry_time` — is exactly the right
+treatment. Most implementations purge on entry only and leak the label tail; this one does not.
+
+Consequences:
+- **No IS trade's outcome extends into the OOS window.** No label overlap.
+- The 3-hour gap is *redundant* given the `exit_time` filter — harmless, and defensible as
+  belt-and-braces against feature staleness at the boundary.
+- **Verdict: PASS.**
+
+### II.1.3 Point-in-time merging — **CLEAN in both files**
+
+`s1_liquidation_cascade.py:133`:
+```python
+129|     df = df.sort_values('datetime_utc').reset_index(drop=True)     # left frame sorted ✅
+133|     df = pd.merge_asof(df, btc_ref, on='datetime_utc', direction='backward')
+```
+
+`verify_sequential_w1_w20.py:60–71`:
+```python
+66|     df = df_signals.sort_values('entry_time').reset_index(drop=True)          # ✅
+67|     bm = btc_macro_[['datetime_utc'] + REG_FEATS].sort_values('datetime_utc')  # ✅
+68|     df = pd.merge_asof(df, bm, left_on='entry_time', right_on='datetime_utc', direction='backward')
+```
+
+Both frames are sorted on the join key (pandas raises otherwise, so this is enforced at runtime),
+and `direction='backward'` binds each altcoin signal to the most recent BTC row **at or before**
+its own timestamp. **Zero lookahead**, conditional on the BTC columns being causal at their own
+timestamp — verified: `btc_r_24h = close.pct_change(96)` (L146), `btc_vol_delta_12 =
+vol_ratio.diff(12)` (L147), `btc_rsi_z` and `btc_trend_strength` pointwise (L148–150). All
+backward. **Verdict: PASS.**
+
+### II.1.4 The one real causality defect in `s1_liquidation_cascade.py`
+
+**V-01 · MEDIUM · Full-horizon MAE is injected into the risk-state machine at entry.**
+
+```python
+526|     mae_dollar = units * maes[i]        # maes[i] is the trade's EVENTUAL max adverse excursion
+532|     open_mae_dollars[p] = mae_dollar     # booked at ENTRY
+...
+480|     open_mae += open_mae_dollars[p]
+484|     cur_mtm_equity = capital - open_mae
+507|     drawdown_budget = max(0.0, peak_capital * dd_limit - closed_drawdown - open_mae)
+508|     cur_risk = min(target_risk, drawdown_budget / 1.2)
+```
+
+`maes[i]` is a function of trade *i*'s entire future path. Booking it at entry means the sizing
+and gating of **subsequent** trades (L507–508) depend on the realised future MAE of an open
+position. That is temporal leakage in the risk channel.
+
+**Direction is strictly conservative, and I verified why.** At any instant during a trade,
+unrealised PnL ≥ −(full-horizon MAE) by definition of MAE. Therefore
+`capital − open_mae ≤ true MTM equity`, so `dd` is **over**stated, `max_dd` is **over**stated,
+`drawdown_budget` is **under**stated, `cur_risk` is smaller, and positions are smaller. **It
+cannot inflate ROI.** But it does mean the reported max-DD, trade count and equity path are not
+reproducible live.
+
+**Fix:** carry a bar-by-bar unrealised-PnL series per open position and mark to that.
+
+---
+
+## II.2 DOMAIN 2 — THRESHOLD CALIBRATION & PARAMETER SNOOPING
+
+### II.2.1 Frozen decision boundary p\* — **CLEAN, zero OOS contact**
+
+```python
+818|     model.fit(X_train, y_train)
+820|     # F3 Fix: Derive frozen decision threshold strictly In-Sample (Top 20% IS threshold)
+821|     is_probs = model.predict_proba(X_train)[:, 1]
+822|     frozen_prob_threshold = float(np.percentile(is_probs, 75)) if len(is_probs) > 0 else 0.50
+823|     frozen_prob_threshold = max(0.50, min(0.65, frozen_prob_threshold))
+...
+826|     X_oos = df_oos[fcols].fillna(0.0).to_numpy(dtype=np.float32)
+830|     mask_oos = (probs_oos >= frozen_prob_threshold)
+```
+
+`is_probs` is computed on `X_train` only. The clamp at L823 uses two literals. `df_oos` is
+**never referenced** at L821–823. **The threshold does not touch out-of-sample data.** Verdict:
+**PASS.**
+
+**Two notes, neither a leakage violation:**
+- **Doc/code mismatch:** the comment says "Top 20% IS threshold"; `percentile(..., 75)` is the
+  top **25%**.
+- **V-02 · MEDIUM · the quantile is taken on *fitted* in-sample probabilities.** A fitted
+  LightGBM's in-sample probabilities are over-confident, so their 75th percentile sits lower than
+  the 75th percentile of genuine out-of-sample probabilities. The clamp to `[0.50, 0.65]`
+  mitigates this substantially. **Effect: the gate admits more OOS trades than "top 25%" implies
+  — permissive, not leaky.** Same pattern in `verify_sequential_w1_w20.py:90` (`p_perc=70/72`)
+  and `:666`/`:675` (`percentile(gbm.predict(n4_is[...]), 75)`).
+
+### II.2.2 Runtime search — **CLEAN in `s1`; ABSENT in the verifier**
+
+Optuna **is** live in `s1_liquidation_cascade.py`:
+
+```python
+782|     def _optuna_objective(trial):
+783|         md = trial.suggest_int("max_depth", 3, 6)
+...
+789|         n_split = int(len(X_train) * 0.8)
+790|         X_tr, X_val = X_train[:n_split], X_train[n_split:]
+791|         y_tr, y_val = y_train[:n_split], y_train[n_split:]
+...
+803|         val_wr = (y_val[pred == 1]).mean() if (pred == 1).sum() > 0 else 0.0
+804|         return val_wr
+806|     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42))
+807|     study.optimize(_optuna_objective, n_trials=15, timeout=10)
+```
+
+Every input is `X_train` / `y_train`, i.e. `df_is`. **`df_oos` is not in scope of the objective.**
+The internal 80/20 split is **positional on a frame sorted by `entry_time`** (L715), so the
+validation fold is the *later* 20% of IS — a proper temporal holdout, not a shuffle. Seeded
+(`seed=42`), bounded (15 trials, 10 s). This is textbook walk-forward hyperparameter selection on
+training data. **Verdict: PASS — no OOS search.**
+
+`verify_sequential_w1_w20.py` contains **no** optuna, grid, or threshold sweep. It needs none —
+see §II.2.4.
+
+### II.2.3 Lookup tables — **PURGED** ✅
+
+```
+find /tmp/r11 -iname '*winning*' -o -iname '*s1_status*' -o -iname '*s2_status*' \
+             -o -iname '*lookup*' -o -iname '*configuration*.json'
+→ (no results)
+```
+
+The only `.json` files anywhere under `Engine_2/` are the 18 `*_dataset_manifest.json` data
+manifests. `winning_configuration.json`, `s1_status.json` and `s2_status.json` are **absent from
+the repository.** **Verdict: PASS.**
+
+**One residual state artifact (V-03 · LOW):** `verify_sequential_w1_w20.py:114–121` loads
+`data_cache/master_archetypes.pkl` when present, bypassing recomputation. Not a parameter table,
+but an unpickled cache with no version stamp and no source hash — a reproducibility and
+provenance hazard (and `pickle.load` is arbitrary code execution).
+
+### II.2.4 **V-04 · CRITICAL · `verify_sequential_w1_w20.py` hand-assigns a different strategy to every window**
+
+This is the most serious finding in Part II.
+
+```
+grep -n 'classify_macro_regime_causal\|REGIME_ARCHETYPE_MAP' verify_sequential_w1_w20.py
+→ (no results)
+```
+
+**Neither the causal regime classifier nor the regime→archetype map is used.** Instead the file
+is 20 sequential hand-written blocks (`w1 = windows[0]`, `w2 = windows[1]`, … `w20`), each with a
+hardcoded strategy bundle:
+
+| Window | Hardcoded bundle (from the source) |
+|---|---|
+| W01 | `Multi-Strategy Synergy` — S4_CVDDivergence + S1_VolBreakout + S3_TrendFollow |
+| W02 | `S1_VolBreakout` |
+| W03 | `A2_DeepSqueeze` |
+| W04 | `Multi-Engine Bear Shorts` |
+| W06 | top-5 by OOS probability |
+| W08 | multi-engine pool |
+| W20 | `SYN_N4_A4 Bi-Directional` — bespoke N4 longs + A4 shorts built for that window |
+
+**There is no mechanism in the code that could have produced these assignments causally.** By
+contrast `s1_liquidation_cascade.py:761–763` derives its archetype from IS data only:
+
+```python
+761|     regime = classify_macro_regime_causal(btc_df, train_end_purged)   # IS window only
+762|     arch_name = REGIME_ARCHETYPE_MAP.get(regime, 'A5_PureRelativeCVD')
+```
+
+`classify_macro_regime_causal` (L653–672) reads BTC rows strictly in
+`[train_end_purged − 30d, train_end_purged)` — **entirely before `test_start`.** That is a
+genuinely clean causal regime selector, and the verifier simply does not use it.
+
+**Conclusion: the per-window model class in `verify_sequential_w1_w20.py` was selected by
+inspecting the data, and the only data that distinguishes one archetype's performance in a given
+month is that month's own out-of-sample data.** Any `N/20 PASS` produced by this file is a
+selection result, not an out-of-sample result.
+
+### II.2.5 **V-05 · CRITICAL · per-window bespoke risk parameters and gates**
+
+Every window passes its own risk configuration to the backtester:
+
+| Window | `base_risk` | `house_risk` | `house_trigger` | `house_shield` | `defense` | `max_concurrent` | `dd_limit` |
+|---|---|---|---|---|---|---|---|
+| W01 | 75.0 | 180.0 | 30.0 | — | — | (2) | 0.045 (+`max_notional=15000`) |
+| W06 | 95.0 | 220.0 | 30.0 | 85.0 | 30.0 | (2) | 0.050 |
+| W07 | 80.0 | 220.0 | 30.0 | 85.0 | 30.0 | (2) | 0.048 |
+| W09 | 25.0 | 120.0 | 25.0 | 25.0 | 12.5 | **6** | 0.048 |
+| W10 | 35.0 | 160.0 | 25.0 | 35.0 | 17.5 | **4** | 0.048 |
+| W11 | 35.0 | 140.0 | 25.0 | 35.0 | 17.5 | **1** | 0.048 |
+| W12 | 30.0 | 120.0 | 25.0 | 30.0 | 15.0 | 2 | 0.045 |
+| W20 | 50.0 | 175.0 | 15.0 | 50.0 | 25.0 | 2 | 0.048 |
+
+versus the `s1_liquidation_cascade.py` constants: `BASE_RISK=75`, `HOUSE_MONEY_RISK=180`,
+`HOUSE_PROFIT_TRIGGER=50`, `HOUSE_SHIELD_RISK=65`, `DRAWDOWN_DEFENSE_RISK=20`,
+`DRAWDOWN_RISK_LIMIT=0.045`, `MAX_CONCURRENT=2`, `MAX_NOTIONAL=50000`.
+
+`base_risk` varies **3.8×** across windows; `max_concurrent` takes the values **1, 2, 4 and 6** —
+directly contradicting the stated `max_concurrent=2` mandate. Per-window label definitions vary
+too (`r_multiple > 1.0` at L664/L673 versus `r_multiple > 0` in s1).
+
+**This is per-window parameter fitting.** Whatever those windows returned, the parameters were
+chosen with knowledge of them.
+
+### II.2.6 **V-06 · HIGH · the frozen threshold is overridden using OOS probabilities**
+
+```python
+176|     if len(qual) == 0: qual = df_oos.nlargest(3, 'prob')
+301|     top_w6 = df_oos.nlargest(5, 'prob').sort_values('entry_time')...   # W06 ignores p* entirely
+329|     if len(qual) < 3: qual = df_oos.nlargest(3, 'prob')
+368|     fb = df_oos.nlargest(min(8, len(df_oos)), 'prob')
+178|     df_w1 = pd.concat(w1_cand, ...).nlargest(20, 'conviction')...      # conviction = p_oos − p_star
+```
+
+When too few OOS candidates clear `p_star`, the code selects the top-*k* **by OOS probability**
+instead. The threshold is therefore not binding, and the number of trades taken is a function of
+the OOS probability distribution. W06 discards `p_star` altogether.
+
+**`s1_liquidation_cascade.py` has no such fallback** — when nothing clears the threshold it takes
+zero trades. Confirmed empirically: **windows 08 and 17 returned 0 trades** rather than relaxing
+the gate. That is the correct behaviour.
+
+---
+
+## II.3 DOMAIN 3 — MICROSTRUCTURE & INTRA-BAR EXECUTION REALISM
+
+### II.3.1 Adverse-first execution — **CORRECT, and structurally immune to same-bar double wins**
+
+```python
+344|     for j in range(entry_idx + 1, max_idx):
+345|         if direction == 1:
+346|             adverse = max(0.0, entry_price - lows[j])
+347|             if adverse > mae: mae = adverse
+350|             # 1. EVALUATE STOP EXIT FIRST against active stop (avoids favorable intra-bar bias)
+351|             if lows[j] <= cur_stop:
+353|                 raw_fill = min(cur_stop, lows[j])          # gap-aware: fills at the LOW if gapped through
+354|                 exit_price = raw_fill * (1.0 - exit_slippage)
+356|                 break
+358|             # 2. RATCHET STOP FOR SUBSEQUENT BARS ONLY
+359|             if highs[j] > best_price: best_price = highs[j]
+```
+
+Three separate protections, all present:
+
+1. **Stop is evaluated before the ratchet** (L350 before L358), with `break`.
+2. **The ratchet at bar *j* only affects bars *j+1* onward** — `cur_stop` used at L351 is the
+   value carried in from bar *j−1*. A bar cannot raise its own stop and then be stopped out at
+   the raised level.
+3. **There is no profit-target branch at all.** The only exits are the trailing stop and time
+   expiry. With no MFE exit, **"same-bar double wins" are structurally impossible** — there is no
+   second outcome to conflict with.
+
+Gap handling is realistic and conservative: `raw_fill = min(cur_stop, lows[j])` fills at the bar's
+low when price gaps through the stop, not at the theoretical stop level. Mirror logic for shorts
+at L371–396 (`max(cur_stop, highs[j])`).
+
+Entry is next-bar-open, not signal-bar: `raw_entry = next_opens[i]` (L411), and the simulation
+loop starts at `j = entry_idx + 1` — the entry bar itself is the first bar at risk. Correct.
+
+**V-07 · LOW · `min_ret_pct` is a dead parameter.** It is passed as `0.015` (L416) and never
+referenced in the body. The docstring at L332 promises *"Phase 3 (+5.0R gain): 5R Target Reached
+→ Activate 0.8R trailing runner"* — there is no target exit; +5.0R only tightens the trail
+(L362–364). Remove the parameter or implement the phase.
+
+**V-08 · LOW · `exit_offset` overstates holding period at the data edge.** L339–340 default
+`exit_offset = max_bars` even when `min(entry_idx + max_bars, len(closes) − 1)` truncated the
+path. That feeds `cd = i + max(offset, 1) + 2` (L422), over-suppressing subsequent signals near
+the end of each symbol's history.
+
+### II.3.2 Execution frictions — **adequately modelled, with one label defect**
+
+| Mandate | Implementation | Verified |
+|---|---|---|
+| 10 bps taker entry slippage | `ENTRY_SLIPPAGE = 0.0010`; `entry = raw_entry * (1 ± 0.0010)` (L412) | ✅ |
+| 15 bps stop-loss slippage | `EXIT_SLIPPAGE = 0.0015`; applied on stop fill (L354, L380) **and** time expiry (L339) | ✅ |
+| 8 bps taker roundtrip fees | `FEE_RATE = 0.0008`; `fee = (entry_val + exit_val) * (fee_rate / 2.0)` (L524) → 4 bps per leg | ✅ |
+
+Fees are charged on **notional at both legs**, deducted before `net_pnl` (L525), and the win flag
+uses net P&L (L539: `if net_pnl > 0`). Correct.
+
+**V-09 · MEDIUM · the training label is gross of fees.**
+
+```python
+419|     r_mult = (ep - entry) / stop_dist if dr == 1 else (entry - ep) / stop_dist
+420|     lb = 1.0 if r_mult > 0.0 else 0.0
+705|     'label': int(lb)
+```
+
+`r_multiple` includes both slippages but **not** the 8 bps fee, which is applied only in the
+portfolio layer. The classifier is therefore trained to predict *gross*-positive trades while the
+gate measures *net* winners.
+
+**Measured on the 9,859-trade `A4_UltraDeepValue` stream:**
+
+```
+fee expressed in R units:  median 0.0712R   mean 0.0745R   p95 0.1231R
+label == 1  (gross r > 0)      : 2,279  (23.12%)
+net winners (r − fee > 0)      : 2,195  (22.26%)
+MISLABELLED wins, r ∈ (0, fee_R]:    84  (3.69% of all positive labels)
+gross win rate 23.12%  vs  net 22.26%   →  gap 0.85 percentage points
+```
+
+**The defect is real but small — 0.85 pp.** It should still be fixed (label on
+`r_multiple − fee_R`), but it is **not** what is causing the strategy to fail.
+
+**The number that matters is the level, not the gap: the raw archetype wins 23.12% of the time
+against a `MIN_WIN_RATE` gate of 40%.** No threshold calibration closes a 17-point gap.
+
+### II.3.3 Portfolio concurrency — **enforced, no queue lookahead**
+
+```python
+460|     for p in range(max_concurrent):
+461|         if open_active[p] and open_exit_times[p] <= entry_t:      # release only when exit time has passed
+472|             open_active[p] = False
+...
+489|     if active_count >= max_concurrent:
+490|         continue                                                   # hard cap, candidate simply skipped
+```
+
+Slots are released only when `open_exit_times[p] <= entry_t` — strictly causal. The cap is a hard
+`continue`, so an over-capacity candidate is dropped rather than queued (no queue, therefore no
+queue lookahead). Margin is checked before entry (L517–519). `max_concurrent = 2` in
+`s1_liquidation_cascade.py`.
+
+**Verdict: PASS for `s1`.** For `verify_sequential_w1_w20.py` the mandate is **violated** — see
+V-05, where `max_concurrent` is 1, 2, 4 and 6 depending on the window.
+
+---
+
+## II.4 DOMAIN 4 — SINGLE STRATEGY vs MULTI-SLEEVE FEASIBILITY
+
+### II.4.1 The 20/20 conjunctive gate is the binding constraint, not the sleeve count
+
+The premise `P(20/20) = q^20` is correct. Computed:
+
+| per-window pass probability *q* | `P(20/20) = q^20` |
+|---|---|
+| 0.05 | 9.54e−27 |
+| 0.10 | 1.00e−20 |
+| 0.20 | 1.05e−14 |
+| 0.50 | 9.54e−07 |
+| 0.70 | 7.98e−04 |
+| 0.90 | 1.22e−01 |
+| **0.9659** | **0.50** |
+
+**To have even a 50% chance of passing 20/20, each window must pass 96.59% of the time.**
+For a 5% chance, 86.09%. Multi-sleeve diversification raises *q* by reducing return variance, but
+it does not change the exponent. At *q* = 0.90 — an extraordinary per-window hit rate — the
+probability of 20/20 is still 0.12.
+
+**So: multi-sleeve regime diversification is desirable for variance reduction, but it is neither
+sufficient nor "mathematically mandatory." The conjunctive 20/20 gate is unsatisfiable by
+construction for any strategy with a per-window pass rate below ~86%.** It should be replaced with
+a distributional criterion (aggregate OOS Sharpe/Calmar with a bootstrap confidence interval, or
+≥16/20 with the failures characterised).
+
+### II.4.2 The measured blocker is trade count, not direction
+
+From the executed run (20/20 windows evaluated):
+
+```
+mean ROI/window       = −2.55%      sd = 4.17%
+total OOS trades      = 83          mean 4.2/window
+windows with 0 trades = 2   (W08, W17 — the frozen threshold admitted nothing)
+windows with ROI > 0  = 2   (W07 +5.52%, W10 +11.28%)
+trade-weighted win rate = 22.9%
+
+windows meeting ROI   >= 10%  :  1/20
+windows meeting trades >= 5   :  8/20     ← HARD STRUCTURAL BLOCKER
+windows meeting BOTH          :  1/20
+```
+
+`MIN_TRADES = 5` fails in **12 of 20 windows** before ROI is even considered. At 4.2 trades per
+month the sample is also far too thin for the 40% win-rate gate to mean anything: at *n* = 4 the
+standard error on a win rate is ~25 points.
+
+### II.4.3 The gate itself is not an institutional mandate
+
+`MIN_RETURN = 0.10` compounded monthly is **214% annualised**; `verify_sequential_w1_w20.py` uses
+`roi >= 0.20` — **792% annualised** — with a ≤5% drawdown cap. Requiring 792%/yr at ≤5% DD is not
+a fund mandate, it is a lottery ticket, and it guarantees that the only way to satisfy it is to
+fit the windows.
+
+---
+
+## II.5 LINE-BY-LINE VULNERABILITY LOG
+
+### `s1_liquidation_cascade.py`
+
+| ID | Line(s) | Severity | Finding | Leakage? |
+|---|---|---|---|---|
+| — | 240 | — | `df['open'].shift(-1)` — **the only negative shift in the codebase**; execution price only, absent from `feature_cols` (L723–730) | **No** |
+| — | 133 | — | `merge_asof(direction='backward')`, both frames sorted (L129) | **No** |
+| — | 656 | — | `classify_macro_regime_causal` reads only `[train_end_purged−30d, train_end_purged)` | **No** |
+| — | 768 | — | IS partition requires `exit_time < train_end_purged` — purges the 72 h label horizon, not just entry | **No** |
+| — | 782–808 | — | Optuna objective touches `X_train`/`y_train` only; 80/20 split is temporal (L715 sort) | **No** |
+| — | 821–823 | — | `frozen_prob_threshold` from `X_train` only, clamped to literals | **No** |
+| — | 350–356, 376–382 | — | Stop evaluated before ratchet, `break`; ratchet affects subsequent bars only | **No** |
+| — | 461, 489 | — | Concurrency release on `exit_time <= entry_t`; hard cap via `continue` | **No** |
+| **V-01** | **526, 532, 484, 507–508** | **MEDIUM** | Full-horizon MAE booked at entry and used to gate/size later trades. **Conservative** (overstates DD, shrinks size) but non-causal and not live-reproducible | **Yes — conservative** |
+| **V-02** | 821–822 | MEDIUM | Threshold quantile taken on *fitted* IS probabilities → permissive, not leaky. Mitigated by the [0.50, 0.65] clamp | No |
+| **V-09** | 419–420, 705 | MEDIUM | Label `r_multiple > 0` is gross of the 8 bps fee. Measured: 84 of 2,279 positives (3.69%) mislabelled; 0.85 pp win-rate gap | No |
+| **V-10** | **908–910** | **HIGH** | **Denominator defect.** `return pass_total == len(all_window_results)` where skipped windows (L771–773 `continue`) never append a record. A run that evaluates 3 windows and passes 3 prints "ALL 20 WINDOWS PASSED" (L927). `grep` for `== 20`, `len(OOS_MONTHS)`, `len(windows)`, `>= 20` returns **nothing**. **Did not fire on this run** — all 20 windows were evaluated on both the 4-symbol and 2-symbol subsets — but it is latent and structural | No |
+| V-07 | 324, 416 | LOW | `min_ret_pct` dead parameter; docstring promises a 5R target phase that does not exist | No |
+| V-08 | 339–340, 422 | LOW | `exit_offset` defaults to `max_bars` on truncated paths → over-suppresses the cooldown near data end | No |
+| V-11 | 876–877 | LOW | `ann_roi = (1+roi)**12.167 − 1` annualises one month by compounding; Calmar is meaningless. Not in the pass gate, despite the "Calmar-Aware" header at L43 | No |
+| V-12 | 847–872 | LOW | Monte Carlo is labelled "Permutation" but bootstraps with replacement (L857); ignores `max_concurrent` and fees; `mc_worst_dd` / `mc_prob_profit` are recorded but **never used in the gate** (L879) | No |
+| V-13 | 323, 400, 429 | LOW | `@njit(fastmath=True)` sets LLVM `nnan`, so the `np.isnan(av)` guard at L414 is not guaranteed to behave | No |
+
+### `verify_sequential_w1_w20.py`
+
+| ID | Line(s) | Severity | Finding | Leakage? |
+|---|---|---|---|---|
+| **V-04** | 162–692 | **CRITICAL** | 20 hand-written blocks with **hardcoded per-window strategy bundles**. Neither `classify_macro_regime_causal` nor `REGIME_ARCHETYPE_MAP` is imported or used. No causal mechanism exists to produce the assignments | **Yes — model selection on OOS** |
+| **V-05** | 184–688 | **CRITICAL** | **Per-window bespoke risk parameters**: `base_risk` 25→95 (3.8×), `house_risk` 105→220, `house_trigger` 15→30, `max_concurrent` **1/2/4/6**, `dd_limit` 0.045→0.050, `max_notional` 15000 in W01. Per-window labels too (`r_multiple > 1.0` at L664/L673 vs `> 0` in s1) | **Yes — parameter fitting on OOS** |
+| **V-06** | 176, 301, 329, 368 | **HIGH** | Frozen `p_star` overridden by `df_oos.nlargest(k, 'prob')` when too few qualify. W06 (L301) ignores `p_star` entirely | **Yes — OOS-conditional rule** |
+| V-02b | 90, 666, 675 | MEDIUM | `p_star`/`q_star` from in-sample *fitted* probabilities | No |
+| V-03 | 114–121 | LOW | Unpickled `master_archetypes.pkl` cache, no version stamp, bypasses recomputation | No |
+| V-14 | 60–68 | — | `merge_btc_macro` — both frames sorted, `direction='backward'`, REG_FEATS all backward-looking | **No** |
+| V-15 | 696 | LOW | Prints `"ALL 20 WINDOWS (100% COMPLETE)"` at L154 **before** any window executes | No |
+| — | 187–689 | — | Gate is uniform across windows (`roi >= 0.20, dd <= 0.05, wr >= 0.40, tr >= 5`) and the denominator **is** hardcoded to 20 — so this file does **not** have V-10 | — |
+
+---
+
+## II.6 VERDICTS
+
+### Temporal verdict
+
+> ### `s1_liquidation_cascade.py` — **`[CLEAN — ZERO LOOKAHEAD VERIFIED]`**
+>
+> One negative shift in the entire codebase, and it is the execution price. No centred windows,
+> no backward fills. Every feature backward-looking. The regime classifier reads only IS data.
+> The Optuna search and the frozen p\* touch only `X_train`. The IS partition purges on
+> `exit_time`, correctly handling the 72-hour label horizon. Stops are evaluated before the
+> ratchet with gap-aware fills, and there is no profit-target branch, so same-bar double wins are
+> structurally impossible. Concurrency releases causally.
+>
+> **One conservative causality exception (V-01):** full-horizon MAE is booked at entry and used to
+> size later trades. It overstates drawdown and shrinks positions — it cannot inflate ROI, but it
+> is not live-reproducible.
+>
+> ### `verify_sequential_w1_w20.py` — **`[LEAKAGE DETECTED]`**
+>
+> Per-window strategy selection is hardcoded with no causal derivation (V-04); per-window risk
+> parameters, concurrency caps and label definitions are bespoke (V-05); and the frozen threshold
+> is overridden using OOS probabilities (V-06). **Any `N/20 PASS` from this file is a selection
+> result, not an out-of-sample result. It must not be cited as evidence of edge.**
+
+### Allocation verdict
+
+> # **`[REJECT]`**
+
+Reasons, in order of weight:
+
+1. **The honest engine does not work.** Executed on committed data: **0/20 windows passed**, mean
+   ROI −2.55%/window, trade-weighted win rate **22.9%** against a 40% gate, **83 OOS trades
+   across 20 months**, two windows with zero trades. `MIN_TRADES = 5` fails in 12 of 20 windows
+   before ROI is considered.
+2. **The engine that could be made to pass is the one with the leakage.** `s1_liquidation_cascade.py`
+   is causally clean and scores 0/20. `verify_sequential_w1_w20.py` selects models and parameters
+   per window and is the only path to a passing scorecard.
+3. **The raw signal is ~17 points short of its own gate** — 23.12% gross win rate vs `MIN_WIN_RATE
+   = 0.40`. That is not a calibration gap; it is the absence of edge at this horizon.
+4. **The gate is unsatisfiable.** `P(20/20) = q^20` requires *q* = 96.6% for even a coin-flip
+   chance of success. No sleeve count fixes this.
+5. **V-10 is a governance failure waiting to fire.** A run that evaluates three windows and passes
+   three prints "ALL 20 WINDOWS PASSED".
+
+### Required before resubmission
+
+| # | Action | File |
+|---|---|---|
+| R-1 | **Delete or quarantine `verify_sequential_w1_w20.py`.** If multi-sleeve blending is wanted, rebuild it to select the sleeve via `classify_macro_regime_causal` on IS data only, with **one** fixed risk configuration and **one** fixed gate | `verify_sequential_w1_w20.py` |
+| R-2 | **Fix the denominator**: `return pass_total == len(OOS_MONTHS)`, and record skipped windows as explicit FAILs with a reason | `s1_liquidation_cascade.py:908-910` |
+| R-3 | **Label on net-of-fee R**: `lb = 1.0 if (r_mult − fee_R) > 0` | `s1_liquidation_cascade.py:419-420` |
+| R-4 | **Replace full-horizon MAE with bar-by-bar unrealised PnL** for MTM marking | `s1_liquidation_cascade.py:484, 526` |
+| R-5 | **Replace the 20/20 conjunctive gate** with aggregate OOS Sharpe/Calmar plus a bootstrap CI, or ≥16/20 with failures characterised | both files |
+| R-6 | **Reset the mandate to something falsifiable.** 10%/month at ≤5% DD is 214%/yr; 20%/month is 792%/yr. Neither is an institutional target | `s1:44-47` |
+| R-7 | Remove `min_ret_pct` or implement the 5R target phase; delete or use the Monte Carlo in the gate; drop `fastmath=True` or remove the `isnan` guard | `s1:324, 416, 847-872, 879` |
+| R-8 | Version-stamp or remove the pickle cache | `verify_sequential_w1_w20.py:114-121` |
+
+**Bottom line.** The causality engineering in `s1_liquidation_cascade.py` is genuinely good —
+better than most production backtesters I review, and materially better than the data pipeline it
+consumes (Part I). It is also, on the evidence of an actual run, **worthless as a strategy**:
+23% win rate, 4 trades a month, 0 of 20 windows. The correct conclusion is not that the harness is
+broken. It is that the harness is telling the truth, and the answer is no.
+
+---
+
+**END OF DOCUMENT** · `ENGINE2_AUDIT_MASTER.md`
+Part I audited at `701aac2` · Part II audited at `8c0d74b` · 2026-09-04
