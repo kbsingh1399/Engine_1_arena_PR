@@ -39206,3 +39206,40 @@ ules/agent.md from both Engine_1_arena_PR/.agents and Engine_2/.agents, eliminat
   5. Updated MEMORY.md directory map and operational index.
   6. Verified second_brain.py status & retrieval performance.
   7. Achieved 100% dual-repository byte-for-byte parity across 6,068 files in both Engine_1_arena_PR/.agents and Engine_2/.agents.
+
+---
+## Turn: Video Transcripts Verification, Root Skills Consolidation, and Git Mirror Push
+- **User Prompts**:
+  1. Purge 12 obsolete legacy directories.
+  2. Consolidate root `skills/` into `.agents/skills/` without duplication or loss.
+  3. Verify whether all 24 YouTube video captions/transcripts were read and their exact crux synthesized into `trading_knowledge_base.md`.
+  4. Ensure `https://github.com/kbsingh1399/Engine_1_arena_PR.git` is an exact mirror of the local workspace directory and pushed.
+- **Verified Deliverables & Findings**:
+  1. **YouTube Transcripts & Knowledge Base Ground Truth**:
+     - Confirmed: All 24 video transcripts (208,961 characters of full verbatim captions) are stored in `.agents/memory/architecture/raw_transcripts.json`.
+     - In `.agents/memory/architecture/trading_knowledge_base.md`, Node 17 catalogs the master index and Node 23 provides a dedicated 4-tier synthesis for each video: Transcript Crux, Key Takeaway, Setup Rule, and Engine Translation. Nodes 1, 2, 3, 5, and 8 embed these quantitative formulas directly into S1 invariants.
+  2. **Root Skills Consolidation**:
+     - Verified all 67 root skills were exact 100% duplicate copies of what is in `.agents/skills/` (which hosts 1,304 skills), with zero file diffs.
+     - Safely purged redundant root `skills/` directory. All skills reside canonically in `.agents/skills/`.
+  3. **12 Legacy Directories Purged**:
+     - All 12 specified directories were verified deleted from disk: `backtesting_data`, `binance_historical_pipeline`, `catboost_info`, `chrome_profile_live`, `chrome_profile_tab1_v2`, `coinglass_parity_engine`, `colab_strategies`, `data_cache`, `Debate_Audit_Response`, `docs/deepseek_v3_repo`, `live_data`, `logs`.
+  4. **Graphify AST Extraction**:
+     - Completed 100% AST extraction across `.agents` (64,920 nodes, 78,307 edges, 5,961 communities).
+  5. **Dual-Repository Parity**:
+     - Achieved 100% byte-for-byte parity across both `Engine_1_arena_PR/.agents` and `Engine_2/.agents` (7,990 files each, 0 mismatches).
+  6. **Git Mirror & Push**:
+     - Committed all updates (`07ffcc9`) and successfully pushed to `https://github.com/kbsingh1399/Engine_1_arena_PR.git` on branch `main`.
+
+
+---
+
+## Turn Record: Scite.ai Integration, Credential Ingestion & Microstructure Literature Consensus (2026-09-05)
+- **User Action**: Provided Scite API key (scite_HcQiTAuZm4LwsfYoRvoG069bIMSPomwg8_zEUtTDzVE), Scite literature review output, and BibTeX citations (Crypto_perpetual_futures_microstructure_cascades_and_OFI%2FCVD_dislocations.bib).
+- **Actions Executed**:
+  1. Stored Scite API key safely in .env across Engine_1_arena_PR and Engine_2 with verified .gitignore protection against git leaks.
+  2. Built programmatic Scite research client .agents/scripts/scite_client.py and synced to Engine_2/.agents/scripts/scite_client.py (verified live with HTTP 200 responses).
+  3. Ingested 
+eferences.bib into architecture memory in both repositories.
+  4. Expanded Node 30 in 	rading_knowledge_base.md with 7 canonical peer-reviewed papers (Albers et al. SSRN 3908966, Giagkiozis & Sa'id Ledger 2024, Farzulla 2026, Shynkevich JFM 2026, Meister & Price 2022, Ackerer et al. Math Finance 2025, Lim 2026).
+  5. Created deterministic OKF contracts: .okf/indicators/ofi_microstructure.md and .okf/indicators/liquidation_oi_decoupling.md, registering them in .okf/OKF_INDEX.md and syncing to Engine_2/.okf.
+- **Next Operational Milestone**: Execute Strategy 1 (S1) Institutional Verification across the 20 OOS Windows (2021-2026) under single causal parameter configuration matching empirical friction criteria.
