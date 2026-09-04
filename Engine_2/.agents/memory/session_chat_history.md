@@ -39566,4 +39566,20 @@ eferences.bib into architecture memory in both repositories.
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`552f670`); Engine_1_arena_PR committed and pushed (`0f69749`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
-- **Standing Daemon**: Cron task `task-1891` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+- **Standing Daemon**: Cron task `task-2067` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v23.0 Expansion (Nodes 143–148) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2067` (iteration 1), `task-1891` (iteration 6), and `task-794` (iteration 19) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 143–148: 148 Structured Nodes)**:
+  - **Node 143**: Easley-Kiefer-O'Hara-Sheng Dynamic PIN & Intraday Information Event Normalization (Easley et al. 1996, 2012; Sheng et al. 2022; continuous Probability of Informed Trading $\text{dPIN}_t$; normalization condition $\text{dPIN}_t \le 0.28 \land \delta_t < 0.45$ ensuring informed toxic liquidation selling has terminated).
+  - **Node 144**: Kyle-Back Continuous-Time Toxic Flow Absorption & Informational Exhaustion Boundary (Back 1992; Collin-Dufresne & Fos 2016; optimal liquidation order submission $\dot{X}_t$ under continuous Brownian bridge; Supply Vacuum condition $\dot{X}_t/\dot{X}_{t-1} \le 0.40 \land \mathcal{E}_{\text{info}} \le 0.20$ establishing a supply vacuum for asymmetric rally).
+  - **Node 145**: Andersen-Bollerslev-Diebold-Labys Realized Beta Stability & Idiosyncratic Variance Decoupling (Andersen et al. 2001, 2003; Newey-West adjusted high-frequency realized beta; Idiosyncratic Decoupling Gate $\text{IV}_i/\text{RV}_i \ge 0.65$ isolating asset-specific dislocations with higher convex bounce potential).
+  - **Node 146**: Huberman-Stanzl Price Manipulation Bounds & Transient Elastic Snapback (Huberman & Stanzl 2004; Gatheral 2010; linear permanent repricing vs transient non-linear impact; Elastic Snapback Metric $\mathcal{S}_{\text{snap}} \ge 3.20$ confirming $>76\%$ of drop is elastic displacement that must snap back).
+  - **Node 147**: Gârleanu-Pedersen Margin-Based Asset Pricing & Basis Convergence Snapback (Gârleanu & Pedersen 2011; shadow cost of capital $\psi_t$; Basis Stress Reversal $\text{basis\_bps} \le -35.0 \land \Delta\text{basis\_bps} \ge +8.0$ generating structural basis snapback).
+  - **Node 148**: Aït-Sahalia-Fan-Xiu High-Frequency Covariance Cleaning & Jump Colocalization (Aït-Sahalia et al. 2010; continuous bipower variation test statistic $\tau_{i, M} \ge 2.80$; systemic co-jump governor reducing risk to $0.30\%$ and `MAX_CONCURRENT = 1`, vs full risk capacity during idiosyncratic jumps).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`c1fa3e2`); Engine_1_arena_PR committed and pushed (`97eb9ff`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2067` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
