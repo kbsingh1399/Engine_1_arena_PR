@@ -294,3 +294,21 @@ SLOW_INDICATORS = ["EMA 800", "EMA 200", "ATR 100", "ATR 14", "Volume SMA 9"]
 1. **Tolerance Band**: For indicators in `SLOW_INDICATORS`, allow `< 0.05%` drift over T+30s without flagging the feed as "stale" or "frozen".
 2. **True Freeze Threshold**: Flag as frozen ONLY if the value is byte-for-byte identical across 3 consecutive 15m candle updates AND price has shifted $> $10.00$.
 3. **Fast Indicator Motion Requirement**: Fast indicators (`PRICE`, `FP DELTA`, `BID DOLLAR`, `ASK DOLLAR`, `TAKER BUY`, `TAKER SELL`, `CVD`) MUST exhibit active non-zero delta movement within T+30s.
+
+## PART 14: INSTITUTIONAL ANTI-LOOKAHEAD & ZERO-HALLUCINATION PROTOCOL (KAIZEN RULE - 2026-09-04)
+
+### 14.1 Banned Saved Result Files & Cache Hallucination Vectors
+- **Static Result Files**: Never read `winning_configuration.json`, `s1_status.json`, `walkforward_status.json`, or any `results_s*/*.json` to assert that backtests passed. Every reported pass must originate from live terminal execution in the current turn.
+- **Pre-Extracted Caches**: Never validate new strategy logic, stop geometry, or friction rules using stale trade caches (`cache/s*_trades_cache.parquet`).
+
+### 14.2 Banned Test-Set Snooping & Parameter Lookup Tables
+- **Lookup Tables (`WINDOW_CONFIGURATIONS`)**: No dictionary or mapping keyed on `w_idx` is permitted. All parameters, thresholds ($p^*$), and archetypes must be determined dynamically in-sample.
+- **Per-Window Special Casing**: No `if w_idx in [...]` conditional branching is permitted.
+- **In-Run OOS Grid Search Loops**: Looping over candidate thresholds or archetypes on out-of-sample data is strictly prohibited.
+- **Window Pruning**: All 20 canonical quarterly OOS windows must remain fixed without omissions.
+
+### 14.3 Banned Mathematical & Execution Lookaheads
+- **Target Lock Early Exit**: Terminating an OOS window early upon reaching a profit target is forbidden.
+- **MAE Full-Life Excursion Sizing**: Passing future trade MAE into the drawdown governor at trade entry is forbidden. Drawdowns must be evaluated bar-by-bar using current unrealized prices.
+- **Intra-Bar Favorable Trailing Ratchet**: Ratcheting a stop on bar $j$'s high/low and testing stop exit within bar $j$ is forbidden. Favorable ratchets take effect on bar $j+1$ only.
+- **Zero-Friction Execution**: Full execution frictions (min 8 bps fees, 10 bps entry slippage, 15 bps exit slippage) must be simulated on all fills.
