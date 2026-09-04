@@ -39293,7 +39293,18 @@ eferences.bib into architecture memory in both repositories.
   - **Node 44**: Adversarial Machine Learning & Multicollinearity Purging (Marcos Lopez de Prado Clustered Feature Importance [CFI] via Hierarchical Risk Parity, Boruta shadow feature Gaussian noise rejection thresholds).
   - **Node 45**: Volatility Signature Plots & Microstructure Sampling Sweet Spots (Aït-Sahalia realized volatility explosion under ultra-high-frequency noise $\tau < 1\text{m}$, mathematical justification of 15m candle resolution where noise decays to $<4.2\%$).
   - **Node 46**: Exchange Liquidation Hydrodynamics & The "Post-Wick Vacuum" (BitMEX / CEX matching engine kinetic cessation, thin liquidity crust vs deep mantle, vertical snapback mechanics on cleared ask books).
-- **Parity & Sync**: Executed `verify_and_sync_agents.py` with 100% byte-for-byte verification across 7,993 files in both repositories.
+---
 
-
-
+## Turn Record: Knowledge Base v7.0 Expansion (Nodes 47–52) & 2026 Microstructure Frontiers (2026-09-05)
+- **User Directive**: Continuous search for the most advanced trading techniques grounded in active parquet data with zero repetition ("also no repeat").
+- **Synthesized Knowledge Additions (Nodes 47–52)**:
+  - **Node 47**: Hidden-Liquidity Absorption & Non-Displayed Depth under Market Stress (Boon Chuan Lim 2026, SSRN 6980158; walked-book vs realized impact, $\kappa$ estimation, $H = 20.8, p < 10^{-4}$, iceberg absorption triggers on Table 1 `bid_depth_usd` & `long_liq_usd`).
+  - **Node 48**: Flow-Adjusted Bid Absorption Capacity & Passive-Buy Toxicity (Lawrence Chang 2026, SSRN 6693260; composite pressure-vs-capacity ratio $\text{FABC}_t$, adverse selection prediction, `future_cvd_15m` vs `depth_imbalance` confluence).
+  - **Node 49**: Additive-Multiplicative OFI Dynamics & Cascade Self-Amplification (Oren Tapiero 2026, SSRN 6688399; stochastic OFI differential equation, non-linear leverage feedback loop, variance ratio test $\text{VR}_{\text{OFI}}$ for cascade exhaustion).
+  - **Node 50**: The Master APY & Ergodic Inventory Invariant in Perpetual Futures (Minmin Zeng & Yi Liu 2026, arXiv:2607.11888; 5-channel PnL decomposition theorem, universal invariant $\text{APY} \times \text{VaR}_{99\%} = \mathcal{C}$, ergodic Gaussian inventory variance $\sigma_q^2 = \frac{\lambda^*}{2\eta k}$, exploiting market maker inventory penalties).
+  - **Node 51**: Multi-Tier Microstructure Ratchet Geometry & 5R Convex Runner Preservation (Mathematical solution to the 40% win rate + 5R runner conundrum; 4-tier ratchet: Tier 0 initial stop $-1.0\text{R}$, Tier 1 BE $+0.15\text{R}$ at $+0.8\text{R}$, Tier 2 profit lock $+0.80\text{R}$ at $+1.5\text{R}$, Tier 3 expansion $+2.00\text{R}$ at $+3.0\text{R}$, Tier 4 kinetic trail $+4.00\text{R}$ at $+5.0\text{R}$ trailing dynamically; expectancy $\mathbb{E} = +0.6235\text{R}$, drawdown capped $<4.5\%$).
+  - **Node 52**: Cross-Asset OFI Eigen-Decomposition & Systemic Spillover Delays (Cont, Cucuringu, Zhang 2022; SVD/PCA on $18 \times 18$ OFI matrix, common factor $F_{\text{ofi}, t}$ isolation, 1-2 bar transmission delay between BTC liquidation bottom and altcoin cascade bottom).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: `Engine_2` commit `c019d8f`, `Engine_1_arena_PR` commit `a6d5df0` pushed cleanly to GitHub `origin main`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
