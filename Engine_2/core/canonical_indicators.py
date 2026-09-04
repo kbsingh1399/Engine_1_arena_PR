@@ -62,14 +62,13 @@ def compute_wilder_rma_series(values: np.ndarray, period: int) -> np.ndarray:
     rma = np.empty(n, dtype=np.float64)
     alpha = 1.0 / period
     
-    # First `period` values use simple arithmetic mean
-    if n < period:
-        rma[:] = values.mean() if n > 0 else 0.0
-        return rma
-    
-    rma[period - 1] = np.mean(values[:period])
-    rma[:period - 1] = rma[period - 1] # Backfill early bars
-    
+    # Causal initialization: bar 0 is values[0]
+    # For bars 1..period-1, use causal expanding mean (mean of values[:i+1])
+    # This ensures no future bars leak into early bars
+    rma[0] = values[0]
+    for i in range(1, min(period, n)):
+        rma[i] = (rma[i - 1] * i + values[i]) / (i + 1.0)
+        
     for i in range(period, n):
         rma[i] = values[i] * alpha + rma[i - 1] * (1.0 - alpha)
         
@@ -78,6 +77,7 @@ def compute_wilder_rma_series(values: np.ndarray, period: int) -> np.ndarray:
 def compute_wilder_rsi_series(closes: np.ndarray, period: int = 14) -> np.ndarray:
     """
     Computes Wilder 14-period Relative Strength Index matching TradingView & CoinGlass.
+    Strictly causal initialization with zero future lookahead.
     """
     n = len(closes)
     if n == 0:
@@ -96,22 +96,25 @@ def compute_wilder_rsi_series(closes: np.ndarray, period: int = 14) -> np.ndarra
     avg_gain = np.empty(n, dtype=np.float64)
     avg_loss = np.empty(n, dtype=np.float64)
     
-    avg_gain[period] = np.mean(gains[:period])
-    avg_loss[period] = np.mean(losses[:period])
-    
-    for i in range(period + 1, n):
-        avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i - 1]) / period
-        avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
+    # Causal expanding average for early bars
+    avg_gain[0] = gains[0] if len(gains) > 0 else 0.0
+    avg_loss[0] = losses[0] if len(losses) > 0 else 0.0
+    for i in range(1, min(period, len(deltas))):
+        avg_gain[i] = (avg_gain[i - 1] * i + gains[i]) / (i + 1.0)
+        avg_loss[i] = (avg_loss[i - 1] * i + losses[i]) / (i + 1.0)
         
-    for i in range(period, n):
+    for i in range(period, len(deltas)):
+        avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i]) / period
+        avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i]) / period
+        
+    for i in range(len(deltas)):
         if avg_loss[i] == 0:
-            rsi[i] = 100.0 if avg_gain[i] > 0 else 50.0
+            rsi[i + 1] = 100.0 if avg_gain[i] > 0 else 50.0
         else:
             rs = avg_gain[i] / avg_loss[i]
-            rsi[i] = 100.0 - (100.0 / (1.0 + rs))
+            rsi[i + 1] = 100.0 - (100.0 / (1.0 + rs))
             
-    # Fill pre-warmup bars
-    rsi[:period] = rsi[period]
+    rsi[0] = 50.0
     return np.round(rsi, 2)
 
 def compute_wilder_atr_series(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> np.ndarray:

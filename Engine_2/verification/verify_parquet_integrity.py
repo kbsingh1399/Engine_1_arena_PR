@@ -39,7 +39,8 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
     print("-" * 90)
 
     all_passed = True
-    total_records = 0
+    total_master_candles = 0
+    total_ladder_rungs = 0
 
     for p_file in parquet_files:
         fname = os.path.basename(p_file)
@@ -112,17 +113,39 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
                     master_df_sample = pd.read_parquet(master_path, columns=["open_time_ms"])
                     master_ts_set = set(master_df_sample["open_time_ms"].values)
                     unmatched_ts = set(unique_ts) - master_ts_set
+                    if len(unmatched_ts) > 0:
+                        ref_valid = False
+                        print(f"       -> [FAIL] {fname}: {len(unmatched_ts)} unmatched timestamps not found in master")
+                    
+                    # Reverse check: Check coverage of master candles
+                    missing_in_ladder = len(master_ts_set - set(unique_ts))
+                    if missing_in_ladder > 0:
+                        print(f"       -> [COVERAGE] {fname}: Ladder covers {len(unique_ts):,}/{len(master_ts_set):,} master candles ({len(unique_ts)/max(1, len(master_ts_set))*100:.2f}%)")
+                        
+                    # Assert each candle in ladder has exactly one POC
+                    poc_count = int(df["is_poc"].sum())
+                    if poc_count != len(unique_ts):
+                        ladder_valid = False
+                        print(f"       -> [FAIL] {fname}: is_poc count ({poc_count}) != unique candles ({len(unique_ts)})")
+                        
+                    if "rung_source" in df.columns:
+                        tick_rungs = int((df["rung_source"] == 0).sum())
+                        synth_rungs = int((df["rung_source"] == 1).sum())
+                        print(f"       -> [PROVENANCE] {fname}: {tick_rungs:,} tick-exact rungs | {synth_rungs:,} uniform synthetic rungs")
+                else:
+                    ref_valid = False
+                    print(f"       -> [FAIL] {fname}: Matching master file {master_fname} not found")
             # 3b. Master Specific Verification Gates
             master_gates_valid = True
             if not is_ladder:
                 if "is_synthetic" in df.columns:
-                    # Assert is_synthetic is int8 and flags maintenance bars where volume is 0
-                    has_flat_zero_bars = bool(((df["high"] == df["low"]) & (df["volume_base"] == 0.0)).any())
-                    synth_tagged = bool((df["is_synthetic"] == 1).any())
+                    # Assert is_synthetic is int8 and matches exact count of degenerate maintenance bars
+                    degenerate_count = int(((df["high"] == df["low"]) & ((df["volume_base"] == 0.0) | (df["trade_count"] == 0))).sum())
+                    synth_tagged_count = int((df["is_synthetic"] == 1).sum())
                     dtype_valid = (df["is_synthetic"].dtype == np.int8 or df["is_synthetic"].dtype == "int8")
-                    if has_flat_zero_bars and not synth_tagged:
+                    if degenerate_count > 0 and synth_tagged_count != degenerate_count:
                         master_gates_valid = False
-                        print(f"       -> [FAIL] {fname}: Flat zero-volume bars exist but is_synthetic.sum() == 0")
+                        print(f"       -> [FAIL] {fname}: Tagged synthetic count ({synth_tagged_count}) != degenerate count ({degenerate_count})")
                     if not dtype_valid:
                         master_gates_valid = False
                         print(f"       -> [FAIL] {fname}: is_synthetic dtype is {df['is_synthetic'].dtype}, expected int8")
@@ -137,8 +160,10 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
             if status == "FAIL":
                 all_passed = False
 
-            if "master" not in fname:
-                total_records += rows
+            if "master" in fname:
+                total_master_candles += rows
+            else:
+                total_ladder_rungs += rows
 
             print(f"[{status}] {fname:<36} | Rows: {rows:>7,} | Cols: {cols} | Size: {size_mb:5.2f} MB | Nulls: {null_count} | Infs: {inf_count} | Gaps: {num_gaps} | Monotonic: {is_monotonic}")
             if num_gaps > 0:
@@ -149,7 +174,7 @@ def verify_all_parquets(target_dir: str = DEFAULT_TARGET) -> bool:
 
     print("=" * 90)
     print(f"AUDIT SUMMARY: {'ALL PARQUET DATASETS 100% HEALTHY' if all_passed else 'INTEGRITY ISSUES DETECTED'}")
-    print(f"Total Discrete 15m Records Audited: {total_records:,} candles")
+    print(f"Total Discrete 15m Master Candles: {total_master_candles:,} | Total Ladder Price Bins: {total_ladder_rungs:,}")
     print("=" * 90)
     return all_passed
 

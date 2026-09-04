@@ -218,8 +218,8 @@ class HistoricalMetricsProcessor:
                 on="open_time_ms", how="left"
             )
             real_poc = poc_merged["real_poc"].values
-            fallback_poc = np.round((df["high"].values + df["low"].values + 2.0 * df["close"].values) / 4.0, 1)
-            df["fp_poc"] = np.where(np.isnan(real_poc), fallback_poc, np.round(real_poc, 1))
+            fallback_poc = np.round((df["high"].values + df["low"].values + 2.0 * df["close"].values) / 4.0, 6)
+            df["fp_poc"] = np.where(np.isnan(real_poc), fallback_poc, np.round(real_poc, 6))
             df["poc_source"] = np.where(np.isnan(real_poc), "OHLC_APPROX", "TICK_EXACT")
             
             df["fp_poc_vol_ratio"] = poc_merged["poc_vol_ratio"].fillna(0.0).values if "poc_vol_ratio" in poc_merged.columns else 0.0
@@ -229,7 +229,7 @@ class HistoricalMetricsProcessor:
             if require_footprint:
                 raise RuntimeError(f"[FATAL GATE 2] require_footprint=True but footprint_df is empty for {symbol}! Refusing to zero-fill dead features.")
             print(f"[WARN] No tick footprint data provided for {symbol}. Using OHLC approximation.")
-            df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 1)
+            df["fp_poc"] = np.round((df["high"] + df["low"] + 2.0 * df["close"]) / 4.0, 6)
             df["poc_source"] = "OHLC_APPROX"
             df["fp_poc_vol_ratio"] = 0.0
             df["fp_stacked_buy_imb"] = 0.0
@@ -333,7 +333,9 @@ class HistoricalMetricsProcessor:
             df["taker_volume_ratio"] = np.round(df["taker_buy_vol_btc"].values / np.maximum(df["taker_sell_vol_btc"].values, 1e-6), 4)
 
         # OI rate of change (% per 15m bar) - strictly prevent Inf when previous OI is 0
-        df["oi_change_pct"] = np.round(df["open_interest_k"].pct_change().replace([np.inf, -np.inf], np.nan).fillna(0.0).values * 100.0, 4)
+        raw_oi_change = df["open_interest_k"].pct_change().replace([np.inf, -np.inf], np.nan).fillna(0.0).values * 100.0
+        # Winsorise extreme spikes to [-100.0, 100.0] to prevent unbounded distortion
+        df["oi_change_pct"] = np.round(np.clip(raw_oi_change, -100.0, 100.0), 4)
 
         # 12. Compute Mathematical Liquidations using Upgraded Model
         print("[PROCESSOR] Computing Mathematical Liquidations (Non-Linear Cascade + Funding Asymmetry)...")
@@ -348,10 +350,12 @@ class HistoricalMetricsProcessor:
         null_counts = final_df.isnull().sum()
         if null_counts.any():
             print(f"[PROCESSOR] Imputing isolated null values...")
-            # Backfill would inject a future observation into earlier training rows.
-            # Keep only causal forward-fill; pre-source rows retain the documented
-            # neutral/sentinel value after numeric filling below.
-            final_df = final_df.ffill()
+            # P1-9: Exclude provenance columns from ffill to prevent inheriting TICK_EXACT onto non-tick bars
+            provenance_cols = [c for c in ["future_flow_source", "spot_flow_source", "poc_source"] if c in final_df.columns]
+            non_prov_cols = [c for c in final_df.columns if c not in provenance_cols]
+            final_df[non_prov_cols] = final_df[non_prov_cols].ffill()
+            for c in provenance_cols:
+                final_df[c] = final_df[c].fillna("UNKNOWN")
             numeric = final_df.select_dtypes(include=[np.number]).columns
             final_df[numeric] = final_df[numeric].fillna(0.0)
 

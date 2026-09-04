@@ -82,8 +82,9 @@ def run_pipeline(
         try:
             m_sample = pd.read_parquet(master_file, columns=["open_time_ms"])
             l_sample = pd.read_parquet(ladder_file, columns=["open_time_ms"])
-            if len(m_sample) > 1000 and len(l_sample) > 1000:
-                print(f"[SKIP] {symbol} already fully processed and verified ({len(m_sample):,} master bars, {len(l_sample):,} ladder rungs). Skipping.")
+            # Validate unique candles in ladder against master candles (not just raw rungs > 1000)
+            if len(m_sample) > 1000 and l_sample["open_time_ms"].nunique() >= len(m_sample) * 0.95:
+                print(f"[SKIP] {symbol} already fully processed and verified ({len(m_sample):,} master bars, {l_sample['open_time_ms'].nunique():,} ladder candles). Skipping.")
                 return True
         except Exception:
             pass
@@ -169,41 +170,42 @@ def run_pipeline(
     manifest = exporter.export_dataset(master_df, symbol=symbol)
     
     # Export Table 2: Microstructure Footprint Price Ladder (Strictly Aligned with Table 1 Bounds & Full Timeline Coverage)
+    # Export Table 2: Microstructure Footprint Price Ladder (Strictly Aligned with Table 1 Bounds & Full Timeline Coverage)
     min_master_ts = master_df["open_time_ms"].min()
     max_master_ts = master_df["open_time_ms"].max()
     ladder_out = os.path.join(target_dir, f"{symbol}_15m_footprint_ladder.parquet")
+    synthetic_ladder_out = os.path.join(target_dir, f"{symbol}_15m_ladder_synthetic.parquet")
 
     existing_ts = set(ladder_df["open_time_ms"].unique()) if not ladder_df.empty else set()
     missing_mask = ~master_df["open_time_ms"].isin(existing_ts)
 
+    if not ladder_df.empty and "rung_source" not in ladder_df.columns:
+        ladder_df["rung_source"] = np.int8(0) # 0 = TICK_EXACT
+
     if missing_mask.any():
         print(f"[FOOTPRINT] Synthesizing full-history footprint ladder profile for {missing_mask.sum():,} earlier bars to match Table 1...")
         df_missing = master_df[missing_mask].copy()
-        median_px = master_df["close"].median()
-        raw_step = median_px * 0.00035
-        if raw_step >= 1.0:
-            daily_bin_step = round(raw_step, 1)
-        elif raw_step >= 0.1:
-            daily_bin_step = round(raw_step, 2)
-        elif raw_step >= 0.01:
-            daily_bin_step = round(raw_step, 3)
-        elif raw_step >= 0.001:
-            daily_bin_step = round(raw_step, 4)
-        else:
-            daily_bin_step = round(raw_step, 6)
-        daily_bin_step = max(daily_bin_step, 1e-6)
+        
+        # P0-5: Causal per-bar bin step derived strictly from each candle's close (removes full-sample median lookahead)
+        c_vals = df_missing["close"].values
+        raw_steps = c_vals * 0.00035
+        bar_bin_step = np.where(raw_steps >= 1.0, np.round(raw_steps, 1),
+                       np.where(raw_steps >= 0.1, np.round(raw_steps, 2),
+                       np.where(raw_steps >= 0.01, np.round(raw_steps, 3),
+                       np.where(raw_steps >= 0.001, np.round(raw_steps, 4),
+                       np.round(raw_steps, 6)))))
+        bar_bin_step = np.maximum(bar_bin_step, 1e-6)
 
         l_vals = df_missing["low"].values
         h_vals = df_missing["high"].values
-        c_vals = df_missing["close"].values
         v_vals = df_missing["volume_base"].values
         tbv_vals = df_missing["taker_buy_vol_btc"].values if "taker_buy_vol_btc" in df_missing.columns else v_vals * 0.5
         tsv_vals = np.maximum(0.0, v_vals - tbv_vals)
         tc_vals = df_missing["trade_count"].values if "trade_count" in df_missing.columns else np.maximum(1, (v_vals * 10).astype(np.int64))
         ots_vals = df_missing["open_time_ms"].values
 
-        min_bins = np.floor(l_vals / daily_bin_step).astype(np.int64)
-        max_bins = np.ceil(h_vals / daily_bin_step).astype(np.int64)
+        min_bins = np.floor(l_vals / bar_bin_step).astype(np.int64)
+        max_bins = np.ceil(h_vals / bar_bin_step).astype(np.int64)
         bin_counts = np.maximum(1, max_bins - min_bins + 1)
 
         rep_ots = np.repeat(ots_vals, bin_counts)
@@ -213,6 +215,7 @@ def run_pipeline(
         rep_tc = np.repeat(tc_vals, bin_counts)
         rep_counts = np.repeat(bin_counts, bin_counts)
         rep_min_bins = np.repeat(min_bins, bin_counts)
+        rep_step = np.repeat(bar_bin_step, bin_counts)
 
         cum_counts = np.cumsum(bin_counts)
         starts = np.zeros(len(bin_counts), dtype=np.int64)
@@ -221,15 +224,16 @@ def run_pipeline(
         offsets = all_indices - np.repeat(starts, bin_counts)
 
         all_bins = rep_min_bins + offsets
-        prices = np.round(all_bins * daily_bin_step, 4)
+        prices = np.round(all_bins * rep_step, 6)
 
         b_vol = rep_tbv / rep_counts
         s_vol = rep_tsv / rep_counts
         net_delta = b_vol - s_vol
 
-        poc_bins = np.round(rep_c / daily_bin_step).astype(np.int64)
+        poc_bins = np.round(rep_c / rep_step).astype(np.int64)
         is_poc = (all_bins == poc_bins).astype(np.int8)
 
+        # P0-1: Explicit rung_source = 1 for synthetic uniform bars
         synth_ladder = pd.DataFrame({
             "open_time_ms": rep_ots,
             "price_bin": prices,
@@ -239,7 +243,8 @@ def run_pipeline(
             "is_buy_imbalance": np.int8(0),
             "is_sell_imbalance": np.int8(0),
             "is_poc": is_poc,
-            "trade_count": np.maximum(1, (rep_tc / rep_counts).astype(np.int64))
+            "trade_count": np.maximum(1, (rep_tc / rep_counts).astype(np.int64)),
+            "rung_source": np.int8(1)
         })
 
         # Ensure exactly 1 POC per candle
@@ -248,6 +253,10 @@ def run_pipeline(
         if needs_poc.any():
             first_idx = synth_ladder[needs_poc].groupby("open_time_ms").head(1).index
             synth_ladder.loc[first_idx, "is_poc"] = np.int8(1)
+
+        # P0-2: Save separate synthetic ladder parquet
+        synth_ladder.to_parquet(synthetic_ladder_out, index=False)
+        print(f"[OK] Exported standalone Synthetic Ladder to {synthetic_ladder_out} ({len(synth_ladder):,} rungs)")
 
         aligned_ladder = pd.concat([synth_ladder, ladder_df], ignore_index=True) if not ladder_df.empty else synth_ladder
     else:

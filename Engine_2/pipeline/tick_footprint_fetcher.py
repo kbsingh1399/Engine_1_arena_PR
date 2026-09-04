@@ -73,12 +73,14 @@ class TickFootprintFetcher:
             cache_file = os.path.join(self.fp_dir, f"{symbol}-footprint-15m-{ymd}.parquet")
             ladder_cache_file = os.path.join(self.fp_dir, f"{symbol}-ladder-15m-{ymd}.parquet")
             if os.path.exists(cache_file):
-                try:
-                    c_df = pd.read_parquet(cache_file)
-                    l_df = pd.read_parquet(ladder_cache_file) if os.path.exists(ladder_cache_file) else pd.DataFrame()
-                    return c_df, l_df
-                except Exception:
-                    pass
+                # If ladder requested, only use cache if ladder cache also exists
+                if not return_ladder or os.path.exists(ladder_cache_file):
+                    try:
+                        c_df = pd.read_parquet(cache_file)
+                        l_df = pd.read_parquet(ladder_cache_file) if os.path.exists(ladder_cache_file) else pd.DataFrame()
+                        return c_df, l_df
+                    except Exception:
+                        pass
             
             url = f"https://data.binance.vision/data/futures/um/daily/aggTrades/{symbol}/{symbol}-aggTrades-{ymd}.zip"
             data = self._fetch_url(url)
@@ -170,9 +172,9 @@ class TickFootprintFetcher:
                 # Gate 4: True Diagonal Imbalance across STRICTLY ADJACENT price rungs with minimum volume floor
                 # Buy Imbalance: Ask volume at P >= 3.0 * Bid volume at (P - 1 bin) ONLY if (P - (P-1)) == 1 bin_idx
                 # Sell Imbalance: Bid volume at P >= 3.0 * Ask volume at (P + 1 bin) ONLY if ((P+1) - P) == 1 bin_idx
-                # Minimum volume floor: At least 0.5% of bar volume or 5 trades to filter noise
+                # Minimum volume floor: At least 0.5% of bar volume or $50 notional floor to filter noise across symbols
                 ladder = ladder.merge(grouped[["open_time_ms", "total_vol_coin"]], on="open_time_ms", how="left")
-                min_vol_floor = np.maximum(ladder["total_vol_coin"] * 0.005, 0.05)
+                min_vol_floor = np.maximum(ladder["total_vol_coin"] * 0.005, 50.0 / np.maximum(ladder["price_bin"], 1e-4))
                 
                 # Strict Price Adjacency Validation: diff() of bin_idx within each candle
                 ladder["bin_diff_below"] = ladder.groupby("open_time_ms")["bin_idx"].diff(1)
@@ -252,11 +254,12 @@ class TickFootprintFetcher:
                 ladder_export["net_delta_coin"] = ladder_export["ask_vol_coin"] - ladder_export["bid_vol_coin"]
                 ladder_export = ladder_export.merge(poc_max[["open_time_ms", "poc_bin_idx"]], on="open_time_ms", how="left")
                 # Integer comparison for exact POC flag
-                ladder_export["is_poc"] = (ladder_export["bin_idx"] == ladder_export["poc_bin_idx"]).astype(int)
+                ladder_export["is_poc"] = (ladder_export["bin_idx"] == ladder_export["poc_bin_idx"]).astype(np.int8)
+                ladder_export["rung_source"] = np.int8(0) # 0 = TICK_EXACT
                 ladder_export.drop(columns=["poc_bin_idx", "s_vol_below", "b_vol_above", "total_vol_coin", "bin_diff_below", "bin_diff_above"], inplace=True, errors="ignore")
                 ladder_export = ladder_export[[
                     "open_time_ms", "price_bin", "bid_vol_coin", "ask_vol_coin", "net_delta_coin",
-                    "is_buy_imbalance", "is_sell_imbalance", "is_poc", "trade_count"
+                    "is_buy_imbalance", "is_sell_imbalance", "is_poc", "trade_count", "rung_source"
                 ]]
                 
                 grouped.to_parquet(cache_file, index=False)
