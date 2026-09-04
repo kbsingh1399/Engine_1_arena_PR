@@ -39340,3 +39340,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: `Engine_2` commit `7f7e2ff`, `Engine_1_arena_PR` commit `b436470` pushed cleanly to GitHub `origin main`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Knowledge Base v10.0 Expansion (Nodes 65–70) & Microstructure Execution (2026-09-05)
+- **User Directive**: Continuous search for the most advanced trading techniques grounded in active parquet data with zero repetition ("also no repeat").
+- **Synthesized Knowledge Additions (Nodes 65–70)**:
+  - **Node 65**: Open Interest (OI) Quadrant Decomposition & Forced Capitulation Signatures (4-quadrant state space $(\text{sgn}(\Delta P), \text{sgn}(\Delta \text{OI}))$; S1 strict filtering requiring Quadrant 4 long capitulation $\Delta P < 0 \land \text{oi\_change\_pct} < -0.80\%$ to eliminate false bottom traps from aggressive shorting).
+  - **Node 66**: Footprint POC Migration & Value Area Overlap Ratios (Steidlmayer & Dalton; POC drift velocity $\Delta \text{POC}_t$, Value Area Overlap Ratio $\text{VAOR}_t$; entry condition requiring $\text{fp\_poc}_t \ge \text{fp\_val}_{t-1} \land P_{\text{close}} > \text{fp\_poc}_t$ to avoid one-way auction expansion).
+  - **Node 67**: Taker Buy-to-Volume Ratio (TBR) & Aggression Absorption Asymmetry ($\text{TBR}_t = \text{taker\_buy\_volume}/\text{volume}$; cascade collapse $\text{TBR} < 0.22$ followed by rapid snapback $> 0.55$ indicating institutional absorption and spot accumulation).
+  - **Node 68**: Whale Index Power Laws & Block Size Fragmentation (Gabaix & Hasbrouck; institutional TWAP/POV fragmentation disruption during panic wicks, right-tail block order bump where `whale_index > 0.45` and `avg_trade_size_usd` spikes $>2.5\times$ rolling mean).
+  - **Node 69**: Volatility-Adjusted Kelly Sizing with Exchange Frictions (Binance VIP0 taker fee $8\text{ bps}$, entry slippage $10\text{ bps}$, stop slippage $15\text{ bps}$; effective stop distance $D_{\text{eff}} = \Delta P + 25\text{ bps} \cdot P_{\text{entry}}$; sizing formula guaranteeing net loss never exceeds $\$25.00$ budget).
+  - **Node 70**: The 24-Bar (6-Hour) Time Decay Stop & Capital Efficiency (Half-life of liquidation dislocations; mandatory market exit if trade fails to gain $+0.20\text{R}$ within 24 bars, eliminating chop drag, negative funding bleed, and unlocking portfolio position slots).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: `Engine_2` commit `b178359`, `Engine_1_arena_PR` commit `291f08e` pushed cleanly to GitHub `origin main`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
