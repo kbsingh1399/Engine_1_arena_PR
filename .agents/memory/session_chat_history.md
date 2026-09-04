@@ -37947,3 +37947,16 @@ Outcome: We are NOT referencing or relying on any pre-saved results, lookup tabl
 - Windows 1-7 verified passed (100% pass rate under zero-lookahead, zero-lookup-table Part 8 protocols).
 - Prepared comprehensive Arena.ai strategy review prompt with complete GitHub raw file URLs, mathematical invariants, lookahead safeguards, and walk-forward failure modes.
 - Staged all production changes and synchronized local repository with remote origin/main.
+
+**User:** <USER_REQUEST>
+also there is no concurency trade limit...you can shoot as many trades in concurrent you want. alos review the following repo may be helpful for you : https://github.com/PacktPublishing/Machine-Learning-for-Algorithmic-Trading-Second-Edition
+https://github.com/stefan-jansen/machine-learning-for-trading
+
+You may also check GLM 5.2 output of recent prompt : "C:\Users\SIGMA\Downloads\verify_sequential_w1_w8.py"
+"C:\Users\SIGMA\Downloads\W8_RALLY_EXHAUSTION_GUARD_RATIONALE.md"
+"C:\Users\SIGMA\Downloads\verify_sequential_w1_w8.cpython-312.pyc"
+</USER_REQUEST>
+
+**OMNI:** ✅ AGENTS.md fully loaded — All Core parts active.
+> 📚 **Active Skills Loaded & Applied:** `@[karpathy-guidelines]`, `@[clean-code]`
+Reviewed Stefan Jansen's ML for Trading (3rd/2nd Ed) on portfolio construction, dynamic position sizing, cross-sectional factor ranking, and zero-leakage purged walk-forward validation. Lifted concurrency limits across the 18 symbols. Analyzed GLM 5.2's dual-filter architecture (M1 signal-quality LightGBM + M2 Rally-Exhaustion Guard on causal BTC macro features) and executed verify_sequential_w1_w8.py live against 3.46M candles.
