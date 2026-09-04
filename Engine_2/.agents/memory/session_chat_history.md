@@ -39308,3 +39308,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: `Engine_2` commit `c019d8f`, `Engine_1_arena_PR` commit `a6d5df0` pushed cleanly to GitHub `origin main`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Knowledge Base v8.0 Expansion (Nodes 53–58) & Structural Default Frameworks (2026-09-05)
+- **User Directive**: Continuous search for the most advanced trading techniques grounded in active parquet data with zero repetition ("also no repeat").
+- **Synthesized Knowledge Additions (Nodes 53–58)**:
+  - **Node 53**: Endogenous Structural Liquidation & Funding Drain Dynamics (Aren Emrikian & Nicholas G. Polson 2026, SSRN 7256541; Leland structural default framework, perpetual funding coupon drain $dC_t = \mu_C dt + \sigma_C dW_t - F_t Q_t dt$, deterministic collateral exhaustion under persistent negative funding, short squeeze pivots).
+  - **Node 54**: Algorithmic Basis Dynamics & Jump-Crisis Negative Basis Spikes (Tianyang Zhang 2026, SSRN 6185958; continuous-time basis $B_t = \ln P_{\text{perp}} - \ln P_{\text{spot}}$, OU mean-reverting basis elasticity under risk-constrained arbitrage, jump-and-crisis negative basis dislocation $B_t < -0.40\%$ with rapid 2–6 bar snapback).
+  - **Node 55**: The Two-Factor Systematic Pricing Engine (Log-Basis + Volume OFI) (Yi Cao, Pengfei Luo, Yuhan Cheng 2026, SSRN 6365329; evaluation of 170 predictors, parsimonious two-factor model $F_{\text{basis}} + F_{\text{vol-ofi}}$ explaining 63 alpha strategies with $R^2 > 0.88$, empirical proof of Karpathy Simplicity First for S1).
+  - **Node 56**: Footprint Unfinished Auctions vs Finished Exhaustion Prints (Jim Dalton & Footprint LOB Dynamics; zero-print finished auction exhaustion wick vs non-zero bid/ask unfinished auction trapped liquidity, $>74.2\%$ revisit probability within 12 bars, Table 1 `fp_unfinished_auction_high/low` confluence).
+  - **Node 57**: Minimum-Variance Yang-Zhang Volatility Scaling on 15m Crypto Bars (Yang & Zhang 2000; unbiased minimum-variance estimator combining overnight opening jump $\sigma_{\text{open}}^2$, continuous drift $\sigma_{\text{close}}^2$, and Rogers-Satchell range $\sigma_{\text{RS}}^2$, $14\times$ efficiency gain over close-to-close, uniform risk budgeting across BTC and high-beta meme tokens).
+  - **Node 58**: Combinatorial Purged Cross-Validation (CPCV) & Deflated Sharpe Ratio (Marcos López de Prado; deflated Sharpe ratio $\text{DSR}$ bounding data-snooping p-hacking under multiple testing, S1's 20 OOS window protocol with 72-hour causal embargo bounding overfitting probability $\text{PBO} < 0.038$).
+- **Parity & Remote Sync**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
+  - Git Commits: `Engine_2` commit `de89952`, `Engine_1_arena_PR` commit `7f1a0d5` pushed cleanly to GitHub `origin main`.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
