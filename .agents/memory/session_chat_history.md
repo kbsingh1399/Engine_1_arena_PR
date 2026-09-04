@@ -39447,3 +39447,22 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `Engine_1_arena_PR/.agents` and `Engine_2/.agents`.
   - Git Commits: Synchronized and pushed cleanly to GitHub `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
+---
+
+## Turn Record: Fresh Master Strategy Generation Prompt Authored & Pushed (2026-09-05)
+- **User Directive**: "write a new prompt" (authoring the definitive institutional master generation prompt for Arena.ai / Quant Model Council to construct `Engine_2/s1_liquidation_cascade.py`, `Engine_2/test_all_20_regimes.py`, and `Engine_2/STRATEGY_SPEC.md`).
+- **Authored & Deployed Deliverable**:
+  - [`ARENA_MASTER_S1_PROMPT.md`](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/ARENA_MASTER_S1_PROMPT.md) updated with full integration of Second Brain v15.0 (Nodes 1–100).
+  - Explicitly details the post-mortem root causes of prior 0/20 failures: 5.0R retracement trap (85.8% winning moves lost), single-sleeve starvation in quiet quarters, and $160 risk sizing asymmetry.
+  - Formulates the 4-tier dynamic ratchet (+0.8R -> BE +0.15R, +1.5R -> Lock +0.80R, +2.0R to +2.5R target) and 24-bar (6h) Snell envelope time stop.
+  - Defines the 4-sleeve confluence ensemble (Cascade Flush, Spot CVD Absorption, Extreme VWAP Overshoot, Deep Squeeze).
+  - Enforces the invariant risk budget ($5,000 capital, $25 base, $50 house, $15 defense, 4.5% hard DD, max 2 concurrent).
+  - Table of all 20 canonical OOS quarterly windows (2021–2026) with strictly causal 72-hour purge boundaries.
+  - Zero-lookahead blacklist: zero lookup tables, zero OOS parameter loops, zero target lock breaks.
+- **Dual-Repository & Dual-Branch Git Sync**:
+  - `Engine_1_arena_PR`: Commit `28101cc` pushed to both `origin main` AND `origin arena/01a06dc4-engine-1-arena-pr`.
+  - `Engine_2`: Commit `5b083b6` pushed to `origin main`.
+  - Parity: 100% byte-for-byte sync across 7,993 files in `.agents` maintained.
+- **Standing Daemon**: Cron task `task-794` active on 15-minute intervals.
+
