@@ -39615,3 +39615,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`6dce4b9`); Engine_1_arena_PR committed and pushed (`8c043b4`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2067` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v26.0 Expansion (Nodes 161–166) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2203` (iteration 1), `task-2067` (iteration 4), `task-794` (iteration 22), and `task-1891` (iteration 9) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 161–166: 166 Structured Nodes)**:
+  - **Node 161**: Huang-Stoll Tick-By-Tick Spread Decomposition & Inventory Holding Premium (Huang & Stoll 1997; Stoll 1989; three-part spread decomposition; Inventory Holding Premium ratio $\mathcal{H}_{\text{inv}} \le 0.30$ signaling inventory risk re-balancing and spread normalization).
+  - **Node 162**: Andersen-Bollerslev High-Frequency Intraday Volatility Periodicity & U-Shape Demeaning (Andersen & Bollerslev 1997; diurnal seasonal factor $s_d$; demeaned volatility $\sigma_{\text{clean}}(t, d)$ preventing diurnal volatility expansion from triggering false stop-outs).
+  - **Node 163**: Kyle-Lee High-Frequency Order Flow Toxicity & Toxic Fill Ratio (TFR) (Lee & Ready 1991; Lin et al. 1995; multi-bar forward toxicity metric $\text{TFR}_4 \le 0.25$ and adverse drift $\Delta P_{\text{adv}} \ge 0$ confirming taker sell orders no longer depress price).
+  - **Node 164**: Biais-Hill-Spatt Limit Order Book Value-at-Risk & Liquidity Black Hole Dynamics (Biais et al. 1995; Morris & Shin 2004; depth elasticity metric $\mathcal{E}_{\text{LOB}}$; black hole indicator $\mathcal{B}_{\text{hole}} == 0$ ensuring deep counterparty liquidity is present before entry).
+  - **Node 165**: Merton Jump-Diffusion Option Pricing & Microstructure Recovery Probability (Merton 1976; Bates 1996; analytical target hit probability $\mathbb{P}^* \ge 0.62$ confirming $>62\%$ probability of reaching $+2.5\text{R}$ before stop-loss).
+  - **Node 166**: Hasbrouck High-Frequency Information Shares & Cross-Exchange Price Leadership (Hasbrouck 1995; Baillie et al. 2002; cointegrated VECM information share $\text{IS}_{\text{spot}} \ge 0.58$ confirming unleveraged spot accumulation has seized price discovery).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`ffffec7`); Engine_1_arena_PR committed and pushed (`592cf49`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2203` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
