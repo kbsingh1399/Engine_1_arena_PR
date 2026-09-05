@@ -123,12 +123,12 @@ def status_server():
             
     print("\n=== Preview Status ===")
     if running:
-        print(f"✅ Status: Running")
-        print(f"🔢 PID: {pid}")
-        print(f"🌐 URL: {url} (Likely)")
-        print(f"📝 Logs: {LOG_FILE}")
+        print(f"[+] Status: Running")
+        print(f"[*] PID: {pid}")
+        print(f"[*] URL: {url} (Likely)")
+        print(f"[*] Logs: {LOG_FILE}")
     else:
-        print("⚪ Status: Stopped")
+        print("[-] Status: Stopped")
     print("===================\n")
 
 def main():

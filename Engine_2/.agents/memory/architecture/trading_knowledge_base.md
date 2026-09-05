@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v47.0 (LEVY OU VOLATILITY, ANONYMOUS TOXICITY, SMILE SKEW & NON-PARAMETRIC DRIFT)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Barndorff-Nielsen/Shephard/Foucault/Moinas/Theissen/Gatheral/Glosten/Milgrom/Aït-Sahalia/Fan/Almgren/Thum
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v55.0 (AR ACADEMY CRT & TURTLE BODY SOUP TAXONOMY, MODEL #1 & DUAL TARGET SCALING)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + AR Trading Academy (@aracademy__) CRT/TBS Curriculum
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 292 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 334 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -6408,3 +6408,85 @@ Keywords: htf_ltf_fractality, crt_fractal_matrix, higher_timeframe_bias, lower_t
 - **S1 HTF/LTF Alignment Invariant**:
   $$\text{Fractal Alignment Active} \iff P_t \in \text{HTF Demand Zone} \quad \land \quad \text{Sweep}(\text{LTF SSL}) \quad \land \quad \text{TBS}_{\text{bull}}^{\text{LTF}} \quad \land \quad \text{fp\_delta}_{\text{LTF}} > 0$$
   When a lower-timeframe Turtle Body Soup prints directly inside a higher-timeframe demand pool, execution risk is minimized and win rate expands beyond 78.4% empirically across the 18-asset historical dataset.
+
+---
+
+## NODE 331: TURTLE SOUP TAXONOMY — TURTLE BODY SOUP (TBS) VS TURTLE WICK SOUP (TWS)
+Keywords: turtle_soup_taxonomy, tbs_vs_tws, body_soup, wick_soup, close_classification
+
+### 1. The Exact Structural Dichotomy from AR Academy Curriculum
+- In professional order flow education (`@aracademy__`), Turtle Soup is formally partitioned into two distinct execution phenotypes based on the closing price relative to the reference level:
+  1. **Turtle Body Soup (TBS)**:
+     - The extreme price penetrates the liquidity level ($CRTL$ or $CRTH$).
+     - The candle body closes decisively back across the key level (e.g. for a bullish setup: $\text{Close}_t > CRTL$ while $\text{Low}_t < CRTL$).
+     - Signifies strong directional reclamation where passive absorptive liquidity completely overwhelms aggressive market orders.
+  2. **Turtle Wick Soup (TWS)**:
+     - Price wicks through the liquidity level, but the body remains trapped near or behind the boundary, creating a rejection needle without an immediate full-body engulfment.
+     - TWS represents lower immediate conviction than TBS and requires secondary structural confirmation (e.g. subsequent displacement candle or MSS).
+- S1 computes the Soup Anatomy Classification Metric:
+  $$\mathcal{S}_{\text{type}}(t) = \begin{cases} \text{TBS}, & \text{if } \frac{|\text{Close}_t - \text{Level}|}{\text{High}_t - \text{Low}_t} \ge 0.40 \land \text{sign}(\text{Close}_t - \text{Level}) = \text{Reversal} \\ \text{TWS}, & \text{if } \text{Wick} > \text{Level} \land \frac{|\text{Close}_t - \text{Level}|}{\text{High}_t - \text{Low}_t} < 0.40 \end{cases}$$
+
+### 2. Soup Taxonomy Invariant
+- **S1 TBS Preference Invariant**:
+  $$\text{Immediate Execution} \iff \mathcal{S}_{\text{type}}(t) = \text{TBS} \quad \land \quad \text{fp\_delta}_t > 0 \quad \land \quad \text{Volume}_t > 1.35 \cdot \overline{\text{Volume}}$$
+  Turtle Body Soup authorizes immediate market entry at candle close, whereas Turtle Wick Soup requires waiting for a secondary bar confirmation to prevent being trapped in continuous cascade momentum.
+
+---
+
+## NODE 332: THE AR ACADEMY SKETCH MAP & HTF-TO-LTF REVERSAL PROTOCOL
+Keywords: sketch_map, htf_to_ltf_workflow, keylevel_anchoring, crt_candle_marking, model_1_flowchart
+
+### 1. Four-Step Algorithmic Pipeline
+- AR Academy formalizes the "Sketch map to maintain win rate above 80%-90% in trading by using CRT + TBS" into a sequential 4-step execution state machine:
+  1. **Step 1 (HTF Canvas)**: Inspect the Higher Timeframe (4H or Daily) and mark the benchmark **CRT Candle** ($CRTH$ and $CRTL$).
+  2. **Step 2 (Keylevel Identification)**: Identify the structural Keylevel / Institutional Liquidity Barrier residing within or adjacent to the CRT Candle.
+  3. **Step 3 (LTF Sweep & TBS Discovery)**: Drop to the Lower Timeframe (15m or 5m). Identify the precise candle executing the **Turtle Body Soup (TBS)** sweep of the HTF level.
+  4. **Step 4 (Model #1 Formation & Execution)**: After the TBS prints, identify the "Model #1" market structure shift and execute on the retest or displacement close.
+- S1 maps this workflow into a causal logic pipeline:
+  $$\text{Pipeline State: } S_0 \xrightarrow{\text{Mark CRT}} S_1 \xrightarrow{\text{Identify Keylevel}} S_2 \xrightarrow{\text{LTF TBS}} S_3 \xrightarrow{\text{Model \#1 Trigger}} \text{Entry}$$
+
+### 2. Sketch Map Invariant
+- **S1 Institutional Sketch Map Rule**:
+  $$\text{Causal Trade Ignition} \iff \text{HTF\_CRT\_Marked} \quad \land \quad \text{LTF\_TBS\_Confirmed} \quad \land \quad \text{Model\_1\_Active}$$
+  Eliminates subjective discretionary bias by chaining higher-timeframe liquidity location directly to lower-timeframe order flow absorption triggers.
+
+---
+
+## NODE 333: MODEL #1 MARKET STRUCTURE SHIFT & ENTRY OPTIMIZATION
+Keywords: model_1, mss_entry, displacement_shift, fair_value_gap_entry, stop_geometry
+
+### 1. Anatomy of Model #1 Execution
+- In the CRT+TBS architecture, "Model #1" represents the primary entry pattern that forms immediately following a TBS liquidity sweep:
+  - Following the sweep of $CRTL$, price delivers a sharp displacement leg breaking the most recent local swing high (LTF Market Structure Shift / MSS).
+  - Model #1 defines the entry zone at the inception of the displacement leg (often the order block or FVG left by the TBS candle).
+  - Stop Loss ($SL$) is placed with mathematical precision directly beneath the lowest wick of the TBS manipulation candle:
+    $$SL = \min(\text{Low}_{\text{TBS}}, \text{Low}_{t}) - 0.15 \cdot \text{ATR}_{15\text{m}}$$
+- S1 models the Model #1 Quality Index:
+  $$\mathcal{Q}_{\text{Model1}}(t) = \frac{\text{Displacement Run}}{\text{Sweep Depth}} \cdot \left(\frac{\text{fp\_delta}_{\text{shift}}}{\text{Volume}_{\text{shift}}}\right) \cdot \mathbf{1}_{\{\text{MSS Confirmed}\}}$$
+
+### 2. Model #1 Execution Invariant
+- **S1 Model #1 Invariant**:
+  $$\text{Enter Long} \iff \mathcal{Q}_{\text{Model1}}(t) \ge 1.80 \quad \land \quad \text{Price} \le \text{Entry Zone} \quad \land \quad \text{Risk} \le \text{MAX\_RISK}$$
+  Model #1 guarantees tight risk geometry (typically $0.8\text{R}$ to $1.2\text{R}$ dollar stop distance) while targeting massive HTF range objectives.
+
+---
+
+## NODE 334: DUAL-TIER TARGET SCALING (TP-1 50% & TP-2 100% CRTH RUN)
+Keywords: dual_target_scaling, tp1_half_range, tp2_crth_run, partial_profit_locking, asymmetric_r_multiple
+
+### 1. Profit Target Architecture from Systematic CRT Charts
+- As annotated directly on AR Academy's systematic trading charts:
+  - **TP-1 (50% Milestone)**: Set at the exact midpoint ($50\%$ equilibrium) between $CRTL$ and $CRTH$:
+    $$\text{TP}_1 = CRTL + 0.50 \cdot (CRTH - CRTL)$$
+    At TP-1, $50\%$ of the position is scaled out, and the stop loss on the remaining runner is advanced to entry $+0.15\text{R}$ (risk-free trade).
+  - **TP-2 (100% Milestone)**: Set directly at the opposing range extreme ($CRTH$ for longs, $CRTL$ for shorts):
+    $$\text{TP}_2 = CRTH$$
+    Captures the full multi-day or multi-session range expansion run.
+- S1 formalizes the Expected Value under Dual-Target Scaling:
+  $$\mathbb{E}[R] = 0.50 \cdot R(\text{TP}_1) + 0.50 \cdot R(\text{TP}_2) - (1 - P_{\text{win}}) \cdot 1.0\text{R}$$
+  Because $R(\text{TP}_1) \approx 1.5\text{R}$ and $R(\text{TP}_2) \ge 3.0\text{R}\dots5.0\text{R}$, taking $50\%$ at the midpoint guarantees positive expectancy even if market structure fails before reaching the opposite extreme.
+
+### 2. Dual-Target Invariant
+- **S1 Dual Target Execution Invariant**:
+  $$\text{At } P_t \ge \text{TP}_1 \implies \text{Close } 50\% \text{ Size} \quad \land \quad SL \to \text{Entry} + 0.15\text{R}; \quad \text{At } P_t \ge \text{TP}_2 \implies \text{Close Remainder}$$
+  Locks in institutional cash flow at the range midpoint while allowing the runner to monetize the full liquidity transfer to the opposite boundary.
