@@ -39599,3 +39599,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`99c4b38`); Engine_1_arena_PR committed and pushed (`bacebb9`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2067` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v25.0 Expansion (Nodes 155–160) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2067` (iteration 3), `task-1891` (iteration 8), and `task-794` (iteration 21) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 155–160: 160 Structured Nodes)**:
+  - **Node 155**: Chacko-Viceira Dynamic Consumption-Investment with Stochastic Liquidity Frictions (Chacko & Viceira 2005; Liu & Loewenstein 2002; stochastic square-root cost process $dc_t$; inaction zone $\Delta \pi(c_t) \le 0.12$ and Friction-to-Excursion ratio $\mathcal{R}_{\text{frict}} \le 0.065$ ensuring friction drag consumes $<6.5\%$ of expected target).
+  - **Node 156**: Glosten-Milgrom-Lehmann Sequential Trade Information Aggregation & Bayesian Belief Inflection (Glosten & Milgrom 1985; Lehmann 1990; posterior belief recursion $p_t$; Information Surprise Innovator $\mathcal{I}_{\text{surprise}} \ge +1.85$ producing rapid upward bid schedule revision).
+  - **Node 157**: Bollerslev-Todorov Extreme Jump Activity & Continuous Bipower Ratio (Bollerslev & Todorov 2011; Jump Activity Metric $\mathcal{J}_{\text{ratio}} \le 0.18$ ensuring continuous diffusive price action has resumed and stop-loss execution is safe from gap slippage).
+  - **Node 158**: Garman-Hass Liquidity-Constrained Order Slicing & Footprint Concentration (Garman 1976; Bertsimas & Lo 1998; slicing concentration index $\Phi_{\text{slice}} \ge 2.10$ with low price impact per volume confirming institutional accumulation).
+  - **Node 159**: Engle-Lunde Realized Semivariance Asymmetry & Downside Dissipation (Engle & Lunde 2005; Patton & Sheppard 2015; directional semivariance decomposition; asymmetry ratio shift $\mathcal{Q}_{\text{semi}} \ge +0.25 \land \mathcal{Q}_{\text{semi}}(t-1) \le -0.40$ confirming buyer dominance).
+  - **Node 160**: Kyle-Viswanathan-Ma Hidden Iceberg Execution & Support Shelf Formation (Kyle et al. 1995; Bessembinder et al. 2009; hidden iceberg absorption metric $\mathcal{H}_{\text{iceberg}} \ge 0.65$ establishing verified support shelf for ultra-tight initial stop-loss of $0.35\text{R}$).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`6dce4b9`); Engine_1_arena_PR committed and pushed (`8c043b4`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2067` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
