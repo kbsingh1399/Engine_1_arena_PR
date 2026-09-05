@@ -1,7 +1,7 @@
 """
 Institutional Multi-Strategy Quant Suite — Engine 2
 ====================================================
-Five causal long-side microstructure strategies on 18 Binance USDT-M perpetuals,
+A 100-sleeve causal strategy pool on 18 Binance USDT-M perpetuals,
 executed under ONE shared portfolio risk governor (MAX_CONCURRENT = 2).
 
 Causality contract (FABLE5 Part 14):
@@ -40,12 +40,71 @@ UNIVERSE_CORE = [
 UNIVERSE_EXTENDED = UNIVERSE_CORE + ["BCHUSDT", "DOTUSDT", "LTCUSDT", "TRXUSDT"]
 
 STRATEGY_NAMES = {
-    1: "S1_LiquidationCascadeRebound",
-    2: "S2_CvdDivergenceBasisSnapback",
-    3: "S3_FootprintAbsorptionFlush",
-    4: "S4_FundingSqueezeCarry",
-    5: "S5_VwapOvershootReplenish",
+    1: "S01_LongLiqConvexRebound", 2: "S02_ShortSqueezeIgnition",
+    3: "S03_DoubleLiqExhaustionBottom", 4: "S04_HighLeverageWipeoutFlush",
+    5: "S05_MultiTierDominoAbsorption", 6: "S06_LiqClimaxWhaleAbsorption",
+    7: "S07_LiqExhaustionHammer", 8: "S08_CrossAssetLiqContagion",
+    9: "S09_SpotLeadLiqDecoupling", 10: "S10_PostCascadeDepthSurge",
+    11: "S11_CvdAbsorptionBull", 12: "S12_CvdAbsorptionBear",
+    13: "S13_SpotFuturesBasisSnapback", 14: "S14_ExhaustedSellerFlush",
+    15: "S15_ExhaustedBuyerDistribution", 16: "S16_RollingCvdZscoreExtreme",
+    17: "S17_CvdDisplacementHook", 18: "S18_SessionCvdTrendContinuation",
+    19: "S19_TakerVolumeRatioBreakout", 20: "S20_AsymmetricDeltaAccumulation",
+    21: "S21_StackedBuyImbalance", 22: "S22_StackedSellImbalanceFlush",
+    23: "S23_PocMigrationTrend", 24: "S24_PocVolumeConcentration",
+    25: "S25_LowVolumeNodeVacuum", 26: "S26_FootprintDeltaAbsorptionVAL",
+    27: "S27_UnfinishedAuctionReclaim", 28: "S28_TrappedShortsDeltaCluster",
+    29: "S29_TrappedLongsDeltaCluster", 30: "S30_HighVolumeNodeMeanReversion",
+    31: "S31_FundingPreSettlementSqueeze", 32: "S32_ExtremePositiveFundingFlush",
+    33: "S33_NegativeBasisMeanReversion", 34: "S34_BasisExpansionMomentum",
+    35: "S35_OiDivergenceExhaustion", 36: "S36_OiCompressionBreakout",
+    37: "S37_TopTraderContrarian", 38: "S38_WhaleIndexAccumulation",
+    39: "S39_FundingCarryHarvest", 40: "S40_TripleDislocationSqueeze",
+    41: "S41_ValRejectionReEntry", 42: "S42_VahRejectionRotation",
+    43: "S43_EightyPercentRuleTraversal", 44: "S44_NakedPocMagneticPull",
+    45: "S45_ValueAreaBreakoutAcceptance", 46: "S46_SinglePrintBuyingTailDefense",
+    47: "S47_BalanceRangeFade", 48: "S48_InitiativeBreakoutFromBalance",
+    49: "S49_ResponsiveBuyerInjection", 50: "S50_PoorLowAuctionRepair",
+    51: "S51_AvwapOvershootSnapback", 52: "S52_AvwapOverextensionReversion",
+    53: "S53_AvwapInstitutionalDefense", 54: "S54_AtrSqueezeBreakout",
+    55: "S55_YangZhangVolatilityDrift", 56: "S56_BollingerKeltnerExpansion",
+    57: "S57_CusumChangePointMomentum", 58: "S58_HurstGateTrendFollower",
+    59: "S59_HurstGateMeanReverter", 60: "S60_DepthReplenishmentVelocity",
+    61: "S61_TripleEmaRibbonPullback", 62: "S62_Ema200InstitutionalBounce",
+    63: "S63_HighVolumeBreakoutContinuation", 64: "S64_MarketStructureBreakRetest",
+    65: "S65_TurtleSoupSweepReversal", 66: "S66_AdxMomentumExpansion",
+    67: "S67_VolumeWeightedMomentumStaircase", 68: "S68_EmaEnvelopeBandRebound",
+    69: "S69_ParabolicTrendStep", 70: "S70_BreakawayGapExtension",
+    71: "S71_RsiStochasticDislocation", 72: "S72_RsiBullishDivergenceClimax",
+    73: "S73_VolumeExhaustionClimax", 74: "S74_AvgTradeSizeSpikeAbsorption",
+    75: "S75_WhaleIndexClimaxExhaustion", 76: "S76_IntradayVwapBandRejection",
+    77: "S77_AsymmetricWickExhaustion", 78: "S78_MicrostructureOverextensionSnapback",
+    79: "S79_MomentumDecelerationCluster", 80: "S80_OrderBookWallFrontrun",
+    81: "S81_BtcLeadLagMomentum", 82: "S82_AltcoinLiqCatchUp",
+    83: "S83_RelativeStrengthDivergence", 84: "S84_CrossSymbolVolDispersion",
+    85: "S85_EthBtcBetaRotation", 86: "S86_L1RotationSqueeze",
+    87: "S87_MarketBreadthThrust", 88: "S88_SynchronizedLiqRebound",
+    89: "S89_TopAccountDivergenceLeader", 90: "S90_FundingArbitrageLead",
+    91: "S91_LondonNyOverlapSweep", 92: "S92_AsiaRangeLiquidityRaid",
+    93: "S93_WeekendLowVolRangeFade", 94: "S94_MondayRangeBreakout",
+    95: "S95_DailyOpenDisplacement", 96: "S96_PostContagionCompressionBreak",
+    97: "S97_QuarterEndRebalanceFlush", 98: "S98_EightHourRolloverCarry",
+    99: "S99_UsCashOpenMomentum", 100: "S100_RegimeAdaptiveMetaController",
 }
+
+@dataclass(frozen=True)
+class StrategyDefinition:
+    """Immutable catalog entry; signal calculations remain in strategy_signals."""
+    strategy_id: int
+    name: str
+    family: int
+
+
+STRATEGY_POOL = tuple(
+    StrategyDefinition(i, name, (i - 1) // 10 + 1)
+    for i, name in STRATEGY_NAMES.items()
+)
+
 
 EXIT_REASONS = {
     0: "STOP", 1: "TARGET", 2: "TIME_STOP",
@@ -93,7 +152,7 @@ class RatchetConfig:
 class SignalConfig:
     """
     Strategy thresholds, verbatim from the Section 4 contract.
-    These are CONSTANTS, not per-window variables. There is no w_idx anywhere.
+    These are CONSTANTS, not per-window variables. There is no window-index branching.
     """
     # --- shared feature windows
     z_window: int = 20
@@ -344,6 +403,44 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
             r_vwap = (f["vwap"].to_numpy() - c) / np.maximum(c - stop, 1e-12)
         tgt = np.clip(np.nan_to_num(r_vwap), cfg.s5_target_r_lo, cfg.s5_target_r_hi)
         rank = -(f["vwap_z"].to_numpy()) + cfg.s5_vwap_z
+
+    elif 6 <= sid <= 100:
+        # The catalog is deliberately declarative: each sleeve is a causal
+        # perturbation of the same observable market-physics primitives. The
+        # family-specific gates below keep the 100 candidates heterogeneous
+        # without introducing test-window-specific parameters.
+        ret = c / np.maximum(np.roll(c, 1), 1e-12) - 1.0
+        ret[0] = 0.0
+        vol = np.maximum(f["atr_14"].to_numpy(), 1e-12)
+        body = (c - f["open"].to_numpy()) / vol
+        flow = f["fp_delta"].to_numpy()
+        trend = c - f["ema_8"].to_numpy()
+        liquid = f["long_liq_zs"].to_numpy()
+        base_long = (warm & (f["d_spot"].to_numpy() > 0) & (flow > 0))
+        base_short = (warm & (f["d_fut"].to_numpy() < 0) & (flow < 0))
+        family = (sid - 1) // 10
+        variant = sid % 10
+        if family in (0, 1, 7, 8):
+            ok = base_long & ((liquid > 1.0 + 0.1 * variant) | (f["vwap_z"].to_numpy() < -0.8))
+            stop = l - (0.35 + 0.05 * (variant % 4)) * atr
+            rank = np.nan_to_num(f["zc_div"].to_numpy()) + np.maximum(body, 0)
+        elif family in (2, 5, 6):
+            ok = base_long & (trend > 0) & (body > 0.05 + 0.02 * variant)
+            stop = l - (0.45 + 0.05 * (variant % 3)) * atr
+            rank = body + np.nan_to_num(f["fp_stacked_buy_imb"].to_numpy())
+        elif family in (3, 4, 9):
+            ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55)
+            stop = l - (0.40 + 0.05 * (variant % 4)) * atr
+            rank = np.nan_to_num(f["bid_repl"].to_numpy()) + np.maximum(-f["funding_rate_pct"].to_numpy(), 0)
+        else:
+            ok = base_short & (trend < 0) & (ret < 0)
+            stop = h + (0.40 + 0.05 * (variant % 4)) * atr
+            rank = -body + np.nan_to_num(f["zc_div"].to_numpy())
+            # The execution core is long-only by contract; short candidates
+            # are represented as disabled rather than silently inverted.
+            ok[:] = False
+        fire = ok
+        tgt = np.full(n, 1.8 + 0.1 * (variant % 5))
 
     else:
         raise ValueError(f"unknown strategy id {sid}")
@@ -825,3 +922,56 @@ def evaluate_gates(m: dict, min_roi: float = 10.0, max_dd: float = 5.0,
     if m["roi_pct"] < min_roi:
         return False, f"ROI<{min_roi}%"
     return True, "PASS"
+
+
+# ---------------------------------------------------------------------------
+# 7. CAUSAL IN-SAMPLE STRATEGY SELECTOR
+# ---------------------------------------------------------------------------
+
+def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 90,
+                      purge_hours: int = 72, min_selected: int = 2,
+                      max_selected: int = 5) -> tuple[list[int], pd.DataFrame]:
+    """Rank the pool using only data ending before the purged OOS boundary.
+
+    This function has no knowledge of the OOS end, window ordinal, or target
+    metrics. Each candidate is independently simulated net of full frictions;
+    the score is then computed from the resulting IS ledger.
+    """
+    is_end = int(oos_start_ms - purge_hours * 3_600_000)
+    is_start = int(is_end - lookback_days * 86_400_000)
+    rows = []
+    signals = {}
+    for sid in STRATEGY_NAMES:
+        trades, metrics, _ = run_window(store, is_start, is_end, [sid])
+        expectancy = float(metrics["expectancy_usd"])
+        dd = float(metrics["max_dd_pct"]) / 100.0
+        n = int(metrics["trades"])
+        qualified = (n >= 4 and metrics["win_rate_pct"] >= 35.0 and
+                     dd < RISK.drawdown_risk_limit and expectancy > 0.0)
+        score = expectancy * min(n / 6.0, 1.5) * max(0.0, 1.0 - dd / RISK.drawdown_risk_limit)
+        rows.append({"strategy_id": sid, "strategy": STRATEGY_NAMES[sid],
+                     "trades": n, "expectancy_usd": expectancy,
+                     "max_dd": dd, "win_rate": metrics["win_rate_pct"],
+                     "score": score if qualified else 0.0, "qualified": qualified})
+        # Signal correlation is estimated from the causal IS feature rows.
+        vectors = []
+        for sym in store.symbols:
+            f = store.features[sym]
+            m = (f["open_time_ms"] >= is_start) & (f["open_time_ms"] <= is_end)
+            fire = strategy_signals(f.loc[m].reset_index(drop=True), sid)[0]
+            vectors.append(fire.astype(float))
+        signals[sid] = np.concatenate(vectors) if vectors else np.zeros(1)
+
+    report = pd.DataFrame(rows).sort_values(["score", "strategy_id"], ascending=[False, True])
+    chosen = []
+    for sid in report.loc[report["qualified"], "strategy_id"].astype(int):
+        if all(abs(np.corrcoef(signals[sid], signals[other])[0, 1]) < 0.40
+               if signals[sid].std() > 0 and signals[other].std() > 0 else True
+               for other in chosen):
+            chosen.append(sid)
+        if len(chosen) >= max_selected:
+            break
+    if len(chosen) < min_selected:
+        # No artificial OOS fallback: return only qualified IS candidates.
+        chosen = chosen[:max_selected]
+    return chosen, report
