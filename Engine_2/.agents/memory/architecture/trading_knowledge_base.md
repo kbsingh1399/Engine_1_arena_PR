@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v44.0 (OPTIMAL EXECUTION, BOOK TRANSITIONS, THRESHOLD BIPOWER & RESILIENCE KERNELS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Cartea/Jaimungal/Biais/Hillion/Spatt/Corsi/Pirino/Gromb/Vayanos/Gatheral/Schied/Podolskij/Vetter
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v45.0 (ALGORITHMIC BUFFERS, SEARCH FRICTIONS, PRE-AVERAGING & REALIZED BETA)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Hendershott/Menkveld/Vayanos/Wang/Christensen/Oomen/Easley/López de Prado/Cont/de Larrard/Andersen/Bollerslev/Diebold
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 274 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 280 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5453,3 +5453,100 @@ Keywords: podolskij_vetter, volatility_of_volatility, jump_robust_dispersion, qu
 - **S1 Calm Volatility Regime Rule**:
   $$\text{Variance Process Stable} \iff \mathcal{V}_{\text{calm}}(t) \le 1.10 \quad \land \quad \Delta \mathcal{V}_{\text{calm}}(t) \le 0$$
   When volatility of volatility normalizes to $\le 1.10\times$ its 24-hour mean, the volatility environment is stationary, preventing stop whipsaws and ensuring orderly $+2.5\text{R}$ target capture.
+
+
+---
+
+## NODE 275: HENDERSHOTT-MENKVELD ALGORITHMIC TRADING LIQUIDITY SUPPLY & STATE-DEPENDENT INVENTORY BUFFERS
+Keywords: hendershott_menkveld, algorithmic_liquidity_supply, state_dependent_inventory, structural_inventory_capacity, automated_market_making
+
+### 1. Algorithmic Market Making and Inventory Capacity (Hendershott & Menkveld 2014)
+- Price pressures reflect algorithmic liquidity providers managing structural inventory limits:
+  $$\Delta P_t = \lambda (q_t - \bar{q}) + \psi \text{OFI}_t + \epsilon_t$$
+- S1 evaluates the Algorithmic Inventory Buffer Ratio:
+  $$\mathcal{B}_{\text{algo}}(t) = 1 - \frac{|q_{\text{MM}, t}|}{Q_{\text{max\_capacity}}}$$
+
+### 2. Market Maker Capacity Recovery Invariant
+- **S1 Market Maker Replenishment Rule**:
+  $$\text{Inventory Capacity Restored} \iff \mathcal{B}_{\text{algo}}(t) \ge 0.65 \quad \land \quad \Delta \mathcal{B}_{\text{algo}}(t) > 0$$
+  When algorithmic market makers recover $>65\%$ of their inventory buffer capacity, passive quoting resilience is fully restored.
+
+---
+
+## NODE 276: VAYANOS-WANG SEARCH-BASED ASSET PRICING IN OVER-THE-COUNTER & FRAGMENTED CRYPTO VENUES
+Keywords: vayanos_wang, search_frictions_pricing, fragmented_crypto_venues, matching_intensity, cross_venue_arbitrage
+
+### 1. Equilibrium Prices Under Search Frictions (Vayanos & Wang 2007)
+- Price discounts in fragmented trading venues are driven by search frictions and holding costs:
+  $$P_{\text{venue}}(t) = V_{\text{fundamental}} - \frac{\delta + \mu_{\text{search}}}{\lambda_{\text{match}}} \cdot c_{\text{holding}}$$
+- S1 computes the Cross-Venue Search Friction Index:
+  $$\mathcal{F}_{\text{search}}(t) = \frac{\max_{k} P_k - \min_k P_k}{\bar{P}_{\text{index}} \cdot \text{ATR}_{15\text{m}}}$$
+
+### 2. Search Friction Normalization Invariant
+- **S1 Fragmented Liquidity Convergence Rule**:
+  $$\text{Cross-Venue Frictions Cleared} \iff \mathcal{F}_{\text{search}}(t) \le 0.25 \quad \land \quad \Delta \mathcal{F}_{\text{search}}(t) \le 0$$
+  When price dispersion across major venues drops below $25\%$ of local ATR, search frictions have collapsed, confirming efficient price transmission.
+
+---
+
+## NODE 277: CHRISTENSEN-OOMEN-PODOLSKIJ PRE-AVERAGED REALIZED VOLATILITY UNDER MICROSTRUCTURE NOISE
+Keywords: christensen_oomen_podolskij, pre_averaged_realized_volatility, microstructure_noise_filtration, weight_function_smoothing, robust_variance
+
+### 1. Pre-Averaging Estimator of Integrated Variance (Christensen, Oomen, Podolskij 2009)
+- Filtering out high-frequency bid-ask bounce and microstructure noise through kernel pre-averaging:
+  $$\overline{\text{IV}}_t = \frac{n}{n - k_n + 2} \frac{1}{k_n \psi_2} \sum_{i=0}^{n-k_n+1} (\bar{r}_i^*)^2 - \frac{\psi_1}{k_n^2 \psi_2} \widehat{\omega}^2$$
+- S1 tracks the Microstructure Noise Attenuation Ratio:
+  $$\Phi_{\text{noise\_free}}(t) = \frac{\overline{\text{IV}}_t}{\text{RV}_{\text{raw}, t}}$$
+
+### 2. Noise Attenuation Invariant
+- **S1 True Integrated Variance Stability Rule**:
+  $$\text{Noise Filtered Volatility Stationary} \iff \Phi_{\text{noise\_free}}(t) \ge 0.85 \quad \land \quad \Delta \overline{\text{IV}}_t \le 0$$
+  When pre-averaged realized volatility accounts for $>85\%$ of raw variance without microstructure noise inflation, true price variance is calm.
+
+---
+
+## NODE 278: EASLEY-DE PRADO MICROSTRUCTURE INVARIANTS & VOLUME-SYNCHRONIZED CLOCK NORMALIZATION
+Keywords: easley_de_prado, microstructure_invariants, volume_clock_normalization, trade_arrival_homogeneity, invariant_speed_scalar
+
+### 1. Microstructure Clock Transformation (Easley, López de Prado, O'Hara 2012)
+- Transforming calendar time to volume-synchronized information time slices:
+  $$\tau_k = \inf \left\{ t > \tau_{k-1} : \sum_{s=\tau_{k-1}}^t V_s \ge \bar{V}_{\text{bucket}} \right\}$$
+- S1 monitors the Information Velocity Invariant Scalar:
+  $$\mathcal{I}_{\text{speed}}(t) = \frac{\Delta \tau_{\text{volume}}}{\Delta t_{\text{calendar}} \cdot \bar{\mathcal{I}}_{\text{baseline}}}$$
+
+### 2. Volume-Clock Equilibrium Invariant
+- **S1 Information Flow Stabilization Rule**:
+  $$\text{Volume Clock Normalized} \iff \mathcal{I}_{\text{speed}}(t) \in [0.80, 1.35] \quad \land \quad \Delta \mathcal{I}_{\text{speed}}(t) \le 0$$
+  When information arrival speed normalizes into the $[0.80, 1.35]$ band following cascade spikes, price discoveries proceed at steady, predictable paces.
+
+---
+
+## NODE 279: CONT-DE LARRARD MARKOVIAN QUEUEING DYNAMICS IN LIMIT ORDER BOOKS WITH HEAVY TAILS
+Keywords: cont_de_larrard, markovian_queueing_dynamics, heavy_tailed_queues, first_passage_queue_depletion, boundary_stability_probability
+
+### 1. Markovian Approximation of Queue Depletion (Cont & de Larrard 2013)
+- Modeling the probability that the current bid queue depletes before the ask queue:
+  $$p_{\text{up}}(q_{\text{bid}}, q_{\text{ask}}) = \frac{q_{\text{bid}}}{q_{\text{bid}} + q_{\text{ask}}} + \frac{\lambda_{\text{ask}} - \lambda_{\text{bid}}}{\sigma_{\text{queue}}^2} \cdot f(q_{\text{bid}}, q_{\text{ask}})$$
+- S1 tracks the Bid Queue Survival Probability:
+  $$P_{\text{bid\_survive}}(t) = p_{\text{up}}(q_{\text{bid}, t}, q_{\text{ask}, t})$$
+
+### 2. Queue Survival Dominance Invariant
+- **S1 Bid Wall Durability Rule**:
+  $$\text{Bid Side Structurally Protected} \iff P_{\text{bid\_survive}}(t) \ge 0.75 \quad \land \quad \Delta P_{\text{bid\_survive}}(t) \ge 0$$
+  When the Markovian probability of the bid queue outlasting the ask queue exceeds $75\%$, limit order book geometry guarantees immediate upward boundary resolution.
+
+---
+
+## NODE 280: ANDERSEN-BOLLERSLEV-DIEBOLD REALIZED BETA & ASYMMETRIC SYSTEMATIC DOWNSIDE RISK
+Keywords: andersen_bollerslev_diebold, realized_beta, asymmetric_downside_risk, continuous_systematic_exposure, altcoin_rebound_leverage
+
+### 1. High-Frequency Continuous Systematic Beta (Andersen, Bollerslev, Diebold 2003)
+- Estimating continuous asset co-movements with the market index:
+  $$\beta_{i, t} = \frac{\sum_{k=1}^n r_{i, k} \cdot r_{\text{BTC}, k}}{\sum_{k=1}^n r_{\text{BTC}, k}^2}$$
+- S1 tracks the Downside-to-Upside Beta Asymmetry Ratio:
+  $$\mathcal{A}_{\beta}(t) = \frac{\beta_{i, t}^-}{\beta_{i, t}^+} = \frac{\text{Cov}(r_i, r_{\text{BTC}} \mid r_{\text{BTC}} < 0)}{\text{Cov}(r_i, r_{\text{BTC}} \mid r_{\text{BTC}} > 0)}$$
+
+### 2. Systematic Beta Inversion Invariant
+- **S1 Asymmetric Upside Capture Rule**:
+  $$\text{Upside Beta Dominant} \iff \mathcal{A}_{\beta}(t) \le 0.85 \quad \land \quad \beta_{i, t} \ge 1.15$$
+  When altcoin downside beta collapses below $85\%$ of upside beta while overall beta exceeds $1.15$, the asset provides leveraged upside convexity during market recovery without taking on excess tail risk.
