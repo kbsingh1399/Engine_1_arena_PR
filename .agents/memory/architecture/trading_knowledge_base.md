@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v40.0 (ILLIQUIDITY PREMIA, SEQUENTIAL FREEZES, HIDDEN ORDERS & LEVEL-1 JUMPS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Amihud/Mendelson/Easley/Kiefer/OHara/Paperman/Biais/Hillier/Spatt/Brunnermeier/Sannikov/Cont/deLarrard/AitSahalia/Jacod
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v41.0 (DUAL-TRADING TIMING, SEARCH FIRE-SALES, INTRADAY CLUSTERING & RESTOCKING HORIZONS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Foucault/Roell/Vayanos/Wang/Andersen/Bollerslev/Diebold/Garman/OHara/Viswanathan/Jacod/Podolskij/Vetter
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 250 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 256 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5066,3 +5066,99 @@ Keywords: ait_sahalia_jacod, spectral_jump_separation, jump_activity_index, semi
 - **S1 Volatility Quality Verification Invariant**:
   $$\text{Diffusion Dominance Restored} \iff \hat{\beta}(t) \ge 1.80 \quad \land \quad \Phi_{\text{diff}}(t) \ge 0.88$$
   When the jump activity index approaches pure diffusion ($\beta \to 2.0$) and continuous variation explains $>88\%$ of volatility, entry risk is minimized for the $+2.5\text{R}$ target.
+
+---
+
+## NODE 251: FOUCAULT-ROËLL FRONT-RUNNING DYNAMICS & OPTIMAL DUAL-TRADING TIMING
+Keywords: foucault_roell, front_running_dynamics, dual_trading_timing, order_anticipation, market_order_front_running
+
+### 1. Dual-Trading Equilibrium and Anticipatory Flow (Foucault & Roëll 2005)
+- Brokers trading for proprietary accounts ahead of customer limit orders alter execution costs:
+  $$\Pi_{\text{dual}} = \alpha_{\text{prop}} \cdot \mathbb{E}[\Delta P_{\text{post}} \mid \text{Order Flow}] - \gamma_{\text{penalty}}$$
+- S1 tracks the Front-Running Exhaustion Ratio:
+  $$\mathcal{F}_{\text{front}}(t) = \frac{\text{Aggressive Taker Volume}_{\text{pre-reversal}}}{\text{Passive Resting Depth}_{\text{bid}}}$$
+
+### 2. Dual-Trading Flow Exhaustion Invariant
+- **S1 Front-Running Neutralization Rule**:
+  $$\text{Anticipatory Dumping Terminated} \iff \mathcal{F}_{\text{front}}(t) \le 0.30 \quad \land \quad \Delta \mathcal{F}_{\text{front}}(t) \le 0$$
+  When aggressive taker activity preceding resting orders drops below $30\%$ of available bid depth, predatory front-running has ceased, opening a clean entry window.
+
+---
+
+## NODE 252: VAYANOS-WANG SEARCH-BASED ASSET PRICING & FIRE-SALE SPILLOVER CASCADES
+Keywords: vayanos_wang, search_theory, fire_sale_spillovers, seller_search_frictions, cross_market_liquidity_dislocation
+
+### 1. Search Frictions in Over-the-Counter and Fragmented Markets (Vayanos & Wang 2012)
+- Liquidity shocks force sellers to search for counterparties, depressing valuation below fair price:
+  $$P_{\text{distress}}(t) = V_{\text{fundamental}} - \frac{\lambda_{\text{shock}} \cdot c_{\text{holding}}}{\mu_{\text{match}} + \rho_{\text{discount}}}$$
+- S1 evaluates the Search-Friction Dislocation Metric:
+  $$\Delta_{\text{search}}(t) = \frac{P_{\text{futures}}(t) - P_{\text{spot}}(t)}{P_{\text{spot}}(t)} \cdot 10^4$$
+
+### 2. Fire-Sale Exhaustion Invariant
+- **S1 Search Friction Absorption Invariant**:
+  $$\text{Distress Selling Fully Absorbed} \iff \Delta_{\text{search}}(t) \le -35.0\,\text{bps} \quad \land \quad \frac{d(\Delta_{\text{search}})}{dt} > 0$$
+  When basis dislocation hits severe negative fire-sale territory and begins expanding upward, searching distressed sellers have been cleared by liquidity providers.
+
+---
+
+## NODE 253: ANDERSEN-BOLLERSLEV-DIEBOLD INTRADAY REALIZED VOLATILITY JUMPS & VOLATILITY CLUSTERING
+Keywords: andersen_bollerslev_diebold, intraday_realized_volatility, volatility_clustering, high_frequency_volatility_forecasting, jump_dispersion
+
+### 1. High-Frequency Realized Volatility Decomposition (Andersen, Bollerslev, Diebold 2007)
+- Decomposing realized volatility into continuous HAR components and jump variation:
+  $$\text{RV}_{t} = \beta_0 + \beta_d \text{RV}_{t-1}^{(d)} + \beta_w \text{RV}_{t-1}^{(w)} + \beta_m \text{RV}_{t-1}^{(m)} + \gamma_{\text{jump}} J_{t-1}$$
+- S1 evaluates the Intraday HAR Volatility Stabilization Index:
+  $$\mathcal{S}_{\text{HAR}}(t) = \frac{\text{RV}_{t, 15\text{m}}}{\mathbb{E}[\text{RV} \mid \text{HAR}_{t-1}]}$$
+
+### 2. Volatility Cluster Decoupling Invariant
+- **S1 Volatility Calm Restoration Rule**:
+  $$\text{Volatility Spike Normalized} \iff \mathcal{S}_{\text{HAR}}(t) \le 1.15 \quad \land \quad \Delta \mathcal{S}_{\text{HAR}}(t) < 0$$
+  When short-term realized volatility converges toward its continuous historical expectation without jump shocks, execution noise drops to levels optimal for trailing ratchet management.
+
+---
+
+## NODE 254: GARMAN-O'HARA SPECIALIST INVENTORY DURATION & STOCHASTIC RESTOCKING HORIZON
+Keywords: garman_ohara, inventory_duration, stochastic_restocking, specialist_holding_cost, dealer_inventory_half_life
+
+### 1. Market Maker Inventory Cycle Under Order Arrival (Garman 1976, O'Hara 1995)
+- Dealer quote revisions are driven by inventory holding costs and target replenishment speed:
+  $$\tau_{\text{restock}} = \frac{|I_t - I^*|}{\lambda_{\text{arrival}} \cdot \bar{q}_{\text{trade}}}, \quad \text{HalfLife}_{\text{inv}} = \frac{\ln(2)}{\kappa_{\text{mean\_revert}}}$$
+- S1 evaluates the Specialist Restocking Pressure Metric:
+  $$\mathcal{R}_{\text{restock}}(t) = \frac{\text{Bid Depth Cushion}_{t}}{\text{Ask Depth Liquidity}_{t}}$$
+
+### 2. Inventory Restocking Squeeze Invariant
+- **S1 Dealer Inventory Asymmetry Rule**:
+  $$\text{Restocking Reversal Initiated} \iff \mathcal{R}_{\text{restock}}(t) \ge 2.20 \quad \land \quad \Delta \mathcal{R}_{\text{restock}}(t) > 0$$
+  When dealer bid depth outweighs ask liquidity by $>2.2\times$, market makers aggressively markup bids to restock depleted long inventory, creating upward directional drift.
+
+---
+
+## NODE 255: KYLE-VISWANATHAN-WANG MARKET DEPTH NONLINEARITIES UNDER TOXIC VOLUME SURGES
+Keywords: kyle_viswanathan_wang, nonlinear_market_depth, toxic_volume_surges, price_impact_curvature, quadratic_slippage_regime
+
+### 1. Non-Linear Price Impact Under Extreme Order Imbalance (Kyle, Viswanathan, Wang 2018)
+- Price impact transitions from linear Kyle $\lambda$ to convex power-law under panic dumping:
+  $$\Delta P_t = \lambda_1 Q_t + \lambda_2 \text{Sign}(Q_t) |Q_t|^\alpha, \quad \alpha \approx 1.45$$
+- S1 tracks the Price Impact Curvature Metric:
+  $$\mathcal{K}_{\text{impact}}(t) = \frac{\partial^2 P}{\partial Q^2} \approx \frac{\Delta P_t / Q_t}{\Delta P_{t-1} / Q_{t-1} + \epsilon}$$
+
+### 2. Impact Curvature Flattening Invariant
+- **S1 Quadratic Slippage Collapse Rule**:
+  $$\text{Linear Depth Restored} \iff \mathcal{K}_{\text{impact}}(t) \le 1.10 \quad \land \quad \Delta \mathcal{K}_{\text{impact}}(t) \le 0$$
+  When price impact curvature flattens back toward linear regimes, market depth absorbs institutional buying without runaway slippage penalty.
+
+---
+
+## NODE 256: JACOD-PODOLSKIJ-VETTER TRUNCATED REALIZED COVARIATION & MICROSTRUCTURE NOISE ROBUSTNESS
+Keywords: jacod_podolskij_vetter, truncated_covariation, microstructure_noise_robustness, high_frequency_cointegration, continuous_cross_asset_drift
+
+### 1. Robust Estimation of Integrated Covariance (Jacod, Podolskij, Vetter 2009)
+- Truncating large jumps to extract pure continuous co-movements across asset pairs:
+  $$\text{TCov}_{X,Y}(t) = \sum_{i=1}^n \Delta_i X \cdot \Delta_i Y \cdot \mathbf{1}_{\{|\Delta_i X| \le u_n(X), |\Delta_i Y| \le u_n(Y)\}}$$
+- S1 evaluates the Continuous Co-Movement Coherence Ratio:
+  $$\mathcal{C}_{\text{cohere}}(t) = \frac{\text{TCov}_{\text{Alt,BTC}}(t)}{\sqrt{\text{TVAR}_{\text{Alt}}(t) \cdot \text{TVAR}_{\text{BTC}}(t)}}$$
+
+### 2. Continuous Cross-Asset Coherence Invariant
+- **S1 Robust Rebound Alignment Invariant**:
+  $$\text{Cross-Asset Rebound Coherent} \iff \mathcal{C}_{\text{cohere}}(t) \ge 0.65 \quad \land \quad \Delta \mathcal{C}_{\text{cohere}}(t) > 0$$
+  When jump-truncated continuous covariation between candidate altcoins and BTC exceeds $0.65$, systemic risk has passed into an aligned, institutional recovery wave.
