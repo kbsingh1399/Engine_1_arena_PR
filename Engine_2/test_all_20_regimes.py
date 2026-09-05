@@ -1,5 +1,5 @@
 """
-Master walk-forward validation harness — all 5 strategies x 20 OOS quarters.
+Master causal walk-forward validation harness — 100-sleeve pool x 20 OOS quarters.
 
   python test_all_20_regimes.py                     # S1..S5 individually + ENSEMBLE
   python test_all_20_regimes.py --sleeves 1 3 5     # subset
@@ -16,7 +16,7 @@ import pandas as pd
 
 from quant_strategy_suite import (
     DataStore, RISK, STRATEGY_NAMES, UNIVERSE_CORE, UNIVERSE_EXTENDED,
-    evaluate_gates, run_window,
+    evaluate_gates, run_window, select_strategies,
 )
 
 PURGE_HOURS = 72  # t_purge = t_start - 72h (Section 5 / KB Node 8)
@@ -75,13 +75,19 @@ def run_sleeve(store: DataStore, label: str, sids: list[int], fail_fast: bool):
     rows, all_trades, halted_at = [], [], None
     for win, s, e, regime in WINDOWS:
         s_ms, e_ms = bounds_ms(s, e)
-        purge_ms = s_ms - PURGE_HOURS * 3_600_000  # documented; no IS fit occurs
-        trades, m, _ = run_window(store, s_ms, e_ms, sids)
+        purge_ms = s_ms - PURGE_HOURS * 3_600_000
+        # The active sleeves are fitted strictly before the purged boundary.
+        # No OOS result, end timestamp, or window ordinal enters selection.
+        selected, selection = select_strategies(store, s_ms)
+        active = selected
+        print(f"  causal selector: {[STRATEGY_NAMES[i] for i in active] or ['FLAT: no qualified IS sleeve']}")
+        trades, m, _ = run_window(store, s_ms, e_ms, active)
         ok, why = evaluate_gates(m)
         print(row(win, regime, m, ("PASS" if ok else f"FAIL:{why}")))
         rec = {"sleeve": label, "window": win, "start": s, "end": e,
-               "regime": regime, "t_purge_ms": purge_ms, "passed": ok,
-               "gate": why, **m}
+               "regime": regime, "t_purge_ms": purge_ms,
+               "selected_strategies": ",".join(STRATEGY_NAMES[i] for i in active),
+               "passed": ok, "gate": why, **m}
         rows.append(rec)
         if len(trades):
             trades = trades.assign(sleeve=label, window=win)
@@ -107,7 +113,8 @@ def run_sleeve(store: DataStore, label: str, sids: list[int], fail_fast: bool):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sleeves", nargs="*", type=int, default=[1, 2, 3, 4, 5])
+    ap.add_argument("--sleeves", nargs="*", type=int, default=[1, 2, 3, 4, 5],
+                    help="fallback sleeves only when the causal IS filter has no qualified candidate")
     ap.add_argument("--no-ensemble", action="store_true")
     ap.add_argument("--extended", action="store_true")
     ap.add_argument("--fail-fast", action="store_true")
