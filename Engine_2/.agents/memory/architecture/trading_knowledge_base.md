@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v34.0 (ORDER FLOW COMMONALITY, MRR STRUCTURAL SPREAD, ALGORITHMIC DISCOVERY & ACD DURATION EXPANSION)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Hasbrouck/Seppi/Madhavan/Richardson/Roomans/Hendershott/Jones/Menkveld/Pastor/Stambaugh/Foucault/Engle/Russell
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v35.0 (ENDOGENOUS LIQUIDITY PROVISION, MULTI-TIER ADVERSE SELECTION, MARGIN SPIRALS & JUMP RECOVERY)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + OHara/Wang/Glosten/Milgrom/Merton/Brunnermeier/Pedersen/Garleanu/Biais/Hillion/Spatt
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 214 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 220 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4491,3 +4491,98 @@ Keywords: engle_russell, acd_model, trade_duration_expansion, event_intensity_re
 - **S1 Cascade Termination Rule**:
   $$\text{Trading Frenzy Exhausted} \iff \mathcal{D}_{\text{expand}}(t) \ge 2.50 \quad \land \quad \Delta \mathcal{D}_{\text{expand}}(t) > 0$$
   When average trade durations expand by $\ge 2.5\times$ from cascade peak frenzy, panic selling has halted, confirming optimal entry timing.
+
+---
+
+## NODE 215: O'HARA-WANG ENDOGENOUS LIQUIDITY PROVISION & ASYMMETRIC SPEED ADVANTAGES
+Keywords: ohara_wang, endogenous_liquidity_provision, speed_asymmetry, quote_fade_velocity, adverse_selection_cancellation
+
+### 1. Speed Advantage and Endogenous Liquidity Protection (O'Hara & Wang 2021)
+- Fast market makers endogenously adjust quote fading speed based on latency differentials $\Delta \tau_{\text{lat}}$ and toxic flow detection:
+  $$\mathcal{F}_{\text{fade}}(t) = \frac{\Delta \text{Ask Quote Depth}_{1\text{s}}}{\Delta \text{Bid Quote Depth}_{1\text{s}} + \epsilon}$$
+- S1 evaluates the Endogenous Liquidity Availability Metric:
+  $$\mathcal{L}_{\text{avail}}(t) = \frac{\text{Bid Depth}_{\pm 0.5\%}}{\text{Ask Depth}_{\pm 0.5\%}} \cdot \left(1 - \frac{\text{Cancellation Rate}_{\text{bid}}}{\text{Total Quote Rate}}\right)$$
+
+### 2. Endogenous Liquidity Solidification Invariant
+- **S1 Quote Stability Rule**:
+  $$\text{Firm Bid Depth Solidified} \iff \mathcal{L}_{\text{avail}}(t) \ge 2.00 \quad \land \quad \Delta \mathcal{F}_{\text{fade}}(t) \le -0.30$$
+  When bid-side resting liquidity exceeds ask depth by $2\times$ and quote fading on the bid side drops sharply, market makers are committed to defending the price floor.
+
+---
+
+## NODE 216: GLOSTEN-MILGROM SEQUENTIAL INFORMATION DISSEMINATION & CROSS-TIER ADVERSE SELECTION
+Keywords: glosten_milgrom, sequential_information, cross_tier_spillover, altcoin_adverse_selection, lead_lag_information_flow
+
+### 1. Cross-Asset Information Transmission in Correlated Assets (Glosten & Milgrom 1985; Hasbrouck 1995)
+- Macro information arrives first in BTC/ETH perps and transmits sequentially to Tier 2/3 altcoins with delay $\tau_{\text{delay}} \in [1, 3]$ bars:
+  $$\pi_{i, t} = \frac{\pi_{i, t-1} \cdot P(\text{Trade}_t \mid V = V^H)}{\pi_{i, t-1} \cdot P(\text{Trade}_t \mid V = V^H) + (1 - \pi_{i, t-1}) \cdot P(\text{Trade}_t \mid V = V^L)}$$
+- S1 computes the Cross-Tier Information Dissemination Lag Score:
+  $$\mathcal{I}_{\text{lead}}(t) = \frac{\text{Cov}(\Delta P_{\text{BTC}, t}, \Delta P_{\text{Alt}, t+1})}{\text{Var}(\Delta P_{\text{BTC}, t})}$$
+
+### 2. Altcoin Rebound Clearance Invariant
+- **S1 Cross-Tier Gating Rule**:
+  $$\text{Altcoin Spillover Exhausted} \iff \pi_{\text{BTC}, t}^H \ge 0.75 \quad \land \quad \mathcal{I}_{\text{lead}}(t) \ge 0.65$$
+  Entering altcoin long positions only after Bitcoin's informed belief state inflects positive ensures that macro spillover cascades are fully halted.
+
+---
+
+## NODE 217: MERTON JUMP-DIFFUSION COMPOUND POISSON RECOVERY & FINITE ARRIVAL INTENSITY
+Keywords: merton_jump_diffusion, compound_poisson, jump_arrival_intensity, mean_jump_size, log_normal_jump_recovery
+
+### 1. Compound Poisson Process with Log-Normal Jump Amplitudes (Merton 1976)
+- Post-cascade price recovery dynamics combine continuous Geometric Brownian Motion with positive Poisson jump arrivals:
+  $$\frac{dP_t}{P_t} = (\mu - \lambda k)dt + \sigma dW_t + (Y - 1)dq_t, \quad \ln(Y) \sim \mathcal{N}(\mu_J, \sigma_J^2)$$
+- S1 evaluates the Positive Jump Arrival Intensity:
+  $$\lambda_t^+ = \frac{1}{\Delta t} \sum_{i=1}^M \mathbf{1}_{\{r_{t, i} \ge +2.5\sigma_{\text{local}}\}}$$
+
+### 2. Compound Poisson Momentum Invariant
+- **S1 Statistical Recovery Rule**:
+  $$\text{Positive Jump Mode Initiated} \iff \lambda_t^+ \ge 1.50\text{ / hour} \quad \land \quad \mu_J(t) \ge +1.20\%$$
+  When positive discrete jump arrivals cluster above 1.5 events per hour with positive mean jump amplitude, price momentum is driven by explosive upward gap impulses.
+
+---
+
+## NODE 218: BRUNNERMEIER-PEDERSEN PREDATOR-PREY MARGIN SPIRALS & EQUILIBRIUM RUNAWAYS
+Keywords: brunnermeier_pedersen, margin_spirals, predatory_trading, capital_exhaustion, fire_sale_equilibrium
+
+### 1. Predatory Exploitation of Distressed Margin Portfolios (Brunnermeier & Pedersen 2005, 2009)
+- Predatory short sellers push prices downward to trigger mechanical stop cascades among leveraged longs until margin capital is exhausted:
+  $$\mathcal{M}_{\text{spiral}}(t) = \frac{\Delta \text{Open Interest}_{15\text{m}}}{\text{Liquidated Volume}_{15\text{m}} + \epsilon}$$
+- S1 monitors the Predatory Trade Reversal Boundary:
+  $$\mathcal{P}_{\text{unwind}}(t) = \frac{\text{Taker Buy Volume}_{\text{large}}}{\text{Liquidated Long Volume}} \cdot \mathbf{1}_{\{\Delta \text{OI}_t > 0\}}$$
+
+### 2. Predatory Runaway Termination Invariant
+- **S1 Cascade Termination Invariant**:
+  $$\text{Predatory Spiral Broken} \iff \mathcal{M}_{\text{spiral}}(t) \ge -0.15 \quad \land \quad \mathcal{P}_{\text{unwind}}(t) \ge 1.25$$
+  When open interest ceases declining and aggressive taker buying exceeds forced liquidation volume by $\ge 25\%$, predatory traders are forced to cover, initiating a violent short squeeze.
+
+---
+
+## NODE 219: GÂRLEANU-PEDERSEN DYNAMIC MARGIN CONSTRAINTS & HAIRCUT DISLOCATION PRICING
+Keywords: garleanu_pedersen, margin_haircuts, shadow_cost_of_capital, basis_dislocation, collateral_scarcity
+
+### 1. Margin Haircuts and Capital Shadow Cost Dynamics (Gârleanu & Pedersen 2011)
+- Exchange margin haircut expansions $m_t$ widen the basis dislocation between spot and perpetual contracts:
+  $$P_t^{\text{perp}} - P_t^{\text{spot}} = -\frac{\psi_t \cdot m_t}{1 - m_t}$$
+- S1 measures the Shadow Cost Reversal Elasticity:
+  $$\Psi_{\text{cap}}(t) = \frac{\Delta (P_t^{\text{perp}} - P_t^{\text{spot}})}{m_t \cdot \sigma_{15\text{m}}(t)}$$
+
+### 2. Collateral Constraint Snapback Invariant
+- **S1 Basis Rebound Invariant**:
+  $$\text{Collateral Dislocation Normalized} \iff \Psi_{\text{cap}}(t) \ge +1.80 \quad \land \quad \Delta \Psi_{\text{cap}}(t) > 0$$
+  When perpetual basis rebounds relative to margin haircut requirements, capital constraints relax, triggering rapid mean-reversion toward spot parity.
+
+---
+
+## NODE 220: BIAIS-HILLION-SPATT ASYMMETRIC INFORMATION IN LIMIT ORDER MARKETS & TRANSITORY VOLATILITY FILTERING
+Keywords: biais_hillion_spatt, transitory_volatility, information_filtering, noise_decay, quote_depth_recovery
+
+### 1. Filtering Transitory Microstructure Noise from Persistent Information (Biais, Hillion, Spatt 1995)
+- Distinguishing transitory bid-ask bounce noise ($\sigma_{\text{trans}}^2$) from fundamental information shocks ($\sigma_{\text{info}}^2$):
+  $$\mathcal{S}_{\text{info}}(t) = \frac{\sigma_{\text{info}}^2(t)}{\sigma_{\text{info}}^2(t) + \sigma_{\text{trans}}^2(t)}$$
+- S1 tracks the Information Purity Ratio $\mathcal{S}_{\text{info}}(t)$ through 4-tick autocovariance filtering.
+
+### 2. Transitory Noise Cleansing Invariant
+- **S1 Signal Filtration Invariant**:
+  $$\text{Microstructure Noise Cleared} \iff \mathcal{S}_{\text{info}}(t) \ge 0.80 \quad \land \quad \Delta \mathcal{S}_{\text{info}}(t) > 0$$
+  When fundamental information accounts for $\ge 80\%$ of instantaneous price variance, transitory microstructure chop has dissolved, clearing a clean path for $+2.5\text{R}$ target capture.
