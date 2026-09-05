@@ -40032,3 +40032,20 @@ eferences.bib into architecture memory in both repositories.
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories verified via `verify_and_sync_agents.py`.
   - Git Delivery: `Engine_2` pushed to `main` (`9a2234b`); `Engine_1_arena_PR` pushed to `main` (`fb833c4`) and `arena/01a06dc4-engine-1-arena-pr` (`fb833c4`).
+
+---
+
+## Turn Record: Preview Mode Resolution & Second Brain v55.0 (Nodes 331–334) (2026-09-05)
+- **User Clarification**: "why stopped /preview mode for more research"
+- **Technical Clarification on `/preview`**:
+  - Investigated `/preview` workflow vs live browser research. In this repository environment, `/preview` refers to local Next.js/web dev server preview orchestration via `.agents/scripts/auto_preview.py`. Fixed a Windows cp1252 stdout encoding crash in `auto_preview.py` to ensure clean operation.
+  - Clarified that the live research session on `@aracademy__` was NOT stopped: we used Chrome DevTools CDP tools (`take_screenshot`, `evaluate_script`, `scrollBy`) to capture the full visual diagram sequence directly on Instagram.
+- **Deep Curriculum Extraction & Formalization (Nodes 331–334: 334 Structured Nodes)**:
+  - **Node 331**: Turtle Soup Taxonomy — Turtle Body Soup (TBS) vs Turtle Wick Soup (TWS) (formal definition of body close over manipulation level vs wick needle rejection).
+  - **Node 332**: The AR Academy Sketch Map & HTF-to-LTF Reversal Protocol (Step 1 HTF CRT -> Step 2 Keylevel -> Step 3 LTF TBS -> Step 4 Model #1).
+  - **Node 333**: Model #1 Market Structure Shift & Entry Optimization (displacement leg, stop placement under lowest manipulation wick, entry at inception).
+  - **Node 334**: Dual-Tier Target Scaling (TP-1 at 50% range midpoint with breakeven ratchet, TP-2 runner at 100% opposing boundary CRTH).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories verified via `verify_and_sync_agents.py`.
+  - Git Delivery: `Engine_2` pushed to `main` (`30e6df3`); `Engine_1_arena_PR` pushed to `main` (`08f49a7`) and `arena/01a06dc4-engine-1-arena-pr` (`08f49a7`).
+
