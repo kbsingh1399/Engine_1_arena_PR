@@ -40219,3 +40219,15 @@ eferences.bib into architecture memory in both repositories.
 ## Turn: Status of Arena.ai Output & Local Walk-Forward Investigation
 **User:** status?
 **Status:** Comprehensive diagnosis complete. Identified why Arena.ai stopped (missing pandas in sandbox) and why the dynamic pool failed when tested locally (sub-friction 0.35 ATR stops causing negative expectancy, strict filter disqualifying all candidates, empty fallback causing 0 trades). Provided clear diagnosis and surgical remediation path.
+
+## Turn: Deployed Post-Mortem & 4 Bugs to Arena Branch (commit 9ce465e)
+**User:** you can push to attached and mention bugs that we identiy as well in prompt
+**Status:** Completed. Updated ARENA_OPUS5_MASTER_PROMPT.md with Section 8 detailing the 4 lethal bugs from commit ffc3ce2 and strict loop-until-passed mandate. Pushed commit 9ce465e to arena/01a070fa-engine-1-arena-pr, arena/01a06dc4-engine-1-arena-pr, and main. Provided exact prompt for Arena.ai / GLM.
+
+## Turn: Clarification of UI Markdown Code Box Glitch
+**User:** what is this...why output of box
+**Status:** Explained nested markdown backtick rendering glitch in the UI. Delivered the clean, unboxed prompt text ready for copy-pasting into Arena.ai and GLM.
+
+## Turn: Integration of Gemini Web2API Daemon & agent.md / AGENTS.md Parity
+**User:** in agent.md also add start gemini web2api
+**Status:** Completed. Integrated Step 8 into PART 0 (Boot Sequence), Domain 13 into PART 1 (Routing Matrix), and created PART 15 (Gemini Web2API Service & Zero-Token Multi-Agent Council). Created helper startup scripts start_web2api.ps1 and start_web2api.py. Verified daemon actively running on port 8081 with 8 models and verified multi-agent council dispatch. Mirrored 100% byte-for-byte parity across agent.md and AGENTS.md in root and .agents/rules/ in both Engine_1_arena_PR and Engine_2. Pushed commit ee4f4af to main, arena/01a070fa-engine-1-arena-pr, and arena/01a06dc4-engine-1-arena-pr.
