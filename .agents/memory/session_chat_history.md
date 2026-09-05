@@ -40199,3 +40199,7 @@ eferences.bib into architecture memory in both repositories.
 
 
 
+
+## Turn: Opus 5 Quant Suite Verification & Walk-Forward Audit
+**User:** C:\Users\SIGMA\Downloads\Opus_5_0509.txt is the output of latest opus 5 prompt. create a file in scratch to check if it is working.
+**Status:** Verification complete. Scripts created in scratch (quant_strategy_suite.py, test_all_20_regimes.py). Backtest executed across 20 OOS windows on 14 Binance symbols (2.5M+ 15m bars). Results logged to results_walkforward/scorecard_all_sleeves_20_windows.csv.
