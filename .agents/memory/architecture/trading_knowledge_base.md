@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v45.0 (ALGORITHMIC BUFFERS, SEARCH FRICTIONS, PRE-AVERAGING & REALIZED BETA)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Hendershott/Menkveld/Vayanos/Wang/Christensen/Oomen/Easley/López de Prado/Cont/de Larrard/Andersen/Bollerslev/Diebold
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v46.0 (MICROSTRUCTURE INVARIANCE, ACD DURATION, TAIL JUMPS & QUOTE SKEWS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Kyle/Obizhaeva/Engle/Russell/Bouchaud/Mézard/Hasbrouck/Bollerslev/Todorov/Guéant/Tapia/Manziadi
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 280 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 286 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5550,3 +5550,100 @@ Keywords: andersen_bollerslev_diebold, realized_beta, asymmetric_downside_risk, 
 - **S1 Asymmetric Upside Capture Rule**:
   $$\text{Upside Beta Dominant} \iff \mathcal{A}_{\beta}(t) \le 0.85 \quad \land \quad \beta_{i, t} \ge 1.15$$
   When altcoin downside beta collapses below $85\%$ of upside beta while overall beta exceeds $1.15$, the asset provides leveraged upside convexity during market recovery without taking on excess tail risk.
+
+
+---
+
+## NODE 281: KYLE-OBIZHAEVA INVARIANT MARKET MICROSTRUCTURE & OPTIMAL ORDER SIZE CALIBRATION
+Keywords: kyle_obizhaeva, microstructure_invariance, metaorder_size_distribution, liquidity_conversion_rate, trade_size_calibration
+
+### 1. Invariant Transaction Sizing (Kyle & Obizhaeva 2016, 2019)
+- Metaorder size distributions scale as an invariant power of dollar volume and volatility:
+  $$\tilde{Q}_i = Q_i \cdot \left(\frac{P \sigma^2}{V}\right)^{1/3}$$
+- S1 tracks the Invariant Liquidation Sizing Scalar:
+  $$\mathcal{S}_{\text{invar}}(t) = \frac{Q_{\text{liq}, t}}{\tilde{Q}_{\text{invar\_threshold}}}$$
+
+### 2. Invariant Liquidation Absorption Invariant
+- **S1 Metaorder Depletion Rule**:
+  $$\text{Invariant Metaorder Cleared} \iff \mathcal{S}_{\text{invar}}(t) \le 1.00 \quad \land \quad \Delta \mathcal{S}_{\text{invar}}(t) < 0$$
+  When the current liquidation metaorder size drops below the invariant microstructure capacity threshold, institutional liquidity consumption is complete.
+
+---
+
+## NODE 282: ENGLE-RUSSELL AUTOREGRESSIVE CONDITIONAL DURATION (ACD) CLUSTERING OF LIQUIDATION CASCADES
+Keywords: engle_russell, acd_duration_clustering, inter_trade_durations, liquidation_velocity_deceleration, event_clustering_cooling
+
+### 1. Autoregressive Conditional Duration Dynamics (Engle & Russell 1998)
+- Modeling the expected time duration between consecutive liquidation events:
+  $$\psi_i = \mathbb{E}[x_i \mid \mathcal{F}_{i-1}] = \omega + \alpha x_{i-1} + \beta \psi_{i-1}, \quad x_i = t_i - t_{i-1}$$
+- S1 computes the ACD Liquidation Velocity Ratio:
+  $$\mathcal{V}_{\text{ACD}}(t) = \frac{\bar{\psi}_{\text{baseline}}}{\psi_t}$$
+
+### 2. ACD Deceleration Invariant
+- **S1 Cascade Duration Normalization Rule**:
+  $$\text{Liquidation Frequency Decelerated} \iff \mathcal{V}_{\text{ACD}}(t) \le 1.20 \quad \land \quad \Delta \mathcal{V}_{\text{ACD}}(t) < 0$$
+  When the conditional arrival rate of liquidation trades decelerates toward baseline inter-trade duration, event clustering panic has ceased.
+
+---
+
+## NODE 283: BOUCHAUD-MÉZARD WEALTH DISTRIBUTION DYNAMICS & EXCHANGE INSURANCE FUND DRAWDOWN LIMITS
+Keywords: bouchaud_mezard, wealth_distribution_tails, exchange_insurance_funds, adl_buffer_stability, systemic_backstop_health
+
+### 1. Microscopic Wealth Dynamics Under Extreme Margin Calls (Bouchaud & Mézard 2000)
+- Capital distribution evolves under stochastic multiplicative growth and margin redistribution:
+  $$\frac{dW_i}{dt} = \eta_i(t) W_i + \sum_j J_{ij}(W_j - W_i)$$
+- S1 tracks the Insurance Fund Cushion Health Ratio:
+  $$\mathcal{H}_{\text{insurance}}(t) = \frac{\text{Insurance Fund Balance}_t}{\text{Insurance Fund Balance}_{30\text{d\_mean}}}$$
+
+### 2. Exchange Backstop Security Invariant
+- **S1 ADL Avoidance Rule**:
+  $$\text{Exchange Solvency Uncompromised} \iff \mathcal{H}_{\text{insurance}}(t) \ge 0.95 \quad \land \quad \text{ADL Rate} = 0$$
+  When exchange insurance fund reserves remain $>95\%$ intact without Auto-Deleveraging (ADL) events, structural counterparty risk is zero.
+
+---
+
+## NODE 284: HASBROUCK EMPIRICAL ANALYSIS OF STOCK PRICES IN CONTINUOUS TIME & EFFECTIVE SPREAD FLOOR
+Keywords: hasbrouck, continuous_time_microstructure, effective_spread_floor, discrete_pricing_grid, quote_discreteness_transition
+
+### 1. Continuous Latent Price Process with Discrete Rounding (Hasbrouck 1999)
+- Latent efficient price $m_t$ evolves continuously while observed quotes round to tick boundaries:
+  $$P_t = \text{Round}(m_t + s_t q_t, \Delta_{\text{tick}})$$
+- S1 monitors the Latent Price Drift Efficiency Metric:
+  $$\mathcal{E}_{\text{latent}}(t) = \frac{m_t - P_{\text{bid}, t}}{P_{\text{ask}, t} - P_{\text{bid}, t}}$$
+
+### 2. Latent Midpoint Recovery Invariant
+- **S1 Spread Trapping Inversion Rule**:
+  $$\text{Latent Price Reclaiming Mid} \iff \mathcal{E}_{\text{latent}}(t) \ge 0.55 \quad \land \quad \Delta \mathcal{E}_{\text{latent}}(t) > 0$$
+  When continuous latent price crosses into the upper half of the bid-ask spread, quote discreteness trapping breaks to the upside.
+
+---
+
+## NODE 285: BOLLERSLEV-TODOROV EXTREME JUMP ACTIVITY ESTIMATION & ASYMMETRIC TAIL VARIATION
+Keywords: bollerslev_todorov, extreme_jump_activity, tail_variation_asymmetry, jump_intensity_decay, asymmetric_crash_recovery
+
+### 1. High-Frequency Tail Jump Intensity (Bollerslev & Todorov 2011)
+- Separating extreme left-tail jump activity from continuous diffusive motion:
+  $$\lambda_t^- = \lim_{k \to \infty} \frac{1}{\Delta_n} \sum_{i=1}^n \mathbf{1}_{\{\Delta_i P \le -k \sigma_{t-1} \sqrt{\Delta_n}\}}$$
+- S1 evaluates the Tail Jump Asymmetry Ratio:
+  $$\mathcal{T}_{\text{jump\_asym}}(t) = \frac{\lambda_t^+}{\lambda_t^- + \epsilon}$$
+
+### 2. Positive Jump Dominance Invariant
+- **S1 Rebound Convexity Invariant**:
+  $$\text{Right Tail Dominant} \iff \mathcal{T}_{\text{jump\_asym}}(t) \ge 2.00 \quad \land \quad \lambda_t^- \to 0$$
+  When right-tail positive jump activity exceeds left-tail crash intensity by $>2.0\times$, asymmetric upside jump dynamics provide sharp upward drift.
+
+---
+
+## NODE 286: GUÉANT-TAPIA-MANZIADI UTILITY-BASED MARKET MAKING WITH NON-LINEAR INVENTORY PENALTY
+Keywords: gueant_tapia_manziadi, utility_based_market_making, non_linear_inventory_penalty, optimal_quote_spreads, asymmetry_spread_skew
+
+### 1. Non-Linear Inventory Risk Penalization (Guéant, Tapia, Manziadi 2012)
+- Dealer quotes account for non-linear utility penalties on accumulated inventory:
+  $$\delta_{\text{bid}}^*(q) = \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{\kappa}\right) + \frac{2q+1}{2} \sqrt{\frac{\gamma \sigma^2}{2\kappa A} \left(1 + \frac{\gamma}{\kappa}\right)^{1 + \frac{\kappa}{\gamma}}}$$
+- S1 tracks the Market Maker Bid Quote Skew:
+  $$\mathcal{S}_{\text{quote\_skew}}(t) = \frac{\delta_{\text{ask}}^*(t) - \delta_{\text{bid}}^*(t)}{\text{Spread}_{\text{mid}}}$$
+
+### 2. Bid Quote Aggressiveness Invariant
+- **S1 Market Maker Upward Skew Rule**:
+  $$\text{Dealers Shifting Upward} \iff \mathcal{S}_{\text{quote\_skew}}(t) \ge +0.40 \quad \land \quad \Delta \mathcal{S}_{\text{quote\_skew}}(t) > 0$$
+  When market maker optimal quote spreads skew aggressively upward, dealers are actively discouraging sells and competing for incoming buys, locking the local price floor.
