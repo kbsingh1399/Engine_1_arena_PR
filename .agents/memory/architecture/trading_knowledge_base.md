@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v37.0 (SPREAD DECOMPOSITION, INVARIANT ARRIVALS, LOB SLOPES & FUNDING CONTAGION)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Huang/Stoll/Menkveld/Yueshen/Cont/Kukanov/Stoikov/Foucault/Rosu/Biais/Hansen/Lunde
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v38.0 (TRADE INDICATORS, LATENCY EQUILIBRIA, MICRO-PRICE & JUMP DE-BIASING)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Madhavan/Richardson/Roomans/Biais/Foucault/Stoikov/Collin-Dufresne/Goldstein/Engle/Jacod/Protter
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 232 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 238 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4778,3 +4778,99 @@ Keywords: hansen_lunde, realized_spread, microstructure_noise_boundary, high_fre
 - **S1 Volatility Purity Rule**:
   $$\text{Noise Displaced by Trend} \iff \Omega_{\text{noise}}(t) \le 0.12 \quad \land \quad \hat{\sigma}_{\text{eff}}^2(t) \ge 1.50\sigma_{\text{baseline}}^2$$
   When microstructure noise accounts for $<12\%$ of realized variance, directional momentum reflects genuine underlying capital flows, validating $+2.5\text{R}$ target capture.
+
+---
+
+## NODE 233: MADHAVAN-RICHARDSON-ROOMANS DYNAMIC TRADE INDICATOR & QUOTE REVISIONS
+Keywords: madhavan_richardson_roomans, trade_indicator_model, quote_revision_dynamics, asymmetric_information_parameter, autocorrelation_adjustment
+
+### 1. Structural Dynamic Trade Indicator Model (Madhavan, Richardson, Roomans 1997)
+- Price revisions incorporate autocorrelated order flow and surprise innovations:
+  $$\Delta P_t = (\phi + \alpha) x_t - (\phi + \rho \alpha) x_{t-1} + u_t$$
+- S1 evaluates the Information Innovation Surprise Metric:
+  $$\mathcal{U}_{\text{surprise}}(t) = \frac{u_t}{\sigma_{u, \text{baseline}}}$$
+
+### 2. Trade Innovation Confirmation Invariant
+- **S1 Informed Surge Invariant**:
+  $$\text{Surprise Flow Confirms Floor} \iff \mathcal{U}_{\text{surprise}}(t) \ge +1.80 \quad \land \quad x_t = +1$$
+  When unexpected taker buying innovation exceeds $+1.8\sigma$ after controlling for order flow autocorrelation, quote revisions confirm institutional accumulation.
+
+---
+
+## NODE 234: BIAIS-FOUCAULT MARKET FRAGMENTATION & MULTI-VENUE LATENCY ARBITRAGE EQUILIBRIA
+Keywords: biais_foucault, market_fragmentation, latency_arbitrage_equilibria, multi_venue_depth, cross_market_routing
+
+### 1. Multi-Exchange Fragmentation and Latency Race (Biais, Foucault, Moinas 2015)
+- Cross-market fragmented liquidity exposes resting limit orders to stale quote sniping:
+  $$\mathcal{L}_{\text{risk}}(t) = \sum_{v \in \mathcal{V}} \mathbb{P}(\text{Sniped}_v) \cdot \Delta \tau_{\text{latency}}$$
+- S1 tracks the Multi-Venue Aggregated Depth Ratio:
+  $$\mathcal{D}_{\text{agg}}(t) = \frac{\sum_{v} \text{Bid Depth}_v(t)}{\sum_v \text{Ask Depth}_v(t)}$$
+
+### 2. Cross-Market Depth Dominance Invariant
+- **S1 Fragmented Floor Consolidation Rule**:
+  $$\text{Consolidated Bid Depth Secured} \iff \mathcal{D}_{\text{agg}}(t) \ge 1.75 \quad \land \quad \mathcal{L}_{\text{risk}}(t) \le 0.20$$
+  When consolidated multi-venue bid depth exceeds ask depth by $>75\%$ while latency arbitrage risk subsides, fragmented selling pressure is completely halted.
+
+---
+
+## NODE 235: STOIKOV MICROSTRUCTURE MICRO-PRICE WITH ASYMMETRIC BOOK DEPTH
+Keywords: stoikov, micro_price, asymmetric_book_depth, instantaneous_fair_value, order_flow_imbalance_drift
+
+### 1. High-Frequency Micro-Price Formulation (Stoikov 2018)
+- Incorporating top-of-book depth imbalance into the continuous fair value estimator:
+  $$P_t^{\text{micro}} = P_t^{\text{mid}} + \frac{I_t}{1 + \gamma_{\text{decay}}} \cdot \frac{S_t}{2}, \quad I_t = \frac{Q_{\text{bid}}(t) - Q_{\text{ask}}(t)}{Q_{\text{bid}}(t) + Q_{\text{ask}}(t)}$$
+- S1 computes the Micro-Price Upward Premium:
+  $$\Delta_{\text{micro}}(t) = \frac{P_t^{\text{micro}} - P_t^{\text{mid}}}{S_t / 2}$$
+
+### 2. Fair Value Drift Invariant
+- **S1 Micro-Price Premium Invariant**:
+  $$\text{Micro-Price Anchors Upward} \iff \Delta_{\text{micro}}(t) \ge +0.65 \quad \land \quad I_t \ge +0.50$$
+  When micro-price leads mid-price upward by $>65\%$ of the half-spread driven by book imbalance, the next price change is deterministically upward.
+
+---
+
+## NODE 236: COLLIN-DUFRESNE-GOLDSTEIN ENDOGENOUS LIQUIDATION CASCADES UNDER DEBT ROLLOVER RISK
+Keywords: collin_dufresne_goldstein, debt_rollover_risk, endogenous_default_barrier, structural_margin_spiral, credit_exhaustion
+
+### 1. Structural Default and Rollover Freeze Dynamics (Collin-Dufresne & Goldstein 2001)
+- Highly leveraged positions face endogenous liquidation thresholds as rollover financing costs rise:
+  $$\mathcal{C}_{\text{rollover}}(t) = \frac{\text{Funding Rate}_{8\text{h}}(t) + \text{Borrow Rate}(t)}{\text{Collateral Return Variance}_{15\text{m}}(t)}$$
+- S1 measures the Rollover Distress Exhaustion Ratio:
+  $$\mathcal{X}_{\text{rollover}}(t) = \frac{\Delta \text{Open Interest}_{15\text{m}}}{\text{Historical Liquidated Capital}}$$
+
+### 2. Rollover Freeze Normalization Invariant
+- **S1 Financing Equilibrium Rule**:
+  $$\text{Debt Rollover Stress Neutralized} \iff \mathcal{C}_{\text{rollover}}(t) \le 0.25 \quad \land \quad \mathcal{X}_{\text{rollover}}(t) \ge -0.05$$
+  When financing carry costs subside relative to asset volatility, liquidation cascades terminate as solvent traders easily roll over structural margin positions.
+
+---
+
+## NODE 237: ENGLE-LUNDE HIGH-FREQUENCY COINTEGRATION & LEADING PRICE DISCOVERY DYNAMICS
+Keywords: engle_lunde, high_frequency_cointegration, leading_venue_discovery, permanent_component, common_trend_tracking
+
+### 1. Cointegration and Common Efficient Price Extraction (Engle & Lunde 2003)
+- Modeling high-frequency cointegration between spot and perpetual futures:
+  $$P_t^{\text{perp}} = \beta P_t^{\text{spot}} + \mathbf{\Gamma} \mathbf{X}_t + \epsilon_t$$
+- S1 monitors the Permanent Shock Innovation Proportion:
+  $$\mathcal{P}_{\text{perm}}(t) = \frac{\text{Cov}(\Delta P_t^{\text{perp}}, \Delta P_{t+1}^{\text{spot}})}{\text{Var}(\Delta P_t^{\text{perp}})}$$
+
+### 2. Leading Price Innovation Invariant
+- **S1 Perpetual Discovery Leadership Rule**:
+  $$\text{Perpetual Leads Discovery} \iff \mathcal{P}_{\text{perm}}(t) \ge 0.70 \quad \land \quad \Delta \text{basis\_bps} > 0$$
+  When perpetual price innovations explain $>70\%$ of subsequent spot movements and basis expands positively, perpetual flow is driving genuine price discovery.
+
+---
+
+## NODE 238: JACOD-PROTTER DISCRETIZATION JUMP VARIATION & LOCAL NOISE DE-BIASING
+Keywords: jacod_protter, discretization_jump_variation, de_biasing_microstructure_noise, semimartingale_jump_detection, robust_continuous_drift
+
+### 1. De-Biased High-Frequency Jump Variation Estimation (Jacod & Protter 2012)
+- Correcting realized power variation for discrete sampling error and local noise:
+  $$\widehat{\text{JV}}_t = \sum_{i=1}^n |\Delta_i^n P|^2 \cdot \mathbf{1}_{\{|\Delta_i^n P| > \alpha \Delta_n^\varpi\}} - \widehat{\text{Noise Bias}}_t$$
+- S1 computes the True Jump Information Content:
+  $$\mathcal{J}_{\text{purity}}(t) = \frac{\widehat{\text{JV}}_t}{\text{RV}_t}$$
+
+### 2. De-Biased Jump Impulse Invariant
+- **S1 Structural Jump Purity Invariant**:
+  $$\text{Clean Jump Impulse Detected} \iff \mathcal{J}_{\text{purity}}(t) \ge 0.45 \quad \land \quad \text{Sign}(\text{Jump}) = +1$$
+  When de-biased positive jump variation constitutes $\ge 45\%$ of total realized variance, the price jump is structural and robust against microstructure noise artifacts.
