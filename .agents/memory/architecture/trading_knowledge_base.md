@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v41.0 (DUAL-TRADING TIMING, SEARCH FIRE-SALES, INTRADAY CLUSTERING & RESTOCKING HORIZONS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Foucault/Roell/Vayanos/Wang/Andersen/Bollerslev/Diebold/Garman/OHara/Viswanathan/Jacod/Podolskij/Vetter
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v42.0 (ENDOGENOUS DISCOVERY, MARGIN CONTAGION, ASYNCHRONOUS QMLE & BIPOWER JUMP TESTS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + OHara/Wang/Garleanu/Pedersen/AitSahalia/Fan/Xiu/Glosten/Milgrom/Cont/Kukanov/BarndorffNielsen/Graversen/Jacod
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 256 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 262 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5162,3 +5162,100 @@ Keywords: jacod_podolskij_vetter, truncated_covariation, microstructure_noise_ro
 - **S1 Robust Rebound Alignment Invariant**:
   $$\text{Cross-Asset Rebound Coherent} \iff \mathcal{C}_{\text{cohere}}(t) \ge 0.65 \quad \land \quad \Delta \mathcal{C}_{\text{cohere}}(t) > 0$$
   When jump-truncated continuous covariation between candidate altcoins and BTC exceeds $0.65$, systemic risk has passed into an aligned, institutional recovery wave.
+
+
+---
+
+## NODE 257: O'HARA-WANG ENDOGENOUS LIQUIDITY DISCOVERY & INFORMATIONAL DECOMPOSITION
+Keywords: ohara_wang, endogenous_liquidity_discovery, informational_decomposition, transparency_regimes, post_cascade_discovery_depth
+
+### 1. Endogenous Liquidity and Informational Discovery (O'Hara & Wang 2021)
+- Informational efficiency evolves endogenously as market transparency and trade frequency shift:
+  $$\mathcal{I}_{\text{info}}(t) = \frac{\text{Var}(\mathbb{E}[V \mid \mathcal{F}_t^{\text{LOB}}])}{\text{Var}(V_{\text{true}})} = 1 - \frac{\sigma_{\text{residual}}^2}{\sigma_{\text{total}}^2}$$
+- S1 computes the Informational Discovery Convergence Metric:
+  $$\mathcal{D}_{\text{info}}(t) = \frac{\mathcal{I}_{\text{info}}(t)}{\bar{\mathcal{I}}_{\text{baseline}}}$$
+
+### 2. Information Equilibrium Restored Invariant
+- **S1 Endogenous Discovery Completion Rule**:
+  $$\text{Price Discovery Restored} \iff \mathcal{D}_{\text{info}}(t) \ge 0.92 \quad \land \quad \Delta \sigma_{\text{residual}}^2(t) < 0$$
+  When endogenous price discovery converges to $>92\%$ of historical equilibrium, market prices reflect true fundamental value rather than liquidation noise.
+
+---
+
+## NODE 258: GÂRLEANU-PEDERSEN DYNAMIC MARGIN REQUIREMENTS & MULTI-ASSET COLLATERAL CONTAGION
+Keywords: garleanu_pedersen, dynamic_margins, collateral_contagion, margin_constrained_pricing, cross_asset_haircut_multipliers
+
+### 1. Margin-Constrained Asset Pricing and Shadow Cost of Capital (Gârleanu & Pedersen 2011)
+- When margin constraints bind, high-margin assets face severe valuation discounts:
+  $$P_i(t) = \frac{\mathbb{E}[D_i] - \text{Cov}(D_i, \Lambda)}{\rho} - \psi_t \cdot m_i$$
+- S1 evaluates the Margin Constraint Relief Ratio:
+  $$\mathcal{M}_{\text{relief}}(t) = \frac{m_{\text{spot}} - m_{\text{futures}}(t)}{m_{\text{baseline}}}$$
+
+### 2. Collateral Constraint Unwinding Invariant
+- **S1 Margin Shadow Cost Invariant**:
+  $$\text{Margin Squeeze Dissipated} \iff \mathcal{M}_{\text{relief}}(t) \ge 0.40 \quad \land \quad \Delta \psi_t < 0$$
+  When margin constraint shadow costs diminish by $>40\%$, cross-collateral liquidation pressure vanishes, eliminating forced liquidation dominoes.
+
+---
+
+## NODE 259: AÏT-SAHALIA-FAN-XIU HIGH-FREQUENCY COVARIANCE MATRIX ESTIMATION UNDER ASYNCHRONOUS LIQUIDITY
+Keywords: ait_sahalia_fan_xiu, asynchronous_liquidity, quasi_maximum_likelihood, microstructure_noise_covariation, robust_correlation_matrices
+
+### 1. Quasi-Maximum Likelihood High-Frequency Covariance (Aït-Sahalia, Fan, Xiu 2010)
+- Correcting for asynchronous order arrival and non-synchronous microstructure noise across crypto assets:
+  $$\hat{\boldsymbol{\Sigma}}_{\text{QMLE}} = \arg\max_{\boldsymbol{\Sigma}} \ell(\boldsymbol{\Sigma} \mid \{P_{i, t_k}\}_{i=1}^{18})$$
+- S1 computes the Asynchronous Lead-Lag Dispersion Ratio:
+  $$\Lambda_{\text{async}}(t) = \frac{\text{Tr}(\hat{\boldsymbol{\Sigma}}_{\text{QMLE}}(t))}{\sum_{i=1}^{18} \text{Var}_{\text{unadjusted}}(P_i)}$$
+
+### 2. Asynchronous Alignment Verification Invariant
+- **S1 Asynchronous Flow Synchronization Rule**:
+  $$\text{Asset Cross-Flow Synchronized} \iff \Lambda_{\text{async}}(t) \ge 0.85 \quad \land \quad \Delta \Lambda_{\text{async}}(t) > 0$$
+  When QMLE asynchronous lead-lag dispersion normalizes above $0.85$, all 18 institutional perpetuals react uniformly to aggregate market flow, confirming structural broad-market recovery.
+
+---
+
+## NODE 260: GLOSTEN-MILGROM SEQUENTIAL TRADE INFORMATION CASCADE BREAKDOWN & UNINFORMED PANIC INVERSION
+Keywords: glosten_milgrom, sequential_trade_breakdown, uninformed_panic_inversion, bayesian_belief_drift, retail_dumping_climax
+
+### 1. Bayesian Belief Updating Under Cascade Breakdown (Glosten & Milgrom 1985)
+- Specialists update beliefs sequentially based on order flow signs:
+  $$p_t = \mathbb{P}(V = V_H \mid \text{Trade History}_t) = \frac{p_{t-1} \cdot \mathbb{P}(\text{Sell} \mid V_H)}{p_{t-1} \mathbb{P}(\text{Sell} \mid V_H) + (1 - p_{t-1}) \mathbb{P}(\text{Sell} \mid V_L)}$$
+- S1 computes the Uninformed Cascade Inversion Metric:
+  $$\mathcal{U}_{\text{panic}}(t) = \frac{\text{Retail Uninformed Sell Volume}_{15\text{m}}}{\text{Informed Institutional Absorption Depth}_{\text{bid}}}$$
+
+### 2. Uninformed Panic Climax Invariant
+- **S1 Panic Selling Termination Rule**:
+  $$\text{Retail Dumping Exhausted} \iff \mathcal{U}_{\text{panic}}(t) \le 0.35 \quad \land \quad \frac{dp_t}{dt} > 0$$
+  When retail uninformed sell flow drops below $35\%$ of resting institutional bid depth while dealer beliefs turn affirmative, the selling climax is definitively completed.
+
+---
+
+## NODE 261: CONT-KUKANOV OPTIMAL ORDER SLICING ACROSS FRAGMENTED EXECUTION VENUES
+Keywords: cont_kukanov, optimal_order_slicing, venue_fragmentation, multi_exchange_split, queue_depletion_hazard
+
+### 1. Optimal Static and Dynamic Order Placement (Cont & Kukanov 2017)
+- Minimizing execution shortfall and adverse selection across multiple trading venues:
+  $$\min_{\mathbf{q}} \sum_{k=1}^K \left[ q_k P_k + \theta_k q_k^2 + \lambda_k \mathbb{E}[\text{Shortfall}_k \mid q_k] \right]$$
+- S1 tracks the Venue Liquidity Recovery Index:
+  $$\mathcal{V}_{\text{recover}}(t) = \frac{\sum_{k=1}^K \text{Depth}_{\text{bid}, k}(t)}{\sum_{k=1}^K \bar{\text{Depth}}_{\text{baseline}, k}}$$
+
+### 2. Venue Depth Replenishment Invariant
+- **S1 Multi-Venue Cushion Restoration Rule**:
+  $$\text{Exchange Liquidity Restored} \iff \mathcal{V}_{\text{recover}}(t) \ge 1.35 \quad \land \quad \Delta \mathcal{V}_{\text{recover}}(t) > 0$$
+  When aggregated multi-venue bid depth exceeds $135\%$ of historical baseline, institutional resting orders form an impenetrable support floor across spot and perpetual markets.
+
+---
+
+## NODE 262: BARNDORFF-NIELSEN-GRAVERSEN-JACOD REALIZED BIPOWER VARIATION JUMP TEST & SEMIMARTINGALE DIFFUSION ASSURANCE
+Keywords: barndorff_nielsen_graversen_jacod, bipower_variation_jump_test, semimartingale_diffusion, jump_test_statistic, continuous_rebound_safety
+
+### 1. Realized Bipower Variation Jump Test Statistic (Barndorff-Nielsen, Graversen, Jacod 2006)
+- Testing whether intraday price evolution contains statistically significant jump discontinuities:
+  $$\mathcal{T}_{\text{jump}}(t) = \frac{\frac{\text{RV}_t - \text{BV}_t}{\text{RV}_t}}{\sqrt{\vartheta \cdot \frac{1}{n} \max\left(1, \frac{\text{TP}_t}{\text{BV}_t^2}\right)}} \xrightarrow{d} \mathcal{N}(0, 1)$$
+- S1 tracks the Bipower Jump Absence Confidence:
+  $$\Phi_{\text{jump\_free}}(t) = 1 - \Phi(\mathcal{T}_{\text{jump}}(t))$$
+
+### 2. Semimartingale Diffusion Assurance Invariant
+- **S1 Continuous Motion Assurance Rule**:
+  $$\text{Jump Risk Absent} \iff \mathcal{T}_{\text{jump}}(t) \le 1.645 \quad (\Phi_{\text{jump\_free}} \ge 0.95) \quad \land \quad \text{BV}_t \ge 0.85 \cdot \text{RV}_t$$
+  When the jump test confirms no statistically significant jump components with $>95\%$ confidence ($\mathcal{T}_{\text{jump}} \le 1.645$), price action behaves as pure Brownian diffusion, ensuring smooth trailing stop ratcheting toward $+2.5\text{R}$.
