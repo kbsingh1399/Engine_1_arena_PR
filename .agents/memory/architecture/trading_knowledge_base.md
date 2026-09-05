@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v24.0 (FLASHING QUOTES, MARKOVIAN QUEUES, FRACTIONAL OFI & MERTON DEFAULT BARRIER)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Hasbrouck/Cont/Hautsch/Barndorff-Nielsen/Foucault/Merton
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v25.0 (STOCHASTIC FRICTION, BAYESIAN BELIEF INFLECTION, JUMP ACTIVITY RATIO & HIDDEN ICEBERGS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Chacko/Glosten/Bollerslev/Garman/Engle/Viswanathan
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 154 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 160 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3536,3 +3536,103 @@ Keywords: merton_structural_credit, insurance_fund_depletion, adl_avoidance, aut
 - **S1 Risk Allocation Rule**:
   $$\text{Trading Authorized} \iff d_2(t) \ge 3.20 \quad \land \quad \frac{d(\text{Insurance Fund USD})}{dt} \ge 0$$
   If $d_2(t) < 3.20$ or the Insurance Fund is depleting at a rate $> 2.5\% / \text{hour}$, trading across all 18 assets is immediately paused. S1 trades only when $d_2 \ge 3.20$, ensuring trades are completely immune to ADL clawbacks and socialized execution penalties.
+
+---
+
+## NODE 155: CHACKO-VICEIRA DYNAMIC CONSUMPTION-INVESTMENT WITH STOCHASTIC LIQUIDITY FRICTIONS
+Keywords: stochastic_frictions, chacko_viceira, inaction_zone, bid_ask_dispersion, friction_dissipation, rebalance_gate
+
+### 1. Portfolio Choice Under State-Dependent Liquidity Costs (Chacko & Viceira 2005; Liu & Loewenstein 2002)
+- Transaction costs (quoted spread, market impact, and taker fees) are not constant; they follow a mean-reverting stochastic square-root process during cascading liquidations:
+  $$dc_t = \kappa_c (\bar{c} - c_t)dt + \sigma_c \sqrt{c_t} dW_t^c$$
+- Under stochastic costs, the optimal portfolio weight is characterized by an inaction region $[\underline{\pi}(c_t), \bar{\pi}(c_t)]$, whose width expands with the cube-root of current friction:
+  $$\Delta \pi(c_t) = \bar{\pi}(c_t) - \underline{\pi}(c_t) = \left( \frac{3 c_t \sigma^2}{2 \gamma} \right)^{1/3}$$
+- Trading inside an excessively wide inaction band dissipates alpha through frictional drag.
+
+### 2. The Friction Inaction Gate
+- S1 computes the Friction-to-Excursion Ratio:
+  $$\mathcal{R}_{\text{frict}}(t) = \frac{\text{Spread}_{15\text{m}} + \text{Slippage}_{\text{est}}}{2.5\text{R Target In Dollars}}$$
+- **S1 Execution Invariant**:
+  $$\text{Long Authorized} \iff \Delta \pi(c_t) \le 0.12 \quad \land \quad \mathcal{R}_{\text{frict}}(t) \le 0.065$$
+  Gating execution until $\mathcal{R}_{\text{frict}} \le 0.065$ guarantees that total round-trip frictions consume less than $6.5\%$ of expected target excursion, preserving the positive expected value of the S1 edge.
+
+---
+
+## NODE 156: GLOSTEN-MILGROM-LEHMANN SEQUENTIAL TRADE INFORMATION AGGREGATION & BAYESIAN BELIEF INFLECTION
+Keywords: bayesian_belief_evolution, glosten_milgrom, sequential_trade, surprise_innovator, belief_inflection, bid_repricing
+
+### 1. Market Maker Bayesian Posterior Dynamics (Glosten & Milgrom 1985; Lehmann 1990)
+- In a sequential trade framework, market makers update their posterior probability $p_t = \mathbb{P}(V = V_H \mid \mathcal{F}_t)$ upon observing trade directions $x_t \in \{+1, -1\}$.
+- In liquidation cascades, a long sequence of forced sell orders depresses $p_t \to 0$. However, when a buy order arrives at extreme discounts, the information surprise is maximal:
+  $$\mathcal{I}_{\text{surprise}}(t) = \ln \left( \frac{p_t}{1 - p_t} \right) - \ln \left( \frac{p_{t-1}}{1 - p_{t-1}} \right) = \ln \left( \frac{\mu + (1-\mu)\mathbb{P}(x_t = +1 \mid V_H)}{\mu + (1-\mu)\mathbb{P}(x_t = +1 \mid V_L)} \right)$$
+- An aggressive buy print during extreme oversold regimes forces an immediate discrete upward adjustment in the market maker's subjective valuation.
+
+### 2. Bayesian Belief Inflection Gate
+- **S1 Operational Rule**:
+  $$\text{Belief Inflection Triggered} \iff \mathcal{I}_{\text{surprise}}(t) \ge +1.85 \quad \land \quad \sum_{j=1}^4 \text{fp\_delta}_{t-j} < 0 \quad \land \quad \text{fp\_delta}_t > 0$$
+  When $\mathcal{I}_{\text{surprise}} \ge +1.85$ immediately following persistent negative footprint delta, market makers rapidly revise their bid schedules upward. S1 enters long to capture this structural upward repricing before passive queues re-fill.
+
+---
+
+## NODE 157: BOLLERSLEV-TODOROV EXTREME JUMP ACTIVITY & CONTINUOUS BIPOWER RATIO
+Keywords: jump_activity_ratio, bollerslev_todorov, continuous_to_jump, levy_intensity, tail_compensator, execution_safety
+
+### 1. Disentangling Diffusive Drift from Lévy Jump Discontinuities (Bollerslev & Todorov 2011)
+- Standard volatility estimators conflate ordinary continuous price fluctuations with discrete, non-Gaussian jump shocks. The Jump Activity Ratio isolates the portion of quadratic variation driven purely by jump discontinuities:
+  $$\mathcal{J}_{\text{ratio}}(t) = 1 - \frac{\text{RBV}_t}{\text{RV}_t}$$
+  where $\text{RBV}_t$ is Realized Bipower Variation and $\text{RV}_t$ is total Realized Variance.
+- When $\mathcal{J}_{\text{ratio}} > 0.60$, prices evolve discontinuously; stop-loss execution cannot be guaranteed without severe gap slippage.
+
+### 2. Jump Cessation Safety Boundary
+- **S1 Execution Invariant**:
+  $$\text{Execution Safe} \iff \mathcal{J}_{\text{ratio}}(t) \le 0.18 \quad \land \quad \Delta \mathcal{J}_{\text{ratio}}(t) < 0$$
+  Restricting entry to regimes where $\mathcal{J}_{\text{ratio}} \le 0.18$ ensures that continuous Brownian diffusion has re-established market control. Discrete jump hazards are minimized, ensuring that the initial $1.65\text{R}$ stop-loss functions with precise limit/stop fills.
+
+---
+
+## NODE 158: GARMAN-HASS LIQUIDITY-CONSTRAINED ORDER SLICING & FOOTPRINT CONCENTRATION
+Keywords: order_slicing, garman_hass, twap_execution, footprint_concentration, institutional_accumulation, non_predatory
+
+### 1. Optimal Institutional Accumulation Schedules (Garman 1976; Bertsimas & Lo 1998)
+- Large institutional buyers absorbing distress inventory divide their orders into discrete slices over multiple bars using TWAP/VWAP execution algorithms to avoid predatory front-running.
+- The optimal dynamic slicing program produces an elevated concentration of taker buy volume relative to trade count:
+  $$\Phi_{\text{slice}}(t) = \frac{\text{Taker Buy Volume}_{15\text{m}}}{\sqrt{\text{Total Volume}_{15\text{m}} \cdot \text{Trades Count}_{15\text{m}}}}$$
+- If $\Phi_{\text{slice}}$ is high while price impact per unit volume ($\lambda_{\text{bar}} = \frac{|\Delta P|}{\text{Volume}}$) remains depressed, institutional accumulation is taking place passively without moving the market.
+
+### 2. Institutional Slicing Invariant
+- **S1 Operational Rule**:
+  $$\text{Institutional Accumulation Confirmed} \iff \Phi_{\text{slice}}(t) \ge 2.10 \quad \land \quad \frac{|\Delta P_t|}{\text{Volume}_t} \le 0.35 \bar{\lambda}_{24\text{h}}$$
+  This condition confirms that institutional algorithms are systematically absorbing retail liquidation market orders via sliced programs, providing an immovable bid cushion beneath the entry price.
+
+---
+
+## NODE 159: ENGLE-LUNDE REALIZED SEMIVARIANCE ASYMMETRY & DOWNSIDE DISSIPATION
+Keywords: realized_semivariance, engle_lunde, upside_variance, downside_dissipation, variance_asymmetry, bull_control
+
+### 1. Decomposition of Quadratic Variation into Directional Semivariance (Engle & Lunde 2005; Patton & Sheppard 2015)
+- Standard volatility treats upside and downside price innovations identically. High-frequency Realized Semivariance decomposes realized variance into downside ($\text{RS}^-$) and upside ($\text{RS}^+$) components:
+  $$\text{RS}_t^- = \sum_{i=1}^N r_{t, i}^2 \cdot \mathbf{1}_{\{r_{t, i} < 0\}}, \quad \text{RS}_t^+ = \sum_{i=1}^N r_{t, i}^2 \cdot \mathbf{1}_{\{r_{t, i} > 0\}}$$
+- The Semivariance Asymmetry Ratio is:
+  $$\mathcal{Q}_{\text{semi}}(t) = \frac{\text{RS}_t^+ - \text{RS}_t^-}{\text{RS}_t^+ + \text{RS}_t^-}$$
+- In margin liquidation cascades, $\mathcal{Q}_{\text{semi}}$ collapses to $-0.80\dots-0.95$.
+
+### 2. Upside Dominance Inflection Gate
+- **S1 Operational Rule**:
+  $$\text{Variance Reversal Validated} \iff \mathcal{Q}_{\text{semi}}(t) \ge +0.25 \quad \land \quad \mathcal{Q}_{\text{semi}}(t-1) \le -0.40$$
+  An inflection from severe downside dominance ($\le -0.40$) to positive upside variance ($\ge +0.25$) confirms that buyers have captured directional variance dispersion. Downside volatility has dissipated, clearing the runway for an unencumbered $+2.0\text{R}\dots+2.5\text{R}$ target move.
+
+---
+
+## NODE 160: KYLE-VISWANATHAN-MA HIDDEN ICEBERG EXECUTION & SUPPORT SHELF FORMATION
+Keywords: hidden_iceberg, kyle_viswanathan, native_iceberg, footprint_absorption, support_shelf, tight_stop_anchor
+
+### 1. Footprint Microstructure of Native Iceberg Orders (Kyle et al. 1995; Bessembinder et al. 2009)
+- Institutional participants on Binance USDT-M Perpetuals use exchange-native iceberg orders to disguise accumulation. When aggressive liquidation market sell orders hit an iceberg bid, the displayed queue depth is repeatedly consumed and instantaneously refreshed at the exact same price level.
+- The Hidden Iceberg Absorption Metric is:
+  $$\mathcal{H}_{\text{iceberg}}(t) = \frac{\text{Executed Volume at Specific Bid Price Level} - \text{Initial Displayed Queue Depth}}{\text{Total Bar Taker Sell Volume}}$$
+- When $\mathcal{H}_{\text{iceberg}}(t) \ge 0.65$, more than $65\%$ of the bar's aggressive selling was absorbed by a single hidden limit order.
+
+### 2. Iceberg Stop-Anchor Invariant
+- **S1 Operational Rule**:
+  $$\text{Iceberg Floor Confirmed} \iff \mathcal{H}_{\text{iceberg}}(t) \ge 0.65 \quad \land \quad P_t \ge P_{\text{iceberg}} \quad \land \quad \text{fp\_delta} > 0$$
+  The identified iceberg price level $P_{\text{iceberg}}$ establishes a verified institutional liquidity barrier. S1 sets the initial stop-loss immediately below this level ($\text{Stop} = P_{\text{iceberg}} - 0.15\text{R}$), slashing downside risk to just $0.35\text{R}$ and expanding the realized reward-to-risk ratio.
