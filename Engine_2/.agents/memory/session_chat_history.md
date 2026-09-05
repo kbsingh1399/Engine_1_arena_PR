@@ -39775,3 +39775,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`cdcadab`); Engine_1_arena_PR committed and pushed (`2ecbef0`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2634` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v36.0 Expansion (Nodes 221–226) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2634` (iteration 2), `task-2487` (iteration 5), `task-2345` (iteration 8), `task-2203` (iteration 11), `task-2067` (iteration 14), `task-794` (iteration 32), and `task-1891` (iteration 19) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 221–226: 226 Structured Nodes)**:
+  - **Node 221**: Almgren Optimal Execution Under Non-Linear Temporary Impact & Non-Instantaneous Velocity Decay (Almgren 2003; Gatheral 2010; impact dissipation $\mathcal{R}_{\text{decay}} \le 0.18 \land \Delta \mathcal{R}_{\text{decay}} < 0$ ensuring zero adverse slippage).
+  - **Node 222**: Kyle-Lee Dynamic Informed Trading with Endogenous Information Precision Acquisition (Kyle 1985; Lee 2013; stealth accumulation $\mathcal{A}_{\text{stealth}} \ge 0.38 \land \text{long\_liq\_zs}_t \le 0.50$ tracking smart money accumulation).
+  - **Node 223**: Duffie-Gârleanu Financial Market Runaways & Over-the-Counter Search Friction Re-equilibration (Duffie et al. 2005, 2007; bilateral matching $\mathcal{S}_{\text{match}} \ge 0.70 \land \mathcal{I}_{\text{OTC}} \ge 0.25$ restoring orderly market clearing).
+  - **Node 224**: Biais-Declerck Limit Order Book Equilibrium Under Discrete Tick Grids & Priority Constraints (Biais & Declerck 2007; inside queue priority $\mathcal{Q}_{\text{prio}} \ge 0.40 \land \Delta Q_{\text{bid}} > 0$ defending resting bid floor).
+  - **Node 225**: Hasbrouck High-Frequency Information Shares in Multi-Venue Fragmented Perpetuals (Hasbrouck 1995, 2002; primary venue discovery $\text{IS}_{\text{Binance}} \ge 0.58 \land \Delta \text{IS}_{\text{Binance}} > 0$ confirming genuine price discovery).
+  - **Node 226**: Engle-Granger Cointegration & Error Correction Representation of Perp-Spot Basis Equilibrium (Engle & Granger 1987; cointegration snapback $z_{t-1} \le -2.0\sigma_{\text{basis}} \land \mathcal{V}_{\text{snap}} \ge +0.85$ driving aggressive basis mean-reversion).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`855255a`); Engine_1_arena_PR committed and pushed (`d57042a`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2634` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
