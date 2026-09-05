@@ -327,6 +327,8 @@ def _blank(n: int):
 def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
     n = len(f)
     fire, mode, trig, stop, tgt, rank, hardb = _blank(n)
+    if n == 0:
+        return fire, mode, trig, stop, tgt, rank, hardb
     c, h, l = f["close"].to_numpy(), f["high"].to_numpy(), f["low"].to_numpy()
     atr = f["atr_14"].to_numpy()
     warm = f["warm"].to_numpy()
@@ -422,15 +424,15 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
         variant = sid % 10
         if family in (0, 1, 7, 8):
             ok = base_long & ((liquid > 1.0 + 0.1 * variant) | (f["vwap_z"].to_numpy() < -0.8))
-            stop = l - (0.35 + 0.05 * (variant % 4)) * atr
+            stop = l - (1.50 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["zc_div"].to_numpy()) + np.maximum(body, 0)
         elif family in (2, 5, 6):
             ok = base_long & (trend > 0) & (body > 0.05 + 0.02 * variant)
-            stop = l - (0.45 + 0.05 * (variant % 3)) * atr
+            stop = l - (1.60 + 0.10 * (variant % 3)) * atr
             rank = body + np.nan_to_num(f["fp_stacked_buy_imb"].to_numpy())
         elif family in (3, 4, 9):
             ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55)
-            stop = l - (0.40 + 0.05 * (variant % 4)) * atr
+            stop = l - (1.50 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["bid_repl"].to_numpy()) + np.maximum(-f["funding_rate_pct"].to_numpy(), 0)
         else:
             ok = base_short & (trend < 0) & (ret < 0)
