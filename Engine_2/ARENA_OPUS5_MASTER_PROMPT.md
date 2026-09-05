@@ -24,8 +24,8 @@ Before writing a single line of architecture, strategy logic, or code, you **MUS
 4. **`ACTIVE_CONTEXT.md` (Turn-0 Situational Awareness & Strategy Invariants)**:  
    `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/.agents/rules/ACTIVE_CONTEXT.md`
 
-5. **`ENGINE2_AUDIT_MASTER.md` & `PARITY_AUDIT_REPORT.md` (Post-Mortem Root Causes)**:  
-   `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/ENGINE2_AUDIT_MASTER.md`
+5. **`Engine_2/STRATEGY_SPEC.md` (Institutional Specification & Post-Mortem Cures)**:  
+   `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/Engine_2/STRATEGY_SPEC.md`
 
 ---
 
