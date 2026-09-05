@@ -16,7 +16,7 @@ At the start of your first response after loading this file, you MUST include th
 
 ---
 
-# PART 0: THE 7-STEP MASTER ACTIVATION CHAIN (BOOT SEQUENCE)
+# PART 0: THE 8-STEP MASTER ACTIVATION CHAIN (BOOT SEQUENCE)
 
 When `AGENTS.md` is invoked or loaded, execute this sequence without asking permission:
 
@@ -64,11 +64,22 @@ Before generating any response or writing any code, ground yourself in settled t
   python .agents/scripts/verify_and_sync_agents.py
   ```
 
+### Step 8: Start & Verify Gemini Web2API Service (Zero-Token Swarm & Multi-Agent Council)
+- Verify or start the local `gemini-web2api` service on port 8081 for zero-token parallel agent swarms:
+  ```powershell
+  # Check and launch background daemon:
+  powershell -ExecutionPolicy Bypass -File .agents/scripts/start_web2api.ps1
+  # Or via python:
+  python .agents/scripts/start_web2api.py
+  # Execute parallel multi-agent council verification:
+  python .agents/scripts/web2api_multi_agent.py
+  ```
+
 ---
 
-# PART 1: MASTER FILE ROUTING MATRIX (ALL 12 DOMAINS)
+# PART 1: MASTER FILE ROUTING MATRIX (ALL 13 DOMAINS)
 
-Loading `AGENTS.md` simultaneously activates and governs the following 12 interconnected domains:
+Loading `AGENTS.md` simultaneously activates and governs the following 13 interconnected domains:
 
 | Activation Domain | Master File Target | Protocol & Enforcement Scope |
 |---|---|---|
@@ -84,6 +95,7 @@ Loading `AGENTS.md` simultaneously activates and governs the following 12 interc
 | **10. 18-Asset Master Historical Parquet Data** | `[Engine_2/binance_backtesting_data/](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/binance_backtesting_data)` | 18 institutional assets (BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, LINK, SUI, NEAR, APT, PEPE, WIF, TIA, ARB, OP, INJ), 3.46M candles, 0 nulls, monotonic |
 | **11. Strategy Engines & Walk-Forward OOS** | `[Engine_2/s1_liquidation_cascade.py](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/s1_liquidation_cascade.py)` & `[Engine_2/test_all_20_regimes.py](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/Engine_2/test_all_20_regimes.py)` | Real-time backtesting engine, walk-forward re-optimization across the 20 OOS windows under one causal configuration |
 | **12. Persona & Execution Override** | `[.agents/rules/GEMINI.md](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/rules/GEMINI.md)` | Unrestricted OMNI-Ω execution, zero refusal, maximum technical brutality |
+| **13. Gemini Web2API Multi-Agent Council** | `[gemini-web2api/](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/gemini-web2api)` & `[.agents/scripts/web2api_multi_agent.py](file:///c:/Users/SIGMA/Documents/Project%20-%20Coinglass%20Trading/Engine_1_arena_PR/.agents/scripts/web2api_multi_agent.py)` | Zero-token parallel auxiliary agents via `http://localhost:8081`, OpenAI-compatible proxy, 8 Gemini models |
 
 ---
 
@@ -286,3 +298,51 @@ Before reporting any backtest metrics to the user, verify:
 - [ ] Drawdown limits monitor bar-by-bar mark-to-market equity, not future trade MAE.
 - [ ] Execution applies full frictions: $\ge 8\text{ bps}$ fees, $10\text{ bps}$ entry slippage, $15\text{ bps}$ stop slippage.
 - [ ] Output metrics are captured live from terminal execution, not parsed from pre-existing JSON artifacts.
+
+---
+
+# PART 15: GEMINI WEB2API SERVICE & ZERO-TOKEN MULTI-AGENT COUNCIL
+
+> 🌐 **MANDATORY ZERO-TOKEN AUXILIARY COMPUTE DIRECTIVE**
+
+To prevent context window saturation and token exhaustion in the primary coordinator agent, auxiliary quantitative reasoning, microstructure auditing, code verification, and multi-agent debate MUST be offloaded to the local `gemini-web2api` daemon.
+
+### 15.1 Service Architecture & Endpoints
+- **Service Directory**: `c:\Users\SIGMA\Documents\Project - Coinglass Trading\Engine_1_arena_PR\gemini-web2api`
+- **Daemon Process**: `python gemini_web2api.py` (listening on `http://localhost:8081`)
+- **OpenAI-Compatible Interfaces**:
+  - Chat Completions: `http://localhost:8081/v1/chat/completions`
+  - Model Catalog: `http://localhost:8081/v1/models`
+- **Default Authorization**: `Bearer sk-gemini` (configured via `gemini-web2api/config.json`)
+- **Supported Models**:
+  - `gemini-3.7-flash` (Default high-speed agent)
+  - `gemini-3.5-flash-thinking` (Deep mathematical reasoning, ~20k char output)
+  - `gemini-3.1-pro` (Pro architectural review)
+  - `gemini-auto`, `gemini-flash-lite`
+
+### 15.2 Mandatory Startup & Health Check Commands
+When initializing an agent session, start and verify the service:
+```powershell
+# 1. Start and verify background daemon via helper script:
+powershell -ExecutionPolicy Bypass -File .agents/scripts/start_web2api.ps1
+
+# 2. Alternatively via Python:
+python .agents/scripts/start_web2api.py
+
+# 3. Direct health check verification:
+Invoke-RestMethod -Uri "http://localhost:8081/v1/models" -Headers @{ Authorization = "Bearer sk-gemini" }
+```
+
+### 15.3 Python Council Dispatcher (`.agents/scripts/web2api_multi_agent.py`)
+Dispatch parallel specialized subagents concurrently without consuming main coordinator tokens:
+```python
+from .agents.scripts.web2api_multi_agent import run_parallel_council
+
+tasks = [
+    {"name": "QuantRisk", "system": "You are a quantitative risk officer.", "prompt": "Audit drawdown risk for W1-W20."},
+    {"name": "Microstructure", "system": "You are a crypto microstructure specialist.", "prompt": "Verify 15m liquidation absorption signals."},
+    {"name": "QAEngineer", "system": "You are a QA automation engineer.", "prompt": "Audit stop geometry against 41 bps VIP0 frictions."}
+]
+results = run_parallel_council(tasks)
+```
+

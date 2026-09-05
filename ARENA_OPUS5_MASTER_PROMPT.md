@@ -9,9 +9,9 @@
 
 Before writing a single line of architecture, strategy logic, or code, you **MUST** load and internalize the following core institutional files directly from the repository. Do NOT assume, approximate, or hallucinate schemas, formulas, or rules. Fetch and verify:
 
-1. **`AGENTS.md` (Master Router & 12 Core Domains)**:  
-   `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/.agents/rules/AGENTS.md`  
-   *Mandate*: Acknowledge compliance with `✅ AGENTS.md fully loaded — All 12 Core Domains & Execution Protocols Activated.` Enforce Andrej Karpathy 4 principles (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution), zero-friction avoidance, and strict causality.
+1. **`agent.md` / `AGENTS.md` (Master Router & 13 Core Domains)**:  
+   `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/agent.md`  
+   *Mandate*: Acknowledge compliance with `✅ AGENTS.md fully loaded — All 12 Core Domains & Execution Protocols Activated.` Enforce Andrej Karpathy 4 principles (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution), zero-friction avoidance, strict causality, and start/verify the local `gemini-web2api` daemon on port 8081 via `powershell -ExecutionPolicy Bypass -File .agents/scripts/start_web2api.ps1` or `python .agents/scripts/start_web2api.py` to enable zero-token parallel agent swarms.
 
 2. **`FABLE5_CHECKLIST.md` (Lethal 13-Step Bug Hunt & Part 14 Anti-Lookahead Blacklist)**:  
    `https://raw.githubusercontent.com/kbsingh1399/Engine_1_arena_PR/main/.agents/rules/FABLE5_CHECKLIST.md`  
