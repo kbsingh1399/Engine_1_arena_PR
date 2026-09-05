@@ -28,7 +28,9 @@ trigger: always_on
 - **Anti-Lookahead Blacklist**:
   - Permanently banned: `winning_configuration.json`, `s1_status.json`, per-window hand-picked parameter tables, test-set `nlargest` overrides.
 
-## 3. Core Architecture & Local Tooling
+## 3. Core Architecture, Data Provenance & Local Tooling
+- **Verified Backtesting Parquet Dataset**: `Engine_2/binance_backtesting_data/` contains verified, continuous 15m Master and Footprint Ladder parquets across 18 symbols (2020 -> 2026, 0 nulls, monotonic timestamps).
+- **Canonical Download & Ingest Pipeline**: `Engine_2/run_historical_pipeline.py` is the verified master production pipeline orchestrator (fetches Klines, metrics, and funding rates; computes 28 canonical indicators; applies non-linear liquidation engine; exports master + ladder parquets; verifies integrity).
 - **Second Brain Recall**: `python .agents/scripts/second_brain.py query "<topic>"` (Graph Memory + Context Map + Session History).
 - **DeepSeek Harness**: Local evaluation suite in `deepseek-harness/` via `.agents/scripts/deepseek_harness_runner.py`.
 - **Memory Cleaner**: Run `.agents/scripts/free_ram.ps1` to unthrottle CPU and reclaim physical RAM.
