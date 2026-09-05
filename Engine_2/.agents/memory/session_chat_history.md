@@ -40081,7 +40081,25 @@ eferences.bib into architecture memory in both repositories.
   - **Node 346**: Entropy Collapse & Re-Expansion Metrics in Microstructure Consolidation ($\mathcal{H}_{\text{norm}} \le 0.45$ at sweep wick, $\Delta \mathcal{H}_{\text{norm}} > +0.15$ triggering expansion).
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories verified via `verify_and_sync_agents.py`.
+  - Git Delivery: `Engine_2` pushed to `main`; `Engine_1_arena_PR` pushed to `main` (`a9ae34d`) and `arena/01a06dc4-engine-1-arena-pr` (`a9ae34d`).
+
+---
+
+## Turn Record: Standing Sentinel Iterations, PR Tracking & Second Brain v58.0 (2026-09-05)
+- **User Directive / Sentinel**: Standing cron tasks `task-3428` (iteration 4) and `task-3322` (iteration 7) fired for continuous retail order flow research, PR branch monitoring, and Second Brain node expansion.
+- **PR Status & Arena.ai Tracking**:
+  - Fetched remote repository. Verified head commit at `a9ae34d` (clean state, waiting for incoming PR from Arena model council).
+- **Microstructure Econometric Synthesis (Nodes 347–352: 352 Structured Nodes)**:
+  - **Node 347**: Adaptive Kelly Position Sizing Under Time-Varying Win Probabilities & Non-Gaussian Tails ($f_{\text{adj}}^*(t)$, kurtosis dampener $\kappa_t$, fractional quarter-Kelly bound $c=0.25$ respecting $4.5\%$ hard stop).
+  - **Node 348**: Non-Parametric Kernel Density Order Book Imbalance (KDE-OBI) Estimators ($\text{KDE-OBI}(t) \ge +0.40$, continuous spatial depth integration across $3\text{ATR}$ boundary).
+  - **Node 349**: Fractionally Integrated Vector Autoregression (FIVAR) for Cross-Asset Momentum ($\mathbf{d}$ memory vector, propagation deficit $\Delta_{\text{lag}, i}(t) \ge +1.0 \cdot \text{ATR}_i$ capturing altcoin reaction lag).
+  - **Node 350**: Time-Varying Copula Dependence & Co-Crash Conditional Probability (Rotated Clayton Copula $\lambda_L(t) \le 0.60$ gating Slot 2 multi-asset concurrent risk).
+  - **Node 351**: Liquidation Cascade Absorption Footprint Clustering & Volume POC Convergence ($\mathcal{R}_{\text{POC}} \le 0.25$, $\text{Close}_t > \text{POC}_t$, positive footprint delta confirming institutional floor).
+  - **Node 352**: Markov Decision Process (MDP) Optimal Rebalancing & Dynamic Slippage Budgets (Bellman optimality, net trade convexity $\mathcal{E}_{\text{net}} \ge 1.80\text{R}$, $S_{\text{est}} \le 15\text{ bps}$).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories verified via `verify_and_sync_agents.py`.
   - Git Delivery: `Engine_2` pushed to `main`; `Engine_1_arena_PR` pushed to `main` and `arena/01a06dc4-engine-1-arena-pr`.
+
 
 
 

@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v57.0 (FUNDING BASIS DIVERGENCE, GMM REGIMES, LOB VACUUMS & ENTROPY COLLAPSE)
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v58.0 (ADAPTIVE KELLY SIZING, KDE-OBI, FIVAR DYNAMICS & TIME-VARYING COPULAS)
 # Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + AR Trading Academy (@aracademy__) CRT/TBS Curriculum
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 346 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 352 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -6715,3 +6715,116 @@ Keywords: shannon_entropy, volume_profile_entropy, price_clustering, information
 - **S1 Entropy Transition Invariant**:
   $$\text{Expansion Ignition} \iff \mathcal{H}_{\text{norm}}(t-1) \le 0.45 \quad \land \quad \Delta \mathcal{H}_{\text{norm}}(t) > +0.15 \quad \land \quad \text{Close}_t > CRTL$$
   Statistically validates that institutional accumulation at the range extreme is complete and that the order book has successfully transitioned into directional expansion.
+
+---
+
+## NODE 347: ADAPTIVE KELLY POSITION SIZING UNDER TIME-VARYING WIN PROBABILITIES & NON-GAUSSIAN TAILS
+Keywords: fractional_kelly, dynamic_allocation, time_varying_edge, fat_tailed_rescaling, portfolio_growth
+
+### 1. Mathematical Formulation of the Dynamic Kelly Criterion
+- The canonical Kelly fraction $f^* = \frac{p \cdot b - q}{b}$ assumes stationary Bernoulli trials and thin Gaussian tails, which catastrophically underestimates risk during crypto market drawdowns. S1 implements the Fat-Tail Rescaled Fractional Kelly Fraction $f_{\text{adj}}^*(t)$:
+  $$f^*(t) = \frac{p_t \cdot b_t - (1 - p_t)}{b_t} \cdot \left(\frac{1}{1 + \gamma_{\text{tail}} \cdot \kappa_t}\right)$$
+  where $\kappa_t = \frac{\mu_4(t)}{\sigma^4(t)}$ is the 96-bar rolling kurtosis, $\gamma_{\text{tail}} \approx 0.15$ is the tail penalty scalar, $b_t = \frac{\text{Target\_R}}{\text{Stop\_R}} \approx 2.50$, and $p_t$ is the instantaneous win probability output by the confluence sleeve ensemble.
+- To eliminate any chance of portfolio ruin and respect the $4.5\%$ hard drawdown ceiling on our $\$5,000$ base equity, S1 operates at a fractional quarter-Kelly ($c = 0.25$) bound:
+  $$f_{\text{trade}}(t) = \min\left(f_{\text{max}}, \, \max\left(f_{\text{min}}, \, c \cdot f^*(t)\right)\right), \quad f_{\text{min}} = 0.0030 \ (\$15), \quad f_{\text{max}} = 0.0100 \ (\$50)$$
+- When market kurtosis explodes ($\kappa_t > 8.0$, e.g. during cascading deleveraging), the sizing fraction dynamically compresses towards $f_{\text{min}}$, mathematically bounding loss variance.
+
+### 2. Adaptive Kelly Sizing Invariant
+- **S1 Kelly Sizing Invariant**:
+  $$\text{Size Allocation} = E_t \cdot f_{\text{trade}}(t) \quad \text{where} \quad f_{\text{trade}}(t) = \text{clip}\left(0.25 \cdot \frac{p_t \cdot 2.5 - (1 - p_t)}{2.5 \cdot (1 + 0.15 \kappa_t)}, \, 0.0030, \, 0.0100\right)$$
+  Guarantees optimal compounding growth during high-confluence regimes while autonomously protecting drawdown margins during fat-tailed liquidity shocks.
+
+---
+
+## NODE 348: NON-PARAMETRIC KERNEL DENSITY ORDER BOOK IMBALANCE (KDE-OBI) ESTIMATORS
+Keywords: kde_obi, order_book_imbalance, non_parametric_density, depth_weighting, microstructure_pressure
+
+### 1. Non-Parametric Continuous Depth Modeling
+- Discrete tick-level order book imbalances fail to capture the continuous spatial distribution of limit orders across the depth ladder. S1 models instantaneous order book density via Gaussian Kernel Density Estimation (KDE):
+  $$\hat{f}_{\text{bid}}(p) = \frac{1}{N h} \sum_{i=1}^{N} \mathcal{K}\left(\frac{p - p_{b, i}}{h}\right) \cdot w_{b, i}, \quad \hat{f}_{\text{ask}}(p) = \frac{1}{M h} \sum_{j=1}^{M} \mathcal{K}\left(\frac{p - p_{a, j}}{h}\right) \cdot w_{a, j}$$
+  where bandwidth $h = 0.20 \cdot \text{ATR}$, $\mathcal{K}(u) = \frac{1}{\sqrt{2\pi}} e^{-u^2/2}$, and weights $w_i = \text{Size}_i \cdot \exp(-\lambda_{\text{decay}} |p_i - P_{\text{mid}}|)$.
+- S1 computes the Continuous Integrated Order Book Imbalance (KDE-OBI) over a $3\text{ATR}$ boundary:
+  $$\text{KDE-OBI}(t) = \frac{\int_{P_{\text{mid}} - 3\text{ATR}}^{P_{\text{mid}}} \hat{f}_{\text{bid}}(p) \, dp - \int_{P_{\text{mid}}}^{P_{\text{mid}} + 3\text{ATR}} \hat{f}_{\text{ask}}(p) \, dp}{\int_{P_{\text{mid}} - 3\text{ATR}}^{P_{\text{mid}}} \hat{f}_{\text{bid}}(p) \, dp + \int_{P_{\text{mid}}}^{P_{\text{mid}} + 3\text{ATR}} \hat{f}_{\text{ask}}(p) \, dp} \in [-1, 1]$$
+- When forced market sell orders sweep through the book, discrete levels evaporate; however, a rapid reconstitution of the continuous bid density surface yielding $\text{KDE-OBI}(t) \ge +0.45$ confirms authentic institutional limit bid presence.
+
+### 2. KDE-OBI Confluence Invariant
+- **S1 Continuous Imbalance Invariant**:
+  $$\text{Institutional Bid Wall Present} \iff \text{KDE-OBI}(t) \ge +0.40 \quad \land \quad \frac{d}{dt}\text{KDE-OBI}(t) > 0 \quad \land \quad \text{fp\_delta} > 0$$
+  Filters out fake single-level spoof walls by verifying continuous, density-integrated limit order support beneath the entry bar.
+
+---
+
+## NODE 349: FRACTIONALLY INTEGRATED VECTOR AUTOREGRESSION (FIVAR) FOR CROSS-ASSET MOMENTUM
+Keywords: fivar, fractional_cointegration, long_memory, cross_asset_transmission, lead_lag_arbitrage
+
+### 1. Mathematical Structure of the 18-Asset FIVAR System
+- High-frequency crypto asset returns exhibit long-memory volatility and fractional persistence ($d \in (0, 0.5)$). To capture lead-lag causality between Bitcoin ($X_{1, t}$) and high-beta altcoins ($X_{i, t}, \, i \in \{2, \dots, 18\}$), returns are modeled via a Fractionally Integrated Vector Autoregression:
+  $$\boldsymbol{\Phi}(L) (1 - L)^{\mathbf{d}} \mathbf{X}_t = \boldsymbol{\epsilon}_t, \quad \boldsymbol{\epsilon}_t \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma})$$
+  where $\mathbf{d} = [d_1, d_2, \dots, d_{18}]^T$ is estimated via the Geweke-Porter-Hudak (GPH) log-periodogram estimator.
+- The impulse response function $\Psi_{1 \to i}(\tau) = \frac{\partial X_{i, t+\tau}}{\partial \epsilon_{1, t}}$ quantifies the lagged transmission of a Bitcoin liquidity shock to altcoin $i$.
+- S1 computes the Cross-Asset Propagation Deficit $\Delta_{\text{lag}, i}(t)$:
+  $$\Delta_{\text{lag}, i}(t) = \sum_{\tau=1}^{4} \Psi_{1 \to i}(\tau) \epsilon_{1, t-\tau} - X_{i, t}$$
+- When $\Delta_{\text{lag}, i}(t) \ge +1.20 \cdot \text{ATR}_i$ after Bitcoin completes a Turtle Body Soup reversal, the target altcoin possesses unpriced directional torque, offering high-convexity entry before price catches up.
+
+### 2. FIVAR Propagation Invariant
+- **S1 Cross-Asset Momentum Invariant**:
+  $$\text{Altcoin Lag Arbitrage} \iff \text{Signal}_{\text{BTC}}(t) = \text{ACTIVE} \quad \land \quad \Delta_{\text{lag}, i}(t) \ge +1.0 \cdot \text{ATR}_i \quad \land \quad \text{zc\_div}_i > 0.60$$
+  Permits aggressive secondary entries on lagging high-beta assets (e.g. SOL, SUI, NEAR) with statistical expectation of cross-asset equilibrium restoration.
+
+---
+
+## NODE 350: TIME-VARYING COPULA DEPENDENCE & CO-CRASH CONDITIONAL PROBABILITY
+Keywords: clayton_copula, tail_dependence, co_crash_probability, systemic_deleveraging, correlation_breakdown
+
+### 1. Non-Linear Tail Dependence Modeling
+- Pearson linear correlation $\rho$ fails catastrophically during market selloffs because joint asset dependency increases non-linearly in the tails. S1 models the joint tail risk between candidate trading assets via a Time-Varying Rotated Clayton Copula:
+  $$C_\theta(u, v) = \left(u^{-\theta_t} + v^{-\theta_t} - 1\right)^{-1/\theta_t}, \quad \lambda_L(t) = 2^{-1/\theta_t}$$
+  where $\lambda_L(t) \in [0, 1]$ represents the Lower Tail Dependence coefficient (probability of joint liquidation crash).
+- During systemic deleveraging events across the crypto ecosystem, $\lambda_L(t)$ spikes from normal values ($0.20$) to extreme levels ($\ge 0.78$), indicating that all altcoins are falling in lockstep with zero diversification benefit.
+- S1 evaluates the Co-Crash Risk Metric $\mathcal{C}_{\text{tail}}(t)$:
+  $$\mathcal{C}_{\text{tail}}(t) = \lambda_L(t) \cdot \mathbf{1}_{\{\text{Funding}_{\text{agg}} < 0\}} \cdot \left(\frac{\text{Global\_Liq\_Vol}_t}{\overline{\text{Global\_Liq\_Vol}}_{96}}\right)$$
+- If $\mathcal{C}_{\text{tail}}(t) \ge 0.75$, opening a second concurrent position in an altcoin doubles systemic downside risk rather than diversifying portfolio equity.
+
+### 2. Copula Tail-Risk Invariant
+- **S1 Co-Crash Invariant**:
+  $$\text{Authorize Concurrent Slot 2} \iff \lambda_L(t) \le 0.60 \quad \lor \quad \text{Asset}_2 = \text{BTC} \quad \lor \quad \rho_{12}(t) < 0.45$$
+  Prevents catastrophic double-stopout drawdowns by halting multi-asset concurrent exposure when systemic tail dependence indicates identical directional vulnerability.
+
+---
+
+## NODE 351: LIQUIDATION CASCADE ABSORPTION FOOTPRINT CLUSTERING & VOLUME POC CONVERGENCE
+Keywords: volume_poc, footprint_clustering, absorption_node, market_profile, value_area_migration
+
+### 1. High-Resolution Footprint Point of Control (POC) Migration
+- In an ongoing liquidation waterfall, the intra-bar Point of Control (POC) — the exact price tick possessing the greatest traded volume — continuously migrates downward with the falling price action:
+  $$\Delta P_{\text{POC}}(t) = \text{POC}_t - \text{POC}_{t-1} < 0$$
+- An authentic absorption event occurs when extreme liquidation volume clusters at the absolute lows of the candle, yet price refuses to expand further downward. S1 defines the POC Relative Position Metric:
+  $$\mathcal{R}_{\text{POC}}(t) = \frac{\text{POC}_t - \text{Low}_t}{\text{High}_t - \text{Low}_t} \in [0, 1]$$
+- When $\mathcal{R}_{\text{POC}}(t) \le 0.25$ (POC trapped in the bottom quartile) simultaneously accompanied by positive footprint delta ($\text{fp\_delta}_t > 0$) and a candle close above the POC:
+  $$\text{Close}_t > \text{POC}_t \quad \land \quad \text{Volume}_t \ge 2.50 \cdot \overline{\text{Volume}}_{20}$$
+  this confirms that institutional passive buyers absorbed the entirety of the retail liquidation flood at the lows.
+
+### 2. POC Absorption Invariant
+- **S1 POC Absorption Invariant**:
+  $$\text{Validated Footprint Floor} \iff \mathcal{R}_{\text{POC}}(t) \le 0.25 \quad \land \quad \text{Close}_t > \text{POC}_t \quad \land \quad \text{fp\_delta}_t > 0 \quad \land \quad \text{Close}_t > CRTL$$
+  Pinpoints high-confidence trade location where institutional limit absorption has established a verified structural support floor.
+
+---
+
+## NODE 352: MARKOV DECISION PROCESS (MDP) OPTIMAL REBALANCING & DYNAMIC SLIPPAGE BUDGETS
+Keywords: markov_decision_process, dynamic_slippage, optimal_execution, bellman_equation, friction_control
+
+### 1. MDP Formulation of Execution Slippage
+- Real-world backtesting and live execution across 18 crypto assets incur non-negligible taker fees ($\ge 8\text{ bps}$) and stochastic market order slippage ($S_t \sim \text{LogNormal}(\mu_{\text{slip}}, \sigma_{\text{slip}}^2)$). S1 models the trade execution decision as a discrete-time Markov Decision Process (MDP):
+  $$\mathcal{M} = \langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$$
+  where state $s_t = (\text{Spread}_t, \text{Depth}_{\text{bid}}, \text{Liq\_Vol}_t, \text{Volatility}_t)$, action $a_t \in \{\text{Market Entry}, \text{Aggressive Limit Entry}, \text{Abstain}\}$, and reward $R(s_t, a_t)$ incorporates expected post-entry alpha minus total transaction frictions $\mathcal{F}_{\text{total}} = \text{Fee}_{\text{taker}} + S_t$.
+- The optimal value function satisfies the Bellman Optimality Equation:
+  $$V^*(s) = \max_{a \in \mathcal{A}} \left[ R(s, a) + \gamma \sum_{s'} \mathcal{P}(s' \mid s, a) V^*(s') \right]$$
+- S1 computes the Expected Net Trade Convexity:
+  $$\mathcal{E}_{\text{net}}(t) = \mathbb{E}[\Delta P_{\text{target}}] \cdot p_t - \mathbb{E}[\Delta P_{\text{stop}}] \cdot (1 - p_t) - 2 \cdot (\text{Fee}_{\text{taker}} + S_{\text{est}}(t))$$
+- If expected execution slippage $S_{\text{est}}(t) > 15\text{ bps}$ due to order book thinness, market entry is aborted or rerouted to a limit order at the candle close.
+
+### 2. MDP Slippage Budget Invariant
+- **S1 Execution Friction Invariant**:
+  $$\text{Execute Market Order} \iff \mathcal{E}_{\text{net}}(t) \ge 1.80 \cdot \text{Risk}_{\text{nominal}} \quad \land \quad S_{\text{est}}(t) \le 0.0015 \ (15\text{ bps})$$
+  Mathematically guarantees that execution frictions and adverse selection can never erode the fundamental edge of the quantitative trading strategy.
