@@ -6224,3 +6224,112 @@ Keywords: power_of_three, amd_schematic, judas_swing, accumulation_phase, daily_
 - **S1 Distribution Surge Rule**:
   $$\text{AMD Phase D Active} \iff \text{Sweep}(R_{\text{Asia}}^{\text{low}}) \quad \land \quad \text{Close}_t > R_{\text{Asia}}^{\text{low}} \quad \land \quad \text{fp\_delta} > 0 \quad \land \quad \text{EMA}_8 > \text{EMA}_{21}$$
   When the Judas Swing manipulation phase successfully clears the lower Asian liquidity pool and reclaims the range floor with positive footprint delta, the manipulation phase terminates, releasing explosive Phase D distribution toward session highs.
+
+---
+
+## NODE 321: TIME-GATED SILVER BULLET LIQUIDITY DISPLACEMENT & MSS ENSEMBLES
+Keywords: silver_bullet, market_structure_shift, time_gated_windows, institutional_delivery, execution_hour
+
+### 1. Mathematical Mechanics of the Silver Bullet Model
+- Popularized across short-form trading media as the "Silver Bullet" setup, institutional execution algorithms operate within strict temporal liquidity allocations:
+  - London Window: 07:00–08:00 UTC (03:00–04:00 EST)
+  - New York AM Window: 14:00–15:00 UTC (10:00–11:00 EST)
+  - New York PM Window: 18:00–19:00 UTC (14:00–15:00 EST)
+- The execution model requires a three-stage sequential state machine inside the hour window:
+  1. **Liquidity Sweep**: Probing prior swing high/low ($P_{\text{extreme}}$) to trigger resting retail orders.
+  2. **Market Structure Shift (MSS)**: Violent candle displacement breaking the recent counter-swing level with an un-auctioned Fair Value Gap ($FVG$).
+  3. **Displacement Entry**: Retracement into the FVG within the remaining window duration.
+- S1 computes the Silver Bullet Execution Score:
+  $$\mathcal{SB}_{\text{score}}(t) = \mathbf{1}_{\{t \in \Omega_{\text{SB}}\}} \cdot \left(\frac{|\text{Displacement Body}|}{\text{ATR}_{15\text{m}}}\right) \cdot \left(\frac{\text{Volume}_{\text{displacement}}}{\text{Volume}_{\text{sma9}}}\right)$$
+
+### 2. Silver Bullet Reversal Invariant
+- **S1 Silver Bullet Execution Invariant**:
+  $$\text{Silver Bullet Armed} \iff t \in \Omega_{\text{SB}} \quad \land \quad \text{Sweep}(\text{SSL}) \quad \land \quad \text{MSS}_{\text{bull}} \quad \land \quad P_t \in FVG^+ \quad \land \quad \text{fp\_delta} > 0$$
+  When a sell-side liquidity sweep is immediately followed by a bullish market structure shift and fair value gap formation inside a canonical Silver Bullet hour on expanding volume and positive delta, institutional algorithms guarantee directional price delivery.
+
+---
+
+## NODE 322: BUY-SIDE (BSL) & SELL-SIDE (SSL) LIQUIDITY POOL RUNS
+Keywords: bsl_ssl, liquidity_pools, buy_side_liquidity, sell_side_liquidity, stop_run_magnetism
+
+### 1. Quantitative Modeling of Resting Stop Orders
+- In perpetual futures architecture, resting stop-loss orders do not distribute uniformly across the price continuous domain; they concentrate predictably beyond swing highs (Buy-Side Liquidity, BSL) and swing lows (Sell-Side Liquidity, SSL).
+- S1 models the Liquidity Pool Density Function:
+  $$\Lambda_{\text{SSL}}(p) = \sum_{k=1}^{N} \text{Volume}(L_k) \cdot \exp\left(-\frac{(p - L_k)^2}{2\sigma_{\text{cluster}}^2}\right)$$
+  where $L_k$ are rolling 20-bar swing lows. When market price approaches an SSL pool ($\text{Distance} \le 0.50\text{ATR}$), the gravitation attraction metric accelerates:
+  $$\mathcal{F}_{\text{SSL}}(t) = \frac{\Lambda_{\text{SSL}}(P_t)}{\text{OrderBook Depth}(P_t)}$$
+
+### 2. Liquidity Pool Clearing Invariant
+- **S1 SSL Sweep Floor Invariant**:
+  $$\text{SSL Cleared} \iff P_t < \min_{k}(L_k) \quad \land \quad \text{long\_liq\_zs} > 1.8 \quad \land \quad \text{Close}_t \ge \min_{k}(L_k) \quad \land \quad \text{taker\_buy\_ratio} > 1.20$$
+  When price plunges below a major sell-side liquidity cluster triggering $>1.8\sigma$ liquidation sell volume, but aggressively closes back above the level on surging taker buy ratios, the liquidity pool is declared fully cleared, generating immediate counter-trend momentum.
+
+---
+
+## NODE 323: EQUAL HIGHS (EQH) & EQUAL LOWS (EQL) LIQUIDITY MAGNETISM
+Keywords: equal_highs, equal_lows, eqh_eql, liquidity_magnets, double_bottom_trapping
+
+### 1. Statistical Detection of Equal Extremes
+- Retail technical analysis interprets Equal Lows (Double Bottoms) and Equal Highs (Double Tops) as strong support/resistance barriers. In institutional market microstructure, these levels represent engineered liquidity pools holding dense stop-loss orders.
+- Two consecutive swing lows $L_1$ and $L_2$ are classified as Equal Lows ($EQL$) if:
+  $$\frac{|L_1 - L_2|}{\text{ATR}_{15\text{m}}} \le 0.08 \quad \text{with separation } \Delta t \in [8, 96] \text{ bars}$$
+- S1 measures the Equal Low Liquidity Tension:
+  $$\mathcal{E}_{\text{magnet}}(t) = \frac{\text{ATR}_{15\text{m}}}{|P_t - EQL_{\text{level}}|} \cdot \mathbf{1}_{\{P_t > EQL_{\text{level}}\}}$$
+
+### 2. EQL Raid Reversal Invariant
+- **S1 EQL Raid Invariant**:
+  $$\text{EQL Raid Completed} \iff \text{Low}_t < EQL_{\text{level}} \quad \land \quad \text{Close}_t > EQL_{\text{level}} \quad \land \quad \Delta\text{OI}_{\%} < 0 \quad \land \quad \text{fp\_delta} > 0$$
+  When the obvious retail double-bottom support is violated by an intraday raid wick, flushing retail long positions (OI contraction) and immediately closing back above with positive footprint delta, smart money has accumulated full inventory at the discount.
+
+---
+
+## NODE 324: INDUCEMENT (IDM) ARCHITECTURE & PREMATURE ENTRY TRAPPING
+Keywords: inducement, idm, false_structural_shift, retail_trap_engineering, smart_money_lures
+
+### 1. Mechanics of Inducement in Complex Structure
+- An Inducement ($IDM$) is an internal swing high or low engineered by institutional algorithms to entice retail traders into taking early positions ahead of the true institutional order block.
+- In a bullish sequence, the first internal low after a new high is formed represents the inducement:
+  $$IDM_{\text{bull}} = \text{Internal Low}(t) \quad \text{prior to Major OB}$$
+- Retail traders buy the inducement level believing it is trend continuation. When price sweeps $IDM$, their stop-loss orders provide the sell liquidity needed to fill institutional buy orders resting at the true Order Block ($OB_{\text{major}}$) below:
+  $$\text{Sweep}(IDM) \to \text{Mitigate}(OB_{\text{major}})$$
+
+### 2. Inducement Clearance Invariant
+- **S1 True Demand Activation Invariant**:
+  $$\text{Demand Verified} \iff \text{Low}_t < IDM_{\text{level}} \quad \land \quad P_t \in OB_{\text{major}} \quad \land \quad \text{spot\_cvd\_15m} > 0 \quad \land \quad \mathcal{E}_{\text{trap}} \ge 1.50$$
+  When price sweeps through retail inducement lows directly into the major institutional order block accompanied by Spot CVD accumulation and two-bar engulfing expansion, the premature retail position flush is complete, triggering explosive trend continuation.
+
+---
+
+## NODE 325: KILLZONE EXPANSION MULTIPLIERS & INTRADAY VOLATILITY CYCLES
+Keywords: killzone_multipliers, intraday_volatility, london_killzone, new_york_killzone, session_expansion
+
+### 1. Session Volume Clock & Velocity Multipliers
+- Intraday volatility does not follow a stationary Poisson process. Volume and price range expand deterministically during institutional overlaps:
+  - Asian Killzone: 00:00–04:00 UTC (Baseline $\kappa_{\text{vol}} \approx 0.70\times$)
+  - London Open Killzone: 07:00–10:00 UTC (Expansion $\kappa_{\text{vol}} \approx 1.85\times$)
+  - New York Open Killzone: 13:00–16:00 UTC (Peak Expansion $\kappa_{\text{vol}} \approx 2.40\times$)
+- S1 measures the Killzone Dynamic Volatility Scalar:
+  $$\sigma_{\text{KZ}}(t) = \sigma_{\text{rolling}}(t) \cdot \left[1.0 + \kappa_{\text{session}}(t) \cdot \left(\frac{\text{Volume}_t}{\overline{\text{Volume}}_{\text{tod}}}\right)\right]$$
+  where $\overline{\text{Volume}}_{\text{tod}}$ is the time-of-day seasonal volume expectation across the 18-asset historical dataset.
+
+### 2. Killzone Range Expansion Invariant
+- **S1 Killzone Acceleration Rule**:
+  $$\text{KZ Trend Ignition} \iff t \in \text{Killzone} \quad \land \quad \text{Range}_t \ge 1.75 \cdot \text{ATR}_{14} \quad \land \quad \text{taker\_buy\_volume} > 1.50 \cdot \text{taker\_sell\_volume}$$
+  When an asset triggers a structural breakout during a high-activity killzone with bar range exceeding $1.75\times$ ATR on dominant taker buying, institutional session expansion algorithms are active, invalidating mean-reversion counter-trades.
+
+---
+
+## NODE 326: MACRO DISPLACEMENT CANDLES & FAIR VALUE GAP CONTINUATION MATRIX
+Keywords: macro_displacement, institutional_footprint, displacement_matrix, candle_body_momentum, order_flow_continuation
+
+### 1. Mathematical Formalization of True Displacement
+- In smart money analysis, a "Displacement Candle" represents the physical footprint of institutional aggression where market orders overwhelm passive depth, creating a wide-range body candle with minimal wicks:
+  $$\mathcal{D}_{\text{candle}}(t) = \frac{|\text{Close}_t - \text{Open}_t|}{\text{High}_t - \text{Low}_t} \ge 0.75 \quad \land \quad (\text{High}_t - \text{Low}_t) \ge 1.80 \cdot \text{ATR}_{15\text{m}}$$
+- A valid displacement candle must leave an unfilled Fair Value Gap ($FVG = \text{Low}_{t} - \text{High}_{t-2} > 0$) that remains un-mitigated for at least 3 bars.
+- S1 computes the Institutional Displacement Conviction Metric:
+  $$\mathcal{C}_{\text{disp}}(t) = \mathcal{D}_{\text{candle}}(t) \cdot \left(\frac{\text{Volume}_t}{\text{Volume}_{\text{sma9}}}\right) \cdot \text{sign}(\text{fp\_delta}_t)$$
+
+### 2. Displacement Continuation Invariant
+- **S1 Institutional Momentum Invariant**:
+  $$\text{Institutional Delivery Active} \iff \mathcal{C}_{\text{disp}}(t) \ge 2.50 \quad \land \quad \text{fp\_delta}_t > +0.30 \cdot \text{Volume}_t \quad \land \quad \text{future\_cvd} > \overline{\text{future\_cvd}}$$
+  When a displacement candle prints a body-to-range ratio $\ge 75\%$ with volume $\ge 2.50\times$ baseline and positive footprint delta exceeding $30\%$ of bar turnover, institutional algorithms have committed capital, guaranteeing favorable continuation toward target liquidity pools.
