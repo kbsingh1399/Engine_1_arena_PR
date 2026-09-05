@@ -39978,3 +39978,21 @@ eferences.bib into architecture memory in both repositories.
   - **Dual-Repo Git Synchronization**: Pushed all commits across both repositories to `origin/main` and `origin/arena/01a06dc4-engine-1-arena-pr`.
   - **Parity**: Verified 100% byte-for-byte sync across all 7,993 files in `.agents`.
   - **Standing Daemon**: Background cron sentinel `task-3322` (`*/15 * * * *`, `isDaemon=true`) active.
+
+---
+
+## Turn Record: Instagram Reels Trading Research, Retail Order Flow Extraction & Second Brain v52.0 (2026-09-05)
+- **User Directive (`/goal`)**: "keep finding more information fron instragram reel...search more creators contents, more ideas of trading even in retail space, more orderflow concepts, don't stop...set a singld 15 min timer cron job to keep a check that you continue reseraching".
+- **Social Media & Order Flow Extraction Deliverables**:
+  - **Live Instagram Headless Preview & Modal Inspection**: Extracted viral setups across top accounts (`@chartswithharsh` 8.4M views, `@aracademy__` 1.1M views, `@ghostrader.exe` 815K views, `@chart.logic` 586K views, `@mralbash_` 303K views, `@deepcharts.io`, `Bookmap`, `GoCharting`, `Trader Dale`).
+  - **Data Forensics Clarified**: Debunked the Arena LLM warning regarding `long_liq_usd` (negative signed values for forced market sell liquidations, 0 nulls across 210,613 rows), `open_interest_usd` (populated from 2020-09-01), and `taker_volume_ratio` (taker buy / taker sell quotient naturally centered at 1.0).
+  - **Second Brain Knowledge Expansion (v48.0 -> v52.0: 320 Structured Nodes, Exactly 325 Sections)**:
+    - **Nodes 293–298**: Biais-Hillion-Spatt Markovian order book transitions, Duffie-Gârleanu-Pedersen dealer search frictions, Corsi-Pirino HAR-J jump decomposition, Easley-O'Hara-Paperman VPIN toxic flow depletion, Madhavan-Richardson-Roomans structural price formation, Hendershott-Menkveld algorithmic liquidity replenishment.
+    - **Nodes 299–304**: Fair Value Gap (FVG) consequent encroachment (50% mean threshold rebalance), Liquidity Sweep displacement & stop-run absorption, Order Block (OB) footprint stacked imbalances, Change of Character (CHoCH) structural drift inflection, Asian Killzone expansion & Judas swings, Wyckoff Spring volume diminution.
+    - **Nodes 305–308**: Candle Range Theory (CRT) HTF boundary oscillation, Turtle Body Soup (TBS) wick manipulation & body close reversal, Smart Money candlestick traps & asymmetric engulfing, Fibonacci Golden Zone (61.8%–78.6%) demand mitigation.
+    - **Nodes 309–314**: Passive footprint absorption & delta pinning, Unfinished Auction (poor low) probability of return resolution (74.2%), Trapped breakout traders & POC migration failure, CVD Spot-Futures basis decoupling divergence, Stacked bid diagonal imbalances, Robust liquidation cascade Z-score termination.
+    - **Nodes 315–320**: Breaker Block (BB) order polarity inversion, Inversion Fair Value Gap (IFVG) void flips, Rejection Block wick volume density, Mitigation Block (MB) failure swing order clearance, Vacuum Gap continuous auction rebalancing, Power of Three (AMD) Accumulation-Manipulation-Distribution mechanics.
+  - **Parity & Delivery**:
+    - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories verified via `verify_and_sync_agents.py`.
+    - Git Delivery: `Engine_2` pushed to `main` (`89e7fe6`); `Engine_1_arena_PR` pushed to `main` (`c22a02b`) and `arena/01a06dc4-engine-1-arena-pr` (`c22a02b`).
+  - **Single Background Cron Sentinel**: Active on 15-minute intervals under `task-3428` (`CronExpression="*/15 * * * *"`, `IsDaemon=true`).
