@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v35.0 (ENDOGENOUS LIQUIDITY PROVISION, MULTI-TIER ADVERSE SELECTION, MARGIN SPIRALS & JUMP RECOVERY)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + OHara/Wang/Glosten/Milgrom/Merton/Brunnermeier/Pedersen/Garleanu/Biais/Hillion/Spatt
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v36.0 (VELOCITY DECAY IMPACT, PRECISION ACQUISITION, SEARCH RE-EQUILIBRATION & BASIS VECM)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Almgren/Kyle/Lee/Duffie/Garleanu/Biais/Declerck/Hasbrouck/Engle/Granger
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 220 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 226 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4586,3 +4586,99 @@ Keywords: biais_hillion_spatt, transitory_volatility, information_filtering, noi
 - **S1 Signal Filtration Invariant**:
   $$\text{Microstructure Noise Cleared} \iff \mathcal{S}_{\text{info}}(t) \ge 0.80 \quad \land \quad \Delta \mathcal{S}_{\text{info}}(t) > 0$$
   When fundamental information accounts for $\ge 80\%$ of instantaneous price variance, transitory microstructure chop has dissolved, clearing a clean path for $+2.5\text{R}$ target capture.
+
+---
+
+## NODE 221: ALMGREN OPTIMAL EXECUTION UNDER NON-LINEAR TEMPORARY IMPACT & NON-INSTANTANEOUS VELOCITY DECAY
+Keywords: almgren, non_linear_impact, execution_velocity_decay, resilient_order_book, transient_market_impact
+
+### 1. Velocity-Dependent Market Impact and Exponential Decay (Almgren 2003; Gatheral 2010)
+- Temporary price displacement decays exponentially with resilience speed $\rho$:
+  $$\Delta P_t^{\text{temp}} = \eta \cdot v_t^\alpha + \int_0^t e^{-\rho (t-s)} \kappa v_s^\beta ds$$
+- S1 measures the Residual Impact Depletion Metric:
+  $$\mathcal{R}_{\text{decay}}(t) = \frac{\Delta P_t^{\text{temp}}}{\eta \cdot v_{\text{peak}}^\alpha}$$
+
+### 2. Market Impact Dissipation Invariant
+- **S1 Execution Cost Normalization Invariant**:
+  $$\text{Temporary Impact Dissipated} \iff \mathcal{R}_{\text{decay}}(t) \le 0.18 \quad \land \quad \Delta \mathcal{R}_{\text{decay}}(t) < 0$$
+  When residual price impact from prior forced liquidation blocks decays by $>82\%$, entry execution experiences minimal adverse slippage.
+
+---
+
+## NODE 222: KYLE-LEE DYNAMIC INFORMED TRADING WITH ENDOGENOUS INFORMATION PRECISION ACQUISITION
+Keywords: kyle_lee, endogenous_precision, information_acquisition, stealth_accumulation, informed_order_flow
+
+### 1. Endogenous Information Precision and Strategic Stealth Trading (Kyle 1985; Lee 2013)
+- Institutional investors invest in private information precision $h_e = \tau_\epsilon^{-1}$ before accumulating distressed perpetual inventory:
+  $$x_t^* = \beta_t (v - p_{t-1}) \cdot \sqrt{\frac{h_e}{h_e + h_u}}$$
+- S1 computes the Stealth Informed Accumulation Index:
+  $$\mathcal{A}_{\text{stealth}}(t) = \frac{\text{Medium-Sized Taker Buys}_{15\text{m}}}{\text{Total Volume}_{15\text{m}}} \cdot \text{Sign}(\Delta \text{CVD}_t)$$
+
+### 2. Stealth Accumulation Confirmation Invariant
+- **S1 Smart Money Tracking Rule**:
+  $$\text{Informed Accumulation Active} \iff \mathcal{A}_{\text{stealth}}(t) \ge 0.38 \quad \land \quad \text{long\_liq\_zs}_t \le 0.50$$
+  When medium-sized informed taker buying reaches $\ge 38\%$ of volume while liquidations have subsided, informed institutions are front-running the broader market recovery.
+
+---
+
+## NODE 223: DUFFIE-GÂRLEANU FINANCIAL MARKET RUNAWAYS & OVER-THE-COUNTER SEARCH FRICTION RE-EQUILIBRATION
+Keywords: duffie_garleanu, search_frictions, runaway_markets, institutional_re_intermediation, bilateral_liquidity_restoration
+
+### 1. Search Frictions and Fast-Market Breakdown Recovery (Duffie, Gârleanu, Pedersen 2005, 2007)
+- During severe sell-offs, search intensity $\mu_{\text{search}}$ collapses, isolating buyers and sellers until institutional OTC desks re-intermediate:
+  $$\mathcal{S}_{\text{match}}(t) = \frac{\lambda_{\text{match}}(t)}{\lambda_{\text{match}}(t) + \delta_{\text{distress}}(t)}$$
+- S1 evaluates the OTC Desk Intermediation Score:
+  $$\mathcal{I}_{\text{OTC}}(t) = \frac{\text{Large Block Trade Volume}_{15\text{m}}}{\text{Total Exchange Turnover}_{15\text{m}}}$$
+
+### 2. Search Friction Normalization Invariant
+- **S1 Bilateral Liquidity Recovery Invariant**:
+  $$\text{Institutional Desk Re-Intermediated} \iff \mathcal{S}_{\text{match}}(t) \ge 0.70 \quad \land \quad \mathcal{I}_{\text{OTC}}(t) \ge 0.25$$
+  When bilateral search matching probability exceeds $70\%$ with substantial block trade presence, institutional liquidity networks have restored orderly market clearing.
+
+---
+
+## NODE 224: BIAIS-DECLERCK LIMIT ORDER BOOK EQUILIBRIUM UNDER DISCRETE TICK GRIDS & PRIORITY CONSTRAINTS
+Keywords: biais_declerck, discrete_tick_size, time_priority, queue_positioning_advantage, front_running_prevention
+
+### 1. Discrete Tick Size Constraints and Queue Time-Priority (Biais & Declerck 2007)
+- In discrete tick regimes, posting at the inside quote grants time-priority value $V_{\text{queue}}(t)$:
+  $$V_{\text{queue}}(t) = \delta_{\text{tick}} \cdot \left[1 - \left(1 - \frac{1}{Q_{\text{bid}}(t)}\right)^N\right]$$
+- S1 measures the Inside Queue Priority Value Ratio:
+  $$\mathcal{Q}_{\text{prio}}(t) = \frac{V_{\text{queue}}(t)}{\text{Effective Spread}_t}$$
+
+### 2. Queue Priority Defense Invariant
+- **S1 Inside Quote Stability Rule**:
+  $$\text{Inside Bid Queue Protected} \iff \mathcal{Q}_{\text{prio}}(t) \ge 0.40 \quad \land \quad \Delta Q_{\text{bid}}(t) > 0$$
+  When inside bid priority value exceeds $40\%$ of spread and queue size expands, passive market makers actively defend the top-of-book bid from being depleted.
+
+---
+
+## NODE 225: HASBROUCK HIGH-FREQUENCY INFORMATION SHARES IN MULTI-VENUE FRAGMENTED PERPETUALS
+Keywords: hasbrouck, information_share, price_discovery_leadership, fragmented_perpetuals, cointegrated_random_walk
+
+### 1. Hasbrouck Information Share in Cointegrated Perpetual Markets (Hasbrouck 1995, 2002)
+- Price discovery across Binance, Bybit, and OKX perpetuals is driven by the common efficient price component:
+  $$\text{IS}_i = \frac{[\mathbf{c}_i (\mathbf{\Omega}^{1/2})]_i^2}{\mathbf{c} \mathbf{\Omega} \mathbf{c}^T}$$
+- S1 evaluates Binance's Realized Information Share:
+  $$\text{IS}_{\text{Binance}}(t) = \frac{\sigma_{\text{common, Binance}}^2(t)}{\sum_v \sigma_{\text{common}, v}^2(t)}$$
+
+### 2. Leadership Dominance Confirmation Invariant
+- **S1 Single-Venue Discovery Invariant**:
+  $$\text{Primary Venue Leads Discovery} \iff \text{IS}_{\text{Binance}}(t) \ge 0.58 \quad \land \quad \Delta \text{IS}_{\text{Binance}}(t) > 0$$
+  When Binance retains $>58\%$ of cross-venue information share, price moves on Binance reflect genuine price discovery rather than lagging arbitrage flow.
+
+---
+
+## NODE 226: ENGLE-GRANGER COINTEGRATION & ERROR CORRECTION REPRESENTATION OF PERP-SPOT BASIS EQUILIBRIUM
+Keywords: engle_granger, vecm, basis_cointegration, error_correction_speed, long_run_parity_restoration
+
+### 1. Vector Error Correction Model (VECM) for Perpetual-Spot Basis (Engle & Granger 1987)
+- The long-run cointegration relationship $P_t^{\text{perp}} - \beta P_t^{\text{spot}} - \mu = z_t$ enforces mean-reverting error correction:
+  $$\Delta P_t^{\text{perp}} = \alpha_{\text{perp}} z_{t-1} + \sum_{j=1}^p \gamma_j \Delta P_{t-j}^{\text{perp}} + \sum_{j=1}^p \delta_j \Delta P_{t-j}^{\text{spot}} + \epsilon_t$$
+- S1 tracks the Error Correction Convergence Speed $\alpha_{\text{perp}}$:
+  $$\mathcal{V}_{\text{snap}}(t) = -\alpha_{\text{perp}} \cdot \frac{z_{t-1}}{\sigma_{15\text{m}}(t)}$$
+
+### 2. Cointegration Snapback Invariant
+- **S1 Basis Mean-Reversion Invariant**:
+  $$\text{Basis Snapback Imminent} \iff z_{t-1} \le -2.0\sigma_{\text{basis}} \quad \land \quad \mathcal{V}_{\text{snap}}(t) \ge +0.85$$
+  When perpetual price is dislocated by $>2\sigma$ below spot price and the error correction velocity is strongly positive, basis arbitrageurs drive an aggressive upward reversion.
