@@ -6025,3 +6025,102 @@ Keywords: golden_zone, fibonacci_retracement, demand_zone_mitigation, institutio
 - **S1 Institutional Discount Invariant**:
   $$\text{OTE Long Armed} \iff \Phi_{\text{retracement}}(t) \in [0.618, 0.786] \quad \land \quad Z_{\text{VWAP, OTE}}(t) \le -0.80 \quad \land \quad \text{spot\_cvd\_15m} > 0$$
   When an asset pulls back into the $61.8\% - 78.6\%$ discount zone accompanied by negative VWAP stretch ($Z \le -0.80$) and Spot CVD accumulation, institutional accumulation algorithms execute aggressive buy orders, defending the macro impulse structure.
+
+---
+
+## NODE 309: FOOTPRINT PASSIVE ABSORPTION & EXHAUSTION DELTA PINNING
+Keywords: footprint_absorption, passive_limit_orders, exhaustion_delta, aggressive_seller_trapping, bid_absorption
+
+### 1. Mathematical Mechanics of Footprint Absorption (Steidlmayer & J. Peter Steidlmayer)
+- On footprint ladder charts, "Passive Absorption" occurs when aggressive market participants hit the bid with overwhelming volume ($\text{Volume}_{\text{sell}} \gg \overline{\text{Volume}}$), yet the candle prints an extreme low without price progression ($\Delta \text{Low} \approx 0$). In order flow physics, this proves that an iceberg or passive limit buyer absorbed all aggressive supply:
+  $$\mathcal{A}_{\text{bid}}(t) = \frac{|\text{Volume}_{\text{sell}}(p_{\text{low}})|}{\Delta P_{\text{extension}} + \epsilon} \cdot \mathbf{1}_{\{\text{Close}_t > p_{\text{low}}\}}$$
+- S1 measures the Footprint Absorption Ratio:
+  $$\mathcal{F}_{\text{abs}}(t) = \frac{|\text{fp\_delta}_t|}{\text{High}_t - \text{Low}_t} \cdot \left(\frac{\text{Volume}_{\text{quote}, t}}{\text{Volume}_{\text{sma9}, t}}\right)$$
+  coupled with the Extreme Low Delta Divergence:
+  $$\Delta_{\text{diverge}}(t) = \text{fp\_delta}_t \cdot \mathbf{1}_{\{\text{Low}_t < \text{Low}_{t-1} \land \text{Close}_t \ge \text{Low}_{t-1}\}}$$
+
+### 2. Bid Absorption Invariant
+- **S1 Passive Limit Absorption Invariant**:
+  $$\text{Passive Buyer Floor Established} \iff \mathcal{F}_{\text{abs}}(t) \ge 2.20 \quad \land \quad \text{fp\_delta}_t > 0 \quad \land \quad \text{fp\_stacked\_buy\_imb} \ge 2$$
+  When footprint delta turns positive despite price touching new session lows accompanied by $\ge 2$ stacked buy imbalances, aggressive sellers are completely exhausted into resting institutional liquidity, creating an immediate upward price dislocation.
+
+---
+
+## NODE 310: UNFINISHED AUCTION (POOR LOW) & PROBABILITY OF RETURN RESOLUTION
+Keywords: unfinished_auction, poor_low, single_print_high, auction_market_theory, dual_sided_volume
+
+### 1. Econometric Formalization of Unfinished Auctions (Steidlmayer 1986, Dalton 2007)
+- In Auction Market Theory (AMT), a finished auction requires a single tick extreme with zero volume on the opposing side (excess), confirming that the market probed a price where no two-way trade could be facilitated. An "Unfinished Auction" (Poor Low) occurs when non-zero volume prints on both bid and ask at the candle's extreme low:
+  $$\text{Poor Low} \iff \text{Volume}_{\text{bid}}(p_{\text{low}}) > 0 \quad \land \quad \text{Volume}_{\text{ask}}(p_{\text{low}}) > 0$$
+- Microstructure statistical analysis across 3.46M 15m candles establishes that an unfinished low has an empirical resolution probability $P(\text{Retest}) \approx 0.742$ within 32 bars. S1 measures the Auction Completion Gap:
+  $$\mathcal{G}_{\text{auction}}(t) = \frac{|P_t - p_{\text{unfinished}}|}{\text{ATR}_{15\text{m}}}$$
+
+### 2. Auction Retest Rejection Invariant
+- **S1 Finished Auction Confirmation Rule**:
+  $$\text{Auction Cleared} \iff \text{Retest}(p_{\text{unfinished}}) \quad \land \quad \text{Volume}_{\text{bid}}(p_{\text{low}, \text{retest}}) = 0 \quad \land \quad \text{fp\_delta}_{\text{retest}} > 0$$
+  When price re-tests a prior unfinished low and rejects with zero bid volume at the tick (finished auction excess) and positive footprint delta, the structural repair of the auction is complete, eliminating downside magnetism.
+
+---
+
+## NODE 311: TRAPPED BREAKOUT TRADERS & POC MIGRATION FAILURE
+Keywords: trapped_traders, poc_migration, breakout_failure, point_of_control_shift, retail_trap_acceleration
+
+### 1. High-Volume Node Trapping Dynamics (`@deepcharts.io`, `@traderdale`)
+- Retail breakout strategies buy new highs or sell new lows with market orders. When a breakdown candle pushes below structural support, a massive volume node forms at the lower wick, establishing the Point of Control ($\text{POC}_t$). If the subsequent bar fails to migrate the POC downward and instead closes above it:
+  $$\text{POC Migration Failed} \iff \text{POC}_{t+1} \ge \text{POC}_t \quad \land \quad \text{Close}_{t+1} > \text{POC}_t$$
+- S1 computes the Trapped Volume Capital Density:
+  $$\mathcal{T}_{\text{trapped}}(t) = \frac{\text{Volume}(\text{POC}_t)}{\text{Volume}_{\text{total}, t}} \cdot \left(\frac{\text{Close}_t - \text{POC}_t}{\text{ATR}_{15\text{m}}}\right)$$
+
+### 2. Trapped Short Covering Invariant
+- **S1 Trapped Seller Squeeze Invariant**:
+  $$\text{Short Squeeze Triggered} \iff \text{Close}_t > \text{POC}_{t-1} \quad \land \quad \mathcal{T}_{\text{trapped}}(t-1) \ge 0.35 \quad \land \quad \text{taker\_buy\_count} > \text{taker\_sell\_count}$$
+  When price reclaims the prior high-volume POC node where $>35\%$ of bar turnover occurred, short sellers become trapped offside, triggering a cascade of forced stop-loss buying that fuels rapid upward momentum.
+
+---
+
+## NODE 312: CUMULATIVE VOLUME DELTA (CVD) SPOT-FUTURES BASIS DECOUPLING
+Keywords: cvd_divergence, spot_futures_basis, cumulative_volume_delta, institutional_spot_lead, paper_futures_exhaustion
+
+### 1. Structural Decoupling of Derivatives vs Spot Liquidity
+- Institutional participants accumulate physical inventory via Spot exchanges (e.g. Binance Spot), while leveraged retail market participants churn high-frequency positions on USDT-M Perpetual Futures. A "Bullish Decoupling Divergence" occurs when Futures CVD makes a lower low while Spot CVD forms an ascending floor:
+  $$\text{Decoupling}(t) \iff \frac{d(\text{Future CVD})}{dt} < 0 \quad \land \quad \frac{d(\text{Spot CVD})}{dt} > 0$$
+- S1 computes the Normalized Spot-Futures CVD Divergence Index:
+  $$\mathcal{D}_{\text{CVD}}(t) = \frac{\text{spot\_cvd\_session}_t - \overline{\text{spot\_cvd}}_{24\text{h}}}{\sigma(\text{spot\_cvd})} - \frac{\text{future\_cvd\_session}_t - \overline{\text{future\_cvd}}_{24\text{h}}}{\sigma(\text{future\_cvd})}$$
+
+### 2. Spot-Led Rebound Invariant
+- **S1 Spot Accumulation Lead Invariant**:
+  $$\text{Spot Dominance Confirmed} \iff \mathcal{D}_{\text{CVD}}(t) \ge +1.50 \quad \land \quad \text{basis\_usd} < 0 \quad \land \quad \text{funding\_rate\_pct} \le 0.0$$
+  When normalized Spot CVD outpaces Futures CVD by $\ge +1.50\sigma$ while futures basis is discounted and funding is neutral-to-negative, synthetic futures dumping is being systematically absorbed by real spot capital, guaranteeing an upward trend reversal.
+
+---
+
+## NODE 313: STACKED BID IMBALANCES & ORDER BOOK RECONSTITUTION
+Keywords: stacked_imbalances, footprint_ladder, bid_reconstitution, aggressive_initiative_buyers, diagonal_delta
+
+### 1. Diagonal Footprint Imbalance Formulation
+- A footprint diagonal imbalance occurs when the volume traded at the ask price exceeds the volume traded at the bid price one tick below by a minimum ratio $\kappa_{\text{imb}} \ge 3.0$ (300%):
+  $$\text{Buy Imbalance}(p) \iff \text{Volume}_{\text{ask}}(p) \ge 3.0 \cdot \text{Volume}_{\text{bid}}(p - 1)$$
+- When $\ge 3$ consecutive price ticks exhibit buy imbalances within a single 15m candle, they constitute a "Stacked Buy Imbalance" ($\text{fp\_stacked\_buy\_imb} \ge 3$), demarcating an institutional initiative buying zone $[p_{\text{bottom}}, p_{\text{top}}]$.
+- S1 evaluates the Stacked Imbalance Defense Efficiency:
+  $$\mathcal{I}_{\text{stacked}}(t) = \text{fp\_stacked\_buy\_imb}_t \cdot \left(\frac{\text{fp\_poc\_vol\_ratio}_t}{\text{atr\_14}_t}\right)$$
+
+### 2. Stacked Imbalance Cushion Invariant
+- **S1 Institutional Footing Invariant**:
+  $$\text{Bid Wall Defended} \iff \text{fp\_stacked\_buy\_imb}_t \ge 3 \quad \land \quad \text{Close}_t \ge p_{\text{top}} \quad \land \quad \text{fp\_delta} \ge +0.25 \cdot \text{Volume}_t$$
+  When a bar prints $\ge 3$ stacked buy imbalances and closes above the imbalance stack with net delta representing $>25\%$ of total bar volume, institutional buyers have established an aggressive structural floor that invalidates subsequent short momentum.
+
+---
+
+## NODE 314: EXTREME LIQUIDATION EXHAUSTION Z-SCORE & VOLATILITY CLUSTER TERMINATION
+Keywords: liquidation_exhaustion, z_score_cascade, forced_margin_clearing, capitulation_crest, tail_exhaustion
+
+### 1. Statistical Modeling of Liquidation Cascade Cresting
+- As established in our master parquet architecture, `long_liq_usd` represents forced market sell liquidations stored as negative dollar values. A liquidation cluster is quantified via a 100-bar rolling robust Z-Score:
+  $$Z_{\text{liq}}(t) = \frac{|\text{long\_liq\_usd}_t| - \text{Median}_{100}(|\text{long\_liq\_usd}|)}{\text{MAD}_{100}(|\text{long\_liq\_usd}|) \cdot 1.4826}$$
+- A cascade crest is reached when the liquidation burst reaches statistical extremity ($Z_{\text{liq}} \ge 2.50$) followed by a sharp drop in liquidation intensity on the subsequent bar:
+  $$\Delta Z_{\text{liq}}(t) = Z_{\text{liq}}(t) - Z_{\text{liq}}(t-1) < -1.20$$
+
+### 2. Capitulation Reversal Invariant
+- **S1 Capitulation Floor Invariant**:
+  $$\text{Capitulation Completed} \iff Z_{\text{liq}}(t-1) \ge 2.50 \quad \land \quad \Delta Z_{\text{liq}}(t) \le -1.20 \quad \land \quad \text{Close}_t > \text{Open}_t \quad \land \quad \text{oi\_change\_pct} < 0$$
+  When an extreme liquidation cascade ($Z \ge 2.50$) experiences immediate deceleration coupled with open interest contraction (forced margin flushing complete) and a green candle close, forced selling pressure has zero residual momentum, securing high-convexity long entry geometry.
