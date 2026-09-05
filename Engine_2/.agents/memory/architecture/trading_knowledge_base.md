@@ -6124,3 +6124,103 @@ Keywords: liquidation_exhaustion, z_score_cascade, forced_margin_clearing, capit
 - **S1 Capitulation Floor Invariant**:
   $$\text{Capitulation Completed} \iff Z_{\text{liq}}(t-1) \ge 2.50 \quad \land \quad \Delta Z_{\text{liq}}(t) \le -1.20 \quad \land \quad \text{Close}_t > \text{Open}_t \quad \land \quad \text{oi\_change\_pct} < 0$$
   When an extreme liquidation cascade ($Z \ge 2.50$) experiences immediate deceleration coupled with open interest contraction (forced margin flushing complete) and a green candle close, forced selling pressure has zero residual momentum, securing high-convexity long entry geometry.
+
+---
+
+## NODE 315: BREAKER BLOCK (BB) ORDER INVERSION & LIQUIDITY TRANSFER
+Keywords: breaker_block, order_inversion, failed_order_block, liquidity_transfer, support_resistance_flip
+
+### 1. Mathematical Mechanics of Institutional Breaker Blocks
+- In trending market structures, a Breaker Block ($BB_{\text{bull}}$) originates as an initial bearish order block (the last up-candle before a swing low $L_1$). When smart money sweeps below $L_1$ to grab sell-side liquidity ($L_2 < L_1$) and subsequently displaces aggressively upward past the order block's high, the zone undergoes a polarity inversion:
+  $$BB_{\text{zone}} = [\text{Low}(OB_{\text{origin}}), \text{High}(OB_{\text{origin}})]$$
+  where polarity flips from distribution to institutional demand accumulation:
+  $$\text{Breaker Inversion} \iff \text{Close}_t > \text{High}(OB_{\text{origin}}) \quad \land \quad L_2 < L_1$$
+- S1 tracks the Breaker Retest Mitigation Efficiency:
+  $$\mathcal{B}_{\text{retest}}(t) = \frac{P_t - \text{Low}(BB)}{\text{High}(BB) - \text{Low}(BB)} \cdot \mathbf{1}_{\{P_t \in BB_{\text{zone}}\}}$$
+
+### 2. Breaker Polarity Invariant
+- **S1 Bullish Breaker Invariant**:
+  $$\text{Breaker Floor Secured} \iff P_t \in BB_{\text{zone}} \quad \land \quad \mathcal{B}_{\text{retest}}(t) \in [0.0, 0.50] \quad \land \quad \text{future\_cvd\_15m} > 0 \quad \land \quad \text{fp\_delta} > 0$$
+  When price retraces into the upper half of a validated bullish breaker block and meets positive footprint delta absorption, trapped breakout shorts are forced to cover into resting institutional bids, confirming aggressive trend acceleration.
+
+---
+
+## NODE 316: INVERSION FAIR VALUE GAP (IFVG) & VOID POLARITY FLIPS
+Keywords: inversion_fvg, ifvg, void_polarity_flip, failed_imbalance, structural_reversal
+
+### 1. Econometric Formulation of Inversion Fair Value Gaps
+- A standard Bearish Fair Value Gap ($FVG^-$) is formed by three consecutive candles where $\text{High}_t < \text{Low}_{t-2}$. If an impulsive bullish displacement drives through the gap and achieves a full candle body close above the upper boundary:
+  $$\text{Inversion Trigger} \iff \text{Close}_t > \text{Low}_{t-2} \quad \text{for } FVG^- = [\text{High}_t, \text{Low}_{t-2}]$$
+  the un-auctioned void transitions into an Inversion Fair Value Gap ($IFVG^+$), converting former resistance into high-probability institutional support.
+- S1 computes the IFVG Rebalancing Ratio:
+  $$\mathcal{I}_{\text{rebalance}}(t) = \frac{P_t - \text{High}(FVG^-)}{\text{Low}_{t-2} - \text{High}(FVG^-)}$$
+
+### 2. Inversion Gap Support Invariant
+- **S1 Inversion Gap Defense Rule**:
+  $$\text{IFVG Support Active} \iff P_t \in IFVG \quad \land \quad \text{Low}_t \ge \text{High}(FVG^-) \quad \land \quad \text{spot\_cvd\_15m} > 0$$
+  When price pulls back into the inverted void without closing below its lower boundary, accompanied by positive Spot CVD, the failed imbalance acts as an impenetrable launchpad for continuation.
+
+---
+
+## NODE 317: REJECTION BLOCK WICK VOLUME DENSITY & LIQUIDITY GRAB RESISTANCE
+Keywords: rejection_block, long_wick_density, liquidity_grab, wick_absorption, extreme_candle_reversal
+
+### 1. Structural Microstructure of Candlestick Rejection Blocks
+- A Rejection Block ($RB$) occurs at a market extreme where a long upper or lower wick forms following an attempt to violate previous swing levels. The rejection block is defined as the price territory between the candle body and the wick extreme:
+  $$\Omega_{\text{RB}} = [\min(\text{Open}_t, \text{Close}_t), \text{Low}_t] \quad \text{for Bullish Rejection Wicks}$$
+- In tick data, institutional participants use the rejection block to absorb retail stops without leaving resting limit orders below. S1 computes the Wick Volume Concentration Metric:
+  $$\mathcal{W}_{\text{density}}(t) = \frac{\sum_{p \in \Omega_{\text{RB}}} \text{Volume}(p)}{\text{Volume}_{\text{total}, t}} \cdot \left(\frac{\text{Wick Length}}{\text{Total Candle Range}}\right)$$
+
+### 2. Rejection Block Absorption Invariant
+- **S1 Rejection Block Floor Invariant**:
+  $$\text{Rejection Floor Confirmed} \iff \mathcal{W}_{\text{density}}(t) \ge 0.45 \quad \land \quad \frac{\text{Wick Length}}{\text{Total Candle Range}} \ge 0.60 \quad \land \quad \text{long\_liq\_zs} > 1.8$$
+  When $>45\%$ of total candle volume is concentrated within an elongated lower wick exceeding $60\%$ of total bar range following extreme liquidation selling, the rejection block marks an institutional accumulation barrier.
+
+---
+
+## NODE 318: MITIGATION BLOCK (MB) TREND CONTINUATION & UNFILLED ORDER CLEARANCE
+Keywords: mitigation_block, trend_continuation, order_clearance, failed_swing, institutional_offload
+
+### 1. Mechanics of Institutional Mitigation Blocks
+- Unlike Breaker Blocks (which require a liquidity sweep of prior extrema), a Mitigation Block ($MB$) occurs when price forms a **failure swing** ($L_2 > L_1$) before breaking the structural high. The origin order block between the failure swing and the breakout represents an un-mitigated order cluster:
+  $$MB_{\text{zone}} = [\text{Low}(OB_{\text{failure}}), \text{High}(OB_{\text{failure}})]$$
+- Institutional participants return to this zone to close out remaining hedge positions at breakeven before continuing the dominant expansion trend. S1 computes the Mitigation Clearance Scalar:
+  $$\mathcal{M}_{\text{clear}}(t) = \frac{P_t - \text{Low}(MB)}{\text{High}(MB) - \text{Low}(MB)} \cdot \mathbf{1}_{\{P_t \in MB_{\text{zone}}\}}$$
+
+### 2. Mitigation Continuation Invariant
+- **S1 Trend Mitigation Invariant**:
+  $$\text{Mitigation Retest Cleared} \iff P_t \in MB_{\text{zone}} \quad \land \quad \text{Close}_t \ge \text{Low}(MB) \quad \land \quad \text{taker\_volume\_ratio} \ge 1.25$$
+  When price retests the failure-swing order block and buyers immediately defend the zone with taker buy/sell ratios $\ge 1.25$, institutional order mitigation is certified complete, launching immediate trend continuation.
+
+---
+
+## NODE 319: VACUUM GAP REBALANCING & MACRO NEWS DISPERSION DRAWS
+Keywords: vacuum_gap, macro_news_dispersion, liquidity_vacuum, gap_draw_magnetism, systemic_rebalancing
+
+### 1. Continuous Auction Void Physics in News Shocks
+- During extreme macro volatility events (CPI, FOMC, funding rate liquidations), algorithmic market makers widen their spreads to infinity, creating a "Vacuum Gap" $\Omega_{\text{vacuum}} = [P_{\text{pre}}, P_{\text{post}}]$ where zero limit order transactions occurred.
+- Because market clearing mechanisms penalize prolonged un-auctioned price intervals, the vacuum gap exerts a deterministic gravitational drift vector $\vec{F}_{\text{draw}}$ pulling price back toward the centroid $P_{\text{mid}} = \frac{P_{\text{pre}} + P_{\text{post}}}{2}$:
+  $$\vec{F}_{\text{draw}}(t) = -\kappa_{\text{vacuum}} \cdot (P_t - P_{\text{mid}}) \cdot \exp\left(-\frac{\tau_{\text{elapsed}}}{\tau_{\text{half-life}}}\right)$$
+
+### 2. Vacuum Rebalancing Magnetism Invariant
+- **S1 Vacuum Rebalance Invariant**:
+  $$\text{Vacuum Magnetism Engaged} \iff |P_t - P_{\text{mid}}| \ge 1.50 \cdot \text{ATR}_{15\text{m}} \quad \land \quad \text{Volume}_{15\text{m}} < 0.50 \cdot \text{Volume}_{\text{sma9}} \quad \land \quad \frac{d\text{Basis}}{dt} > 0$$
+  When an asset drifts away from an un-auctioned vacuum gap on thinning volume and tightening basis, the vacuum draw dominates, generating a high-velocity mean-reversion snapback toward $P_{\text{mid}}$.
+
+---
+
+## NODE 320: POWER OF THREE (AMD) ACCUMULATION-MANIPULATION-DISTRIBUTION INVARIANTS
+Keywords: power_of_three, amd_schematic, judas_swing, accumulation_phase, daily_bias_expansion
+
+### 1. Intraday Cycle Decomposition (Accumulation, Manipulation, Distribution)
+- Popularized across Instagram and YouTube trading reels as the "Power of Three" (AMD) or "ICT 2022 Model", daily bar geometry decomposes into three distinct temporal phases:
+  1. **Accumulation ($A$)**: Asian session tight consolidation establishing liquidity pools above and below the range.
+  2. **Manipulation ($M$)**: London/NY Open "Judas Swing" that aggressively sweeps one side of the range to trigger stops and engineer false momentum.
+  3. **Distribution ($D$)**: True institutional trend expansion running toward opposing liquidity pools throughout the remainder of the trading day.
+- S1 formalizes the AMD Transition Vector by tracking Range Compression followed by Manipulation Displacement:
+  $$\mathcal{AMD}_{\text{score}}(t) = \left(\frac{\text{Range}_{\text{Asia}}}{\text{ATR}_{14}}\right)^{-1} \cdot \left(\frac{\text{Sweep Depth}}{\text{ATR}_{14}}\right) \cdot \mathbf{1}_{\{t \in \text{Killzone}\}}$$
+
+### 2. AMD Expansion Invariant
+- **S1 Distribution Surge Rule**:
+  $$\text{AMD Phase D Active} \iff \text{Sweep}(R_{\text{Asia}}^{\text{low}}) \quad \land \quad \text{Close}_t > R_{\text{Asia}}^{\text{low}} \quad \land \quad \text{fp\_delta} > 0 \quad \land \quad \text{EMA}_8 > \text{EMA}_{21}$$
+  When the Judas Swing manipulation phase successfully clears the lower Asian liquidity pool and reclaims the range floor with positive footprint delta, the manipulation phase terminates, releasing explosive Phase D distribution toward session highs.
