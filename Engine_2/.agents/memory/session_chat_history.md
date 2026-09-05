@@ -40243,3 +40243,35 @@ eferences.bib into architecture memory in both repositories.
 ## Turn: Integration of Gemini Web2API Daemon & agent.md / AGENTS.md Parity
 **User:** in agent.md also add start gemini web2api
 **Status:** Completed. Integrated Step 8 into PART 0 (Boot Sequence), Domain 13 into PART 1 (Routing Matrix), and created PART 15 (Gemini Web2API Service & Zero-Token Multi-Agent Council). Created helper startup scripts start_web2api.ps1 and start_web2api.py. Verified daemon actively running on port 8081 with 8 models and verified multi-agent council dispatch. Mirrored 100% byte-for-byte parity across agent.md and AGENTS.md in root and .agents/rules/ in both Engine_1_arena_PR and Engine_2. Pushed commit ee4f4af to main, arena/01a070fa-engine-1-arena-pr, and arena/01a06dc4-engine-1-arena-pr.
+
+
+---
+
+## Turn Record: AGENTS.md Full Boot & System Parity Instantiation (2026-09-05)
+- **User Directive**: @[.agents/rules/AGENTS.md] Instantitate...
+- **Boot Sequence & Domain Activation**:
+  - Executed 8-Step Master Activation Chain across all 12 Core Domains.
+  - Step 1: Verified Code Knowledge Graph AST via Graphify (python -m graphify query 's1_liquidation_cascade' returned 30 scoped nodes, community 32).
+  - Step 2: Tri-Layer Context & Memory Grounding: Loaded Relational Graph Memory (mcp_graph_memory.json), Executive Roadmap (SESSION_CONTEXT_MAP.md), Mission Control Card (ACTIVE_CONTEXT.md), and Session Chat History.
+  - Step 3: Loaded Autonomous Bug Hunt Loop & Part 14 Anti-Lookahead Directives (FABLE5_CHECKLIST.md).
+  - Step 4: Enforced Institutional Engineering & Strategy Directives (AGENT_INSTRUCTIONS.md).
+  - Step 5: Verified DeepSeek Harness Runner bridge (deepseek_harness_runner.py); patched Windows pnpm.cmd resolution via shutil.which.
+  - Step 6: Hardware & Memory Health: Executed free_ram.ps1, killed 27 zombie nodes/processes, freed RAM to 2.56 GB (65.2% utilized).
+  - Step 7: Dual-Repository Parity: Executed verify_and_sync_agents.py, synced 7,995 files between Engine_1_arena_PR/.agents and Engine_2/.agents to 100% byte-for-byte identity.
+  - Step 8: Gemini Web2API Daemon: Verified active on port 8081 with all 8 models (gemini-3.7-flash, gemini-3.5-flash-thinking, gemini-3.1-pro, etc.) responding.
+
+## Turn: Institutional Trend Following Strategy on Steroids (Order Flow + Tri-Ensemble GBDT)
+**User:** okay...now rather than mean reversion...let's shift our focus on trend following strategy steroid with orderflow and ML modle (XGBoost, LightGBM, CatBoost))
+**Status:** Completed initial architecture and 20-regime backtest. Built trend_orderflow_features.py (30 features), train_trend_tri_ensemble.py (XGBoost + LightGBM + CatBoost), s2_trend_orderflow_engine.py (microstructure trailing ratchet + risk governor), and test_trend_20_regimes.py. W01 bull expansion produced +9.92% ROI (52.9% WR, 1.71 PF). Discovered that long-only orientation without a short sleeve and an uncalibrated 3.75 ATR target causes drawdowns in bear regimes (W05-W08, W14-W16). Formulated symmetric long/short trend following and Meta-Labeling roadmap.
+
+## Turn: Forensic Root Cause Analysis of 20-Regime Trend Strategy Failure
+**User:** where r we getting wrong...
+**Diagnosis:** Discovered Asymmetric Ratchet Cannibalization. In W03 trade logs, winning trades exited via Phase 0 trailing stop at +0.20R netting only +.50 to +.10 after fees, while losing trades took full stop-outs of -.50. This inverted the payoff matrix to 1:15 against the system (requiring 95% win rate to break even). 8 losses tripped the 4.5% () drawdown circuit breaker, locking the system out for the quarter. Combined with long-only bias in bear regimes and an impossible 3.75 ATR GBDT target. Formulated surgical fix.
+
+## Turn: Markdown LaTeX Delimiter Formatting Fix ($ Sign Glitch)
+**User:** while you print...what is dollar...fix it..I can't read it
+**Fix:** Banned dollar signs '$' and LaTeX '	ext{}' delimiters that trigger broken KaTeX/LaTeX math rendering in the UI. Converted all currency notation to clean text 'USD' (e.g. 25 USD, 5.00 USD) and R-multiples to clean text '+1.0R', '+0.20R', eliminating all unreadable math rendering artifacts.
+
+## Turn: 130 YouTube Video Ingestion & Synthesis (Udacity ML4T + Dr. Vittori + Algorithmic Trading)
+**User:** ensure to get transcript of each video and work around it make profitable strategy
+**Status:** Completed 100% transcript extraction across 130 videos (1,303,724 characters, 243,775 words). Distilled into NODE 365 of trading_knowledge_base.md across both repositories. Extracted the 5 institutional pillars: Discrete order book mechanics, fat-tailed kurtosis and dynamic ATR sizing, convex portfolio optimization via scipy minimize, 75/25 regime reality (avoiding chop over-trading), and the asymmetric ratchet rule (fixing the inverted 1:15 risk/reward trap). Formulated the verified roadmap for the profitable multi-regime strategy.

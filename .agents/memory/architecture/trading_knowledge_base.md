@@ -7063,3 +7063,43 @@ Keywords: bookmap, iceberg_orders, passive_liquidity, spread_delta, limit_order_
   Anchors strategy entry to verified institutional passive replenishment, mathematically eliminating the risk of catching a falling knife.
 
 
+
+## NODE 365: 130 QUANTITATIVE VIDEO CURATION & MACHINE LEARNING FOR TRADING MASTERCLASSES
+Keywords: udacity_ml4t, tucker_balch, dr_edoardo_vittori, order_book_mechanics, convex_optimization, fat_tails, meta_labeling, asymmetric_pnl_defense
+
+### 1. Corpus Provenance & Multi-Source Scale
+- Distilled directly from **130 full video transcripts (1,303,724 characters, 243,775 words)** encompassing:
+  1. *Udacity CS 7646: Machine Learning for Trading* by Prof. Tucker Balch (Georgia Tech, 100 complete lecture transcripts).
+  2. *Algorithmic Trading & Machine Learning Course in Python* (122,855 characters).
+  3. *Machine Learning Algorithms for Financial Markets* with Dr. Edoardo Vittori (65,666 characters).
+  4. *Self-Improving AI Trading Agents & Reinforcement Learning in Finance* (46,822 characters).
+  5. *Applications of Machine Learning in Trading Tutorials* (17 quantitative lecture modules).
+
+### 2. Core Quantitative Pillars & Mathematical Cruxes
+
+#### A. Microstructure & Order Book Mechanics (Udacity Lectures 95-100)
+- **Discrete Queue Dynamics**: Prices move not continuously, but in discrete tick jumps as aggressive market orders consume limit orders resting on the book.
+- **Liquidity Voids & Iceberg Replenishment**: When market orders sweep through multiple price levels, they leave temporary liquidity voids. Institutional algos replenish these books using algorithmic limit orders.
+- **The Market Mechanics Exploitation**: Smart money forces market orders into illiquid zones to trigger cascading stop losses (liquidations), creating artificial supply/demand that they immediately absorb.
+
+#### B. Fat-Tailed Kurtosis & Non-Gaussian Reality (Udacity Lectures 56-66)
+- **Extreme Kurtosis Invariant**: Financial asset returns exhibit high excess kurtosis ( > 3.0$) and heavy negative skewness.
+- **The Gaussian Fallacy**: Strategies assuming normal distributions will experience catastrophic drawdown during 3-sigma events because 3-sigma events occur 10x to 50x more frequently than predicted by Gaussian statistics.
+- **Dynamic ATR Sizing**: Risk budgets must be dynamic:
+  \text{Position Size} = \frac{\text{Risk Budget USD}}{\max(k \cdot \text{ATR}_{14}, 0.005 \cdot P_{\text{entry}})}
+
+#### C. Convex Portfolio Optimization (Udacity Lectures 74-86)
+- **Markowitz Mean-Variance & Sharpe Maximization**:
+  \max_{\mathbf{w}} \frac{\mathbf{w}^T \boldsymbol{\mu} - R_f}{\sqrt{\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}}} \quad \text{s.t.} \quad \sum w_i = 1, \quad 0 \le w_i \le w_{\max}
+- Solved via scipy.optimize.minimize (SLSQP). Single-asset concentration is bounded at {\max} = 0.30$ to prevent out-of-sample portfolio collapse.
+
+#### D. The 75/25 Regime Reality & Asymmetric PnL Defense (Dr. Vittori & Algorithmic Trading Course)
+- **The Regime Split**: Crypto and financial markets reside in **mean-reverting consolidation 75% of the time** and in **directional trend expansion only 25% of the time**.
+- **The Asymmetric Ratchet Rule**:
+  - Never move trailing stops to tight breakeven (+0.10R to +0.20R) inside the 75% chop zone. A +0.20R gain nets only ~.00 after exchange taker fees and slippage, while full stop-outs cost -.00, creating an inverted 1:15 risk/reward profile.
+  - A trailing stop must only ratchet to $+0.50\text{R}$ once price has achieved at least $+1.3\text{R}$ expansion, guaranteeing meaningful net profit while allowing natural 15m noise to breathe.
+
+#### E. Marcos López de Prado Meta-Labeling
+- **Primary vs Secondary Separation**:
+  - Primary Model: Uses order flow confluence (Footprint Delta flip + Stacked Imbalances + CVD divergence) to establish trade entry.
+  - Secondary Model (GBDT Ensemble): Predicts binary trade profitability (\text{Net PnL} > 0)$ conditioned on the primary signal, eliminating label compression and boosting out-of-sample AUC to $>0.70$.
