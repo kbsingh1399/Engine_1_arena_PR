@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v42.0 (ENDOGENOUS DISCOVERY, MARGIN CONTAGION, ASYNCHRONOUS QMLE & BIPOWER JUMP TESTS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + OHara/Wang/Garleanu/Pedersen/AitSahalia/Fan/Xiu/Glosten/Milgrom/Cont/Kukanov/BarndorffNielsen/Graversen/Jacod
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v43.0 (TRADE SIZE SURPRISES, SPIRAL DECOUPLING, SPATIAL DECAY & MANCINI PURITY)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Madhavan/Richardson/Roomans/Brunnermeier/Pedersen/Hautsch/Sheng/Huang/Stoll/Cont/Stoikov/Mancini
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 262 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 268 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5259,3 +5259,100 @@ Keywords: barndorff_nielsen_graversen_jacod, bipower_variation_jump_test, semima
 - **S1 Continuous Motion Assurance Rule**:
   $$\text{Jump Risk Absent} \iff \mathcal{T}_{\text{jump}}(t) \le 1.645 \quad (\Phi_{\text{jump\_free}} \ge 0.95) \quad \land \quad \text{BV}_t \ge 0.85 \cdot \text{RV}_t$$
   When the jump test confirms no statistically significant jump components with $>95\%$ confidence ($\mathcal{T}_{\text{jump}} \le 1.645$), price action behaves as pure Brownian diffusion, ensuring smooth trailing stop ratcheting toward $+2.5\text{R}$.
+
+
+---
+
+## NODE 263: MADHAVAN-RICHARDSON-ROOMANS MICROSTRUCTURE AUTOCORRELATIONS & TRADE SIZE INFORMATION CONTENT
+Keywords: madhavan_richardson_roomans, trade_size_information, autocorrelation_structure, signed_trade_persistence, block_trade_absorption
+
+### 1. Trade Size and Information Content Dynamics (Madhavan, Richardson, Roomans 1997)
+- Price changes reflect both order flow autocorrelation and unexpected trade size surprises:
+  $$\Delta P_t = (\phi - \alpha) x_{t-1} + \theta [x_t - \mathbb{E}[x_t \mid x_{t-1}]] + \epsilon_t$$
+- S1 computes the Trade Size Information Surprise Metric:
+  $$\mathcal{S}_{\text{MRR}}(t) = \frac{x_t - \rho_{\text{flow}} x_{t-1}}{\sigma_{\text{trade\_size}}}$$
+
+### 2. Trade Size Surprise Inversion Invariant
+- **S1 Informed Trade Surprise Absorption Rule**:
+  $$\text{Selling Surprise Absorbed} \iff \mathcal{S}_{\text{MRR}}(t) \ge 0.0 \quad \land \quad \Delta \mathcal{S}_{\text{MRR}}(t) > 0$$
+  When the standardized order flow surprise flips positive following severe negative liquidation prints, institutional buyers have overpowered negative autocorrelation.
+
+---
+
+## NODE 264: BRUNNERMEIER-PEDERSEN CARRY-TRADE UNWINDING & VOLATILITY-LIQUIDITY FEEDBACK SPIRALS
+Keywords: brunnermeier_pedersen, carry_trade_unwinding, volatility_liquidity_spirals, loss_spiral_crest, margin_spiral_decoupling
+
+### 1. Two-Sided Liquidity Spirals and Market Maker Capital (Brunnermeier & Pedersen 2009)
+- Loss spirals and margin spirals reinforce one another under capital constraints:
+  $$\frac{d\Phi_{\text{liq}}}{dt} = -\kappa_1 \cdot \text{Loss}_t - \kappa_2 \cdot \Delta \text{Margin}_t$$
+- S1 evaluates the Spiral Decoupling Indicator:
+  $$\mathcal{D}_{\text{spiral}}(t) = \frac{\Delta \text{Funding Rate}_{8\text{h}}}{\sigma_{\text{realized}, 1\text{h}}}$$
+
+### 2. Liquidity Spiral Exhaustion Invariant
+- **S1 Deleveraging Spiral Decoupling Rule**:
+  $$\text{Unwinding Phase Ended} \iff \mathcal{D}_{\text{spiral}}(t) \ge -0.05 \quad \land \quad \Delta \sigma_{\text{realized}}(t) < 0$$
+  When negative funding rate pressure decouples from realized volatility surges, mechanical margin selling spirals have reached terminal exhaustion.
+
+---
+
+## NODE 265: HAUTSCH-SHENG ORDER BOOK DYNAMIC EQUILIBRIUM & SPATIAL QUEUE DECAY
+Keywords: hautsch_sheng, spatial_queue_decay, limit_order_intensity, distance_to_mid_depth, spatial_cushion_gradient
+
+### 1. Spatial Limit Order Intensity and Queue Replenishment (Hautsch & Sheng 2011)
+- Order submission intensity decays exponentially with tick distance from mid-price:
+  $$\lambda(s, t) = \lambda_0(t) \cdot \exp(-\beta_{\text{decay}} \cdot |s - P_{\text{mid}}|)$$
+- S1 evaluates the Spatial Bid Density Slope:
+  $$\mathcal{G}_{\text{spatial}}(t) = \frac{\sum_{k=1}^5 \text{Depth}_{\text{bid}}(k) \cdot e^{-\beta k}}{\sum_{k=1}^5 \text{Depth}_{\text{ask}}(k) \cdot e^{-\beta k}}$$
+
+### 2. Spatial Queue Compression Invariant
+- **S1 Near-Mid Bid Wall Invariant**:
+  $$\text{Immediate Bid Cushion Intact} \iff \mathcal{G}_{\text{spatial}}(t) \ge 2.10 \quad \land \quad \Delta \mathcal{G}_{\text{spatial}}(t) > 0$$
+  When the exponentially weighted near-mid bid intensity outweighs the ask side by $>2.1\times$, market makers densely pad inside queues, blocking downward excursions.
+
+---
+
+## NODE 266: HUANG-STOLL SPREAD DECOMPOSITION & CROSS-MARKET REALIZED ADVERSE SELECTION
+Keywords: huang_stoll, spread_decomposition, realized_adverse_selection, order_processing_cost, inventory_holding_risk
+
+### 1. Three-Way Spread Decomposition (Huang & Stoll 1997)
+- Bid-ask spread decomposes into adverse selection ($\alpha$), inventory holding ($\beta$), and order processing ($1-\alpha-\beta$):
+  $$S = 2(\alpha + \beta + \gamma_{\text{proc}}) \cdot P$$
+- S1 computes the Adverse Selection Proportional Component:
+  $$\mathcal{A}_{\text{adverse}}(t) = \frac{\mathbb{E}[\Delta P_{\text{post}, 5\text{m}} \cdot q_t]}{S_t / 2}$$
+
+### 2. Adverse Selection Depletion Invariant
+- **S1 Toxic Flow Extraction Rule**:
+  $$\text{Adverse Selection Collapsed} \iff \mathcal{A}_{\text{adverse}}(t) \le 0.15 \quad \land \quad \Delta \mathcal{A}_{\text{adverse}}(t) \le 0$$
+  When adverse selection drops to $<15\%$ of total spread width, informed predatory trading has dissipated, restoring safe conditions for trade execution.
+
+---
+
+## NODE 267: CONT-STOIKOV REAL-TIME ORDER FLOW IMBALANCE (OFI) DRIFT & LEVEL-2 IMBALANCE FIELD
+Keywords: cont_stoikov, order_flow_imbalance_drift, level_2_imbalance_field, multi_level_ofi, instantaneous_drift_vector
+
+### 1. Multi-Level Order Flow Imbalance (Cont, Kukanov, Stoikov 2014)
+- Aggregating size changes across top $K$ order book levels to forecast instantaneous price drift:
+  $$\text{OFI}_t^{(K)} = \sum_{k=1}^K \omega_k \left[ \Delta q_{\text{bid}, t}^{(k)} \mathbf{1}_{\{\Delta P_{\text{bid}}^{(k)} \ge 0\}} - \Delta q_{\text{ask}, t}^{(k)} \mathbf{1}_{\{\Delta P_{\text{ask}}^{(k)} \le 0\}} \right]$$
+- S1 tracks the Normalized OFI Drift Scalar:
+  $$\Omega_{\text{OFI}}(t) = \frac{\text{OFI}_t^{(5)}}{\sigma_{\text{OFI}, 60\text{m}}}$$
+
+### 2. Multi-Level OFI Expansion Invariant
+- **S1 Directional OFI Impulse Rule**:
+  $$\text{Immediate Upward Drift} \iff \Omega_{\text{OFI}}(t) \ge +1.80 \quad \land \quad \Delta \Omega_{\text{OFI}}(t) > 0$$
+  When normalized 5-level OFI exceeds $+1.80$ standard deviations, multi-level queue dynamics generate immediate positive price drift.
+
+---
+
+## NODE 268: MANCINI THRESHOLD TRUNCATION FOR PURE CONTINUOUS SEMIMARTINGALE DIFFUSION
+Keywords: mancini, threshold_truncation, continuous_semimartingale, robust_jump_isolation, continuous_variation_purity
+
+### 1. Non-Parametric Threshold Variation (Mancini 2001, 2009)
+- Isolating the continuous integrated variance component by filtering increments exceeding threshold $r_n$:
+  $$\text{IV}_t = \sum_{i=1}^n (\Delta_i P)^2 \cdot \mathbf{1}_{\{|\Delta_i P| \le \alpha \Delta_n^\varpi \sigma_{t-1}\}}, \quad \varpi \in (0, 0.5)$$
+- S1 tracks the Continuous Variation Purity Index:
+  $$\mathcal{P}_{\text{cont}}(t) = \frac{\text{IV}_t}{\text{RV}_t}$$
+
+### 2. Continuous Trajectory Assurance Invariant
+- **S1 Pure Diffusion Stability Rule**:
+  $$\text{Continuous Rebound Assured} \iff \mathcal{P}_{\text{cont}}(t) \ge 0.90 \quad \land \quad \Delta \mathcal{P}_{\text{cont}}(t) \ge 0$$
+  When Mancini threshold truncation confirms $>90\%$ of total variation is pure continuous diffusion, execution risk from discontinuous jump traps is eliminated, allowing trailing stop ratchets to advance safely toward $+2.5\text{R}$.
