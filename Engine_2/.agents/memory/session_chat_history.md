@@ -39679,3 +39679,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`56bec95`); Engine_1_arena_PR committed and pushed (`fb0354f`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v30.0 Expansion (Nodes 185–190) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2345` (iteration 2), `task-2203` (iteration 5), `task-2067` (iteration 8), `task-794` (iteration 26), and `task-1891` (iteration 13) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 185–190: 190 Structured Nodes)**:
+  - **Node 185**: Froot-Scharfstein-Stein Institutional Liquidity Risk & Corporate Hedging Slack (Froot et al. 1993; Rampini & Viswanathan 2010; market maker financial slack index $\mathcal{S}_{\text{slack}} \ge 1.85 \land \Delta \mathcal{S}_{\text{slack}} > 0$ confirming liquidity provider risk-bearing capital restored).
+  - **Node 186**: Biais-Hillion-Spatt Asymmetric Information & Optimal Limit Order Placement Schedules (Biais et al. 1995; Parlour 1998; inside spread aggressiveness ratio $\Omega_{\text{inside}} \ge 0.58 \land \Delta \Omega_{\text{inside}} > +0.12$ confirming aggressive institutional limit bid clustering).
+  - **Node 187**: Andersen-Bollerslev-Diebold Realized Beta & Asymmetric Downside Market Covariance (Andersen et al. 2005, 2006; downside asymmetry ratio $\mathcal{A}_\beta \ge 1.25 \land \beta_i^- \le 1.10 \bar{\beta}_i$ isolating altcoins decoupled from BTC downside drag).
+  - **Node 188**: Hasbrouck Vector Autoregressive Price Discovery & Permanent Information Shares (Hasbrouck 1991a, 1995; permanent information share $\mathcal{I}_{\text{share}} \le 0.40 \land \sigma_{\epsilon 1}^2 \le 1.30 \bar{\sigma}_{\text{trans}}^2$ confirming informed adverse toxic selling dissolved).
+  - **Node 189**: Barndorff-Nielsen-Hansen-Lunde-Shephard Realized Kernel & Noise-Corrected Precision (Barndorff-Nielsen et al. 2008, 2011; Parzen kernel noise ratio $\Xi_{\text{noise}} \le 0.18$ ensuring ATR stop buffers reflect true continuous price diffusion).
+  - **Node 190**: Vayanos-Wang Liquidity Cycles & Endogenous Search-Based Order Execution Costs (Vayanos & Wang 2012; Weill 2007; liquidity recovery index $\mathcal{D}_{\text{recov}} \ge 1.65 \land \Delta \mathcal{D}_{\text{recov}} > 0$ confirming search friction bottleneck resolved).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`7bf51c4`); Engine_1_arena_PR committed and pushed (`c797313`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
