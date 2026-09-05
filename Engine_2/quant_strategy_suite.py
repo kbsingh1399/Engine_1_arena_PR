@@ -15,6 +15,7 @@ Causality contract (FABLE5 Part 14):
 
 from __future__ import annotations
 
+import gc
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,18 @@ UNIVERSE_CORE = [
     "PEPEUSDT", "WIFUSDT", "TIAUSDT", "ARBUSDT", "OPUSDT", "INJUSDT",
 ]
 UNIVERSE_EXTENDED = UNIVERSE_CORE + ["BCHUSDT", "DOTUSDT", "LTCUSDT", "TRXUSDT"]
+
+# Read only columns used by the causal feature engine. This prevents the
+# multi-million-row metadata/diagnostic columns from exhausting RAM while
+# retaining native parquet execution against the verified master tables.
+MASTER_COLUMNS = [
+    "open_time_ms", "open", "high", "low", "close", "volume_base", "volume_sma9",
+    "future_cvd_15m", "future_cvd_lifetime", "spot_cvd_15m", "spot_cvd_lifetime",
+    "funding_rate_pct", "basis_usd", "oi_change_pct", "long_liq_usd",
+    "ls_ratio_global", "top_account_ratio", "whale_index", "avg_trade_size_usd",
+    "bid_depth_usd", "ask_depth_usd", "fp_delta", "fp_stacked_buy_imb", "fp_poc",
+    "rsi_14", "atr_14", "atr_100", "ema_8", "session_val",
+]
 
 STRATEGY_NAMES = {
     1: "S01_LongLiqConvexRebound", 2: "S02_ShortSqueezeIgnition",
@@ -325,6 +338,8 @@ def _blank(n: int):
 
 def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
     n = len(f)
+    if n == 0:
+        return _blank(0)
     fire, mode, trig, stop, tgt, rank, hardb = _blank(n)
     if n == 0:
         return fire, mode, trig, stop, tgt, rank, hardb
@@ -438,7 +453,7 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
             rank = np.nan_to_num(f["bid_repl"].to_numpy()) + np.maximum(-f["funding_rate_pct"].to_numpy(), 0)
         else:
             ok = base_short & (trend < 0) & (ret < 0)
-            stop = h + (0.40 + 0.05 * (variant % 4)) * atr
+            stop = h + (1.50 + 0.10 * (variant % 4)) * atr
             rank = -body + np.nan_to_num(f["zc_div"].to_numpy())
             # The execution core is long-only by contract; short candidates
             # are represented as disabled rather than silently inverted.
@@ -769,10 +784,11 @@ class DataStore:
                 if verbose:
                     print(f"  [skip] {sym}: {path.name} not found")
                 continue
-            df = pd.read_parquet(path)
+            df = pd.read_parquet(path, columns=MASTER_COLUMNS)
             df = df.sort_values("open_time_ms").drop_duplicates("open_time_ms")
             df = df.reset_index(drop=True)
             f = build_features(df)
+            del df
             self.features[sym] = f
             self.symbols.append(sym)
             if verbose:
@@ -953,6 +969,13 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
     signals = {}
     for sid in STRATEGY_NAMES:
         trades, metrics, _ = run_window(store, is_start, is_end, [sid])
+        # Candidate simulations are independent. Do not retain 100 x symbol
+        # signal arrays across the selector; that cache would be quadratic in
+        # pool size and can exhaust memory on the full parquet universe.
+        if hasattr(store, "_sig"):
+            store._sig.pop(sid, None)
+        if sid % 10 == 0:
+            gc.collect()
         expectancy = float(metrics["expectancy_usd"])
         dd = float(metrics["max_dd_pct"]) / 100.0
         n = int(metrics["trades"])
@@ -989,10 +1012,23 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
             break
 
     if len(chosen) < min_selected:
-        # Avoid 0-sleeve flat trap: fallback to top scoring sleeves from report
-        for sid in report["strategy_id"].astype(int):
-            if sid not in chosen:
+        # The institutional contract requires a live portfolio even when the
+        # strict IS filter is empty. These baseline sleeves are selected by
+        # invariant family, never by OOS window or its realized result.
+        baseline = report.loc[
+            (report["trades"] >= 4) & (report["max_dd"] < RISK.drawdown_risk_limit),
+            "strategy_id",
+        ].astype(int).tolist()
+        baseline.extend([1, 11])
+        for sid in baseline:
+            if sid not in chosen and sid in STRATEGY_NAMES:
                 chosen.append(sid)
             if len(chosen) >= min_selected:
                 break
-    return chosen, report
+        if len(chosen) < min_selected:
+            for sid in report["strategy_id"].astype(int):
+                if sid not in chosen:
+                    chosen.append(sid)
+                if len(chosen) >= min_selected:
+                    break
+    return chosen[:max_selected], report

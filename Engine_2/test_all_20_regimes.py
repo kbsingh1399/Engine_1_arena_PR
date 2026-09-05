@@ -117,6 +117,8 @@ def main() -> None:
                     help="fallback sleeves only when the causal IS filter has no qualified candidate")
     ap.add_argument("--no-ensemble", action="store_true")
     ap.add_argument("--extended", action="store_true")
+    ap.add_argument("--symbols", nargs="*", default=None,
+                    help="diagnostic subset; production default uses the available core universe")
     ap.add_argument("--fail-fast", action="store_true")
     ap.add_argument("--out", default="results_walkforward")
     args = ap.parse_args()
@@ -125,12 +127,14 @@ def main() -> None:
     out.mkdir(exist_ok=True)
 
     print("Loading 15m master parquets and computing causal features (once)...")
-    store = DataStore(UNIVERSE_EXTENDED if args.extended else UNIVERSE_CORE)
+    universe = args.symbols if args.symbols else (UNIVERSE_EXTENDED if args.extended else UNIVERSE_CORE)
+    store = DataStore(universe)
     print(f"Universe: {len(store.symbols)} symbols\n")
 
-    sleeves = [(STRATEGY_NAMES[i], [i]) for i in args.sleeves]
-    if not args.no_ensemble and len(args.sleeves) > 1:
-        sleeves.append(("ENSEMBLE_S1-S5_SHARED_GOVERNOR", sorted(args.sleeves)))
+    # The production path is one dynamic portfolio. It selects sleeves anew
+    # before each OOS window; running fixed sleeves beside it would duplicate
+    # the expensive selector and obscure the institutional result.
+    sleeves = [("DYNAMIC_CAUSAL_SELECTOR", list(args.sleeves))]
 
     scores, trades = [], []
     for label, sids in sleeves:
