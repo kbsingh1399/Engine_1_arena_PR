@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v38.0 (TRADE INDICATORS, LATENCY EQUILIBRIA, MICRO-PRICE & JUMP DE-BIASING)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Madhavan/Richardson/Roomans/Biais/Foucault/Stoikov/Collin-Dufresne/Goldstein/Engle/Jacod/Protter
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v39.0 (SPREAD ELASTICITY, LIQUIDITY COMMONALITY, QUEUE IMBALANCE & HAIRCU SNAPBACK)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Glosten/Harris/O'Hara/Shorish/Lehalle/Neuman/Duffie/Zhu/Hasbrouck/Barndorff-Nielsen/Shephard
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 238 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 244 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4874,3 +4874,99 @@ Keywords: jacod_protter, discretization_jump_variation, de_biasing_microstructur
 - **S1 Structural Jump Purity Invariant**:
   $$\text{Clean Jump Impulse Detected} \iff \mathcal{J}_{\text{purity}}(t) \ge 0.45 \quad \land \quad \text{Sign}(\text{Jump}) = +1$$
   When de-biased positive jump variation constitutes $\ge 45\%$ of total realized variance, the price jump is structural and robust against microstructure noise artifacts.
+
+---
+
+## NODE 239: GLOSTEN-HARRIS BID-ASK SPREAD COMPONENTS & INFORMATION FRICTION ELASTICITY
+Keywords: glosten_harris, spread_components, transitory_order_processing, adverse_selection_slope, volume_dependent_cost
+
+### 1. Volume-Dependent Spread Formulation (Glosten & Harris 1988)
+- Disentangling fixed order-handling costs $c_0$ from trade-size dependent adverse selection $z_0$:
+  $$\Delta P_t = c_0 \Delta q_t + c_1 \Delta (q_t V_t) + z_0 q_t + z_1 q_t V_t + e_t$$
+- S1 tracks the Information Friction Elasticity:
+  $$\eta_{\text{info}}(t) = \frac{\partial \Delta P_t}{\partial V_t} \cdot \frac{V_t}{\Delta P_t} = \frac{c_1 + z_1}{c_0 + z_0 + (c_1 + z_1) V_t} \cdot V_t$$
+
+### 2. Adverse Selection Normalization Invariant
+- **S1 Information Friction Clearance Rule**:
+  $$\text{Adverse Selection Shock Cleared} \iff \eta_{\text{info}}(t) \le 0.25 \quad \land \quad z_0(t) \le 0.30 \cdot \text{Spread}_t$$
+  When trade-size adverse selection elasticity drops below $0.25$, large buy metaorders can enter without incurring excessive price impact slippage.
+
+---
+
+## NODE 240: O'HARA-SHORISH DYNAMIC LIQUIDITY COMMONALITY & ENDOGENOUS NETWORK FRAGILITY
+Keywords: ohara_shorish, liquidity_commonality, systemic_depth_collapse, co_movement_eigenvalue, network_fragility
+
+### 1. Cross-Asset Market Depth Covariance (O'Hara, Shorish et al. 2008, 2014)
+- Measuring the first principal component eigenvalue of normalized depth across 18 perpetual symbols:
+  $$\mathbf{\Sigma}_{\text{depth}}(t) = \frac{1}{N} \sum_{i=1}^N \mathbf{d}_{i, t} \mathbf{d}_{i, t}^T, \quad \lambda_1(t) = \max_{\|\mathbf{v}\|=1} \mathbf{v}^T \mathbf{\Sigma}_{\text{depth}}(t) \mathbf{v}$$
+- S1 monitors the Systemic Liquidity Co-Movement Ratio:
+  $$\Lambda_{\text{sys}}(t) = \frac{\lambda_1(t)}{\sum_{k=1}^{18} \lambda_k(t)}$$
+
+### 2. Systemic Liquidity Recovery Invariant
+- **S1 Network Fragility Relief Invariant**:
+  $$\text{Systemic Liquidity Restored} \iff \Lambda_{\text{sys}}(t) \le 0.42 \quad \land \quad \Delta \Lambda_{\text{sys}}(t) < 0$$
+  When the dominant commonality eigenvalue drops below $42\%$, asset-specific liquidity decouples from systemic market maker retreat, validating localized rebound longs.
+
+---
+
+## NODE 241: LEHALLE-NEUMAN LIMIT ORDER BOOK QUEUE LENGTH IMBALANCE & OPTIMAL PEG PLACEMENT
+Keywords: lehalle_neuman, queue_length_imbalance, optimal_peg_placement, fill_probability_hazard, queue_depletion_velocity
+
+### 1. Markovian Limit Order Queue Transition Dynamics (Lehalle & Neuman 2019)
+- Formulating continuous-time queue death and birth intensities at the inside bid:
+  $$\mu_{\text{bid}}(q) = \lambda_{\text{cancel}} \cdot q + \lambda_{\text{market\_sell}}, \quad \mathcal{Q}_{\text{ratio}}(t) = \frac{q_{\text{bid}}(t)}{q_{\text{bid}}(t) + q_{\text{ask}}(t)}$$
+- S1 tracks the Bid Queue Depletion Hazard:
+  $$\mathcal{H}_{\text{deplete}}(t) = \frac{\mu_{\text{bid}}(q_{\text{bid}})}{\lambda_{\text{limit\_bid}} + \epsilon}$$
+
+### 2. Bid Queue Cushion Defense Invariant
+- **S1 Queue Cushion Defense Rule**:
+  $$\text{Bid Side Wall Entrenched} \iff \mathcal{Q}_{\text{ratio}}(t) \ge 0.72 \quad \land \quad \mathcal{H}_{\text{deplete}}(t) \le 0.35$$
+  When inside bid queue accounts for $>72\%$ of top-of-book volume and depletion hazard is $<35\%$, passive participants provide an unyielding structural price barrier.
+
+---
+
+## NODE 242: DUFFIE-ZHU SYSTEMIC RISK & CROSS-COLLATERAL MARGIN HAIRCUT SNAPBACK
+Keywords: duffie_zhu, cross_collateral_haircuts, margin_spiral_snapback, central_clearing_liquidity, portfolio_margin_relief
+
+### 1. Multi-Asset Cross-Margin Haircut Dynamics (Duffie & Zhu 2011)
+- Portfolio margining accounts experience non-linear haircut expansion during liquidation cascades:
+  $$\mathcal{M}_{\text{haircut}}(t) = \sum_{i=1}^{18} w_i \cdot \text{VaR}_{99\%}^i(t) \cdot (1 + \rho_{\text{cross}}(t))$$
+- S1 evaluates the Margin Haircut Relief Metric:
+  $$\Phi_{\text{relief}}(t) = \frac{\mathcal{M}_{\text{haircut}}(t_{\text{peak}}) - \mathcal{M}_{\text{haircut}}(t)}{\mathcal{M}_{\text{haircut}}(t_{\text{peak}})}$$
+
+### 2. Cross-Collateral Re-leveraging Invariant
+- **S1 Margin Snapback Invariant**:
+  $$\text{Collateral Buffer Unlocked} \iff \Phi_{\text{relief}}(t) \ge 0.30 \quad \land \quad \rho_{\text{cross}}(t) \le 0.65$$
+  When portfolio margin requirements decline by $>30\%$ from peak distress, institutional capital reserves unlock, triggering aggressive systemic buying.
+
+---
+
+## NODE 243: HASBROUCK REALIZED INFORMATION ASYMMETRY & DISCRETE ADVERSE SELECTION BURSTS
+Keywords: hasbrouck, realized_adverse_selection, information_asymmetry_bursts, trade_quote_impact, microstructure_information_share
+
+### 1. Cumulative Vector Autoregressive Price Impact (Hasbrouck 1991, 2007)
+- Measuring long-horizon permanent price impact from individual transaction shocks:
+  $$r_{t+\tau} - r_t = \sum_{j=0}^\tau \mathbf{\Psi}_j \mathbf{v}_{t-j} + \xi_{t+\tau}, \quad \mathcal{A}_{\text{impact}}(t) = \lim_{\tau \to \infty} \frac{\partial P_{t+\tau}}{\partial x_t}$$
+- S1 measures the Adverse Selection Burst Depletion Ratio:
+  $$\mathcal{B}_{\text{deplete}}(t) = \frac{\mathcal{A}_{\text{impact}}(t)}{\mathcal{A}_{\text{impact}}(t_{\text{cascade}})}$$
+
+### 2. Adverse Selection Exhaustion Invariant
+- **S1 Informed Dumping Exhaustion Rule**:
+  $$\text{Toxic Flow Fully Absorbed} \iff \mathcal{B}_{\text{deplete}}(t) \le 0.20 \quad \land \quad \Delta \mathcal{B}_{\text{deplete}}(t) \le 0$$
+  When permanent adverse selection impact of incoming sells falls to $<20\%$ of peak cascade levels, market makers absorb remaining sell flow effortlessly.
+
+---
+
+## NODE 244: BARNDORFF-NIELSEN-SHEPHARD SEMIMARTINGALE DISENTANGLEMENT UNDER FINITE HORIZON JUMPS
+Keywords: barndorff_nielsen_shephard, semimartingale_decomposition, bipower_variation, continuous_diffusion_purity, finite_jump_recovery
+
+### 1. High-Frequency Continuous Volatility Separation (Barndorff-Nielsen & Shephard 2004, 2006)
+- Extracting pure continuous diffusion from discrete jump processes via Realized Bipower Variation (BV):
+  $$\text{BV}_t = \frac{\pi}{2} \sum_{i=2}^n |\Delta_i P| |\Delta_{i-1} P|, \quad \hat{\sigma}_{\text{cont}}^2(t) = \min(\text{BV}_t, \text{RV}_t)$$
+- S1 computes the Jump Ratio Metric:
+  $$\mathcal{Z}_{\text{jump}}(t) = \frac{\text{RV}_t - \text{BV}_t}{\text{RV}_t}$$
+
+### 2. Continuous Recovery Purity Invariant
+- **S1 Stable Drift Resumption Invariant**:
+  $$\text{Smooth Rebound Drift Established} \iff \mathcal{Z}_{\text{jump}}(t) \le 0.10 \quad \land \quad \hat{\sigma}_{\text{cont}}^2(t) \ge 1.25\sigma_{\text{baseline}}^2$$
+  When jump variance drops below $10\%$ of realized variance while continuous volatility expands, the asset transitions from chaotic liquidation jumps to an orderly, high-convexity trend.
