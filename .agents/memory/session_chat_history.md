@@ -39695,3 +39695,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`7bf51c4`); Engine_1_arena_PR committed and pushed (`c797313`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v31.0 Expansion (Nodes 191–196) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2345` (iteration 3), `task-2203` (iteration 6), `task-2067` (iteration 9), `task-794` (iteration 27), and `task-1891` (iteration 14) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 191–196: 196 Structured Nodes)**:
+  - **Node 191**: Duffie-Kan Multi-Factor Affine Yield Curve Dynamics & Cross-Maturity Funding Term Structure (Duffie & Kan 1996; Piazzesi 2010; term structure snapback metric $\Theta_{\text{slope}} \ge -0.50 \land \Delta \Theta_{\text{slope}} > +0.75$ confirming synthetic short borrowing backwardation cleared).
+  - **Node 192**: O'Hara-Shorter High-Frequency Structural Latency Arbitrage & Sub-Penny Quote Sniping Defense (O'Hara 2015; Biais et al. 2015; sweep aggression factor $\Xi_{\text{sweep}} \le 0.12 \land \mathcal{Q}_{\text{stab}} \ge 0.75$ confirming multi-level predatory sniping halted).
+  - **Node 193**: Merton Jump-Diffusion Stopping Time & Optimal Pre-Liquidated Margin Cushion (Merton 1976; Kou 2002; vulnerable margin mass ratio $\mathcal{M}_{\text{vuln}} \le 0.04 \land \mathcal{V}_{\text{deplete}} \le 0.01\text{ bar}^{-1}$ eliminating risk of secondary liquidation waterfalls).
+  - **Node 194**: Engle-Lunde-Shephard High-Frequency Realized Range Volatility & Extremum Scaling (Garman & Klass 1980; Yang & Zhang 2000; range expansion ratio $\mathcal{E}_{\text{range}} \le 1.15 \land \sigma_{\text{GKYZ}}(t) \le 0.80 \sigma_{\text{GKYZ}}(t-1)$ ensuring tight execution without slippage).
+  - **Node 195**: Kyle-Back Strategic Trading with Continuous Signal Arrivals & Information Dispersion (Back 1992; Kyle 1985; order flow linearity $\mathcal{R}_{\text{impact}}^2 \ge 0.75 \land \mathcal{S}_{\text{accum}} \ge +0.35$ confirming strategic institutional accumulator absorbing supply).
+  - **Node 196**: Brunnermeier-Pedersen Dynamic Margin Requirements & Procyclical Liquidity Spirals (Brunnermeier & Pedersen 2009; Adrian & Shin 2010; margin haircut change $\Delta \mathcal{H}_{\text{margin}} \le 0 \land \mathcal{H}_{\text{margin}} \le 1.25 \bar{\mathcal{H}}_{24\text{h}}$ confirming exchange margin hike spiral terminated).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`8affd71`); Engine_1_arena_PR committed and pushed (`2675577`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
