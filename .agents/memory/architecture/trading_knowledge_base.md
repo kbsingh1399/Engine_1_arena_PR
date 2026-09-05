@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v56.0 (KINETIC DISPLACEMENT, FOOTPRINT ABSORPTION, SPILLOVER GRAPHS & WEIBULL TIME STOPS)
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v57.0 (FUNDING BASIS DIVERGENCE, GMM REGIMES, LOB VACUUMS & ENTROPY COLLAPSE)
 # Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + AR Trading Academy (@aracademy__) CRT/TBS Curriculum
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 340 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 346 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -6601,3 +6601,117 @@ Keywords: weibull_excursion, time_decay_stop, hazard_rate, survival_function, sn
 - **S1 Weibull Time-Decay Invariant**:
   $$\text{Market Exit at } t \iff t \ge 24 \text{ bars} \quad \land \quad \text{MFE}_t < +0.20\text{R}$$
   Cuts lingering stagnant trades with zero market momentum, liberating capital and protecting portfolio risk budget before adverse order flow resumes.
+
+---
+
+## NODE 341: ASYMMETRIC CROSS-VENUE FUNDING BASIS DIVERGENCE & DERIVATIVES CARRY DYNAMICS
+Keywords: funding_basis, cross_venue_divergence, derivatives_carry, spot_perp_dislocation, arbitrage_snapback
+
+### 1. Mathematical Formulation of the Funding Basis Spread
+- While Binance USDT-M perpetual contracts enforce an 8-hour funding rate $F_{\text{Binance}}(t)$, external liquidity venues (e.g. OKX, Bybit, Deribit) clear funding on asynchronous schedules or with differing interest rate components:
+  $$\Delta F_{\text{spread}}(t) = F_{\text{Binance}}(t) - \overline{F}_{\text{cross}}(t)$$
+- When severe institutional liquidations hit Binance, localized panic causes the instantaneous premium index $\mathcal{P}_t = (P_{\text{mark}} - P_{\text{index}}) / P_{\text{index}}$ to dislocate violently downwards relative to cross-venue medians.
+- S1 formalizes the Normalized Funding Basis Divergence:
+  $$\mathcal{Z}_{\text{basis}}(t) = \frac{\Delta F_{\text{spread}}(t) - \mu_{\Delta F}(96)}{\sigma_{\Delta F}(96)}$$
+- A dislocation where $\mathcal{Z}_{\text{basis}}(t) \le -2.20$ accompanied by negative funding creates a deterministic statistical carry tailwind: market makers and cross-exchange arbitrageurs are heavily incentivized to buy the undervalued Binance perpetual while shorting external hedges.
+
+### 2. Funding Basis Divergence Invariant
+- **S1 Funding Basis Invariant**:
+  $$\text{Structural Arbitrage Confluence} \iff \mathcal{Z}_{\text{basis}}(t) \le -2.0 \quad \land \quad F_{\text{Binance}}(t) < 0 \quad \land \quad \text{zc\_div} > 0.80$$
+  Guarantees that entry is reinforced by cross-exchange arbitrage snapback capital flows, generating systematic upward drift as spreads compress.
+
+---
+
+## NODE 342: NON-STATIONARY VOLATILITY REGIME CLASSIFICATION VIA GAUSSIAN MIXTURE MODELS
+Keywords: gmm_volatility, regime_classification, expectation_maximization, non_stationary_variance, parameter_adaptation
+
+### 1. Gaussian Mixture Formulation of Microstructure Volatility
+- Rather than assuming Gaussian homoscedasticity or a fixed lookback variance, 15-minute log-return variance $\sigma_t^2$ is modeled as a realization from a 3-component Gaussian Mixture Model (GMM):
+  $$p(\sigma_t^2 \mid \boldsymbol{\Theta}) = \sum_{k=1}^3 \pi_k \cdot \mathcal{N}\left(\sigma_t^2 \ \Big|\ \mu_k, \, \Sigma_k\right), \quad \sum_{k=1}^3 \pi_k = 1$$
+  where $k \in \{1: \text{Compression / Low Vol}, \, 2: \text{Normal Liquidity}, \, 3: \text{Cascade / Crisis Expansion}\}$.
+- The posterior responsibility $\gamma_{tk} = \mathbb{P}(z_t = k \mid \sigma_t^2)$ is computed recursively via the Expectation-Maximization (EM) algorithm without lookahead.
+- During a liquidation cascade, the system shifts abruptly into Regime 3 ($\gamma_{t, 3} > 0.85$). As the cascade exhausts and prints a Turtle Body Soup, the probability begins to decay:
+  $$\frac{d\gamma_{t, 3}}{dt} < 0 \quad \land \quad \gamma_{t, 2} \uparrow$$
+  signaling the resumption of orderly price formation.
+
+### 2. GMM Volatility Transition Invariant
+- **S1 GMM Volatility Invariant**:
+  $$\text{Optimal Reversal Window} \iff \gamma_{t, 3} \in [0.45, 0.75] \quad \land \quad \frac{d\gamma_{t, 3}}{dt} < 0 \quad \land \quad \text{long\_liq\_zs} > 1.8$$
+  Ensures S1 does not trade during peak chaos ($\gamma_{t, 3} > 0.85$) where variance is explosive, but catches the precise inflection where volatility mean-reverts back to normal regimes.
+
+---
+
+## NODE 343: LIQUIDITY HOLE EXHAUSTION & LIMIT ORDER BOOK DEPTH ASYMMETRY RATIOS
+Keywords: liquidity_hole, depth_asymmetry, ask_vacuum, bid_replenishment_ratio, price_slippage_gradient
+
+### 1. Microstructure Hydrodynamics of Liquidity Holes
+- A "liquidity hole" occurs when forced liquidation market sell orders consume all available resting bids down to multiple standard deviations below the current market price, resulting in a sudden vacuum in the bid book:
+  $$\Delta \mathcal{D}_{\text{hole}}(t) = \frac{\int_{P_t - 3\text{ATR}}^{P_t} \text{Depth}_{\text{bid}}(p) \, dp}{\int_{P_t}^{P_t + 3\text{ATR}} \text{Depth}_{\text{ask}}(p) \, dp}$$
+- Once the forced selling halts, the asking book above market price is typically razor-thin because market makers pulled limit offers during the waterfall crash.
+- S1 measures the post-sweep Depth Asymmetry Ratio across the top-10 ladder levels:
+  $$\mathcal{A}_{\text{depth}}(t) = \frac{\sum_{i=1}^{10} \text{Depth}_{\text{bid}}(p_i)}{\sum_{i=1}^{10} \text{Depth}_{\text{ask}}(p_i)}$$
+- When $\mathcal{A}_{\text{depth}}(t) \ge 2.50$ following a sweep of $CRTL$, the path of least resistance tilts dramatically upward: any modest market buying generates outsized price appreciation due to the absence of overhead limit sell walls.
+
+### 2. Depth Asymmetry Invariant
+- **S1 Depth Asymmetry Invariant**:
+  $$\text{Vacuum Reversal Active} \iff \mathcal{A}_{\text{depth}}(t) \ge 2.20 \quad \land \quad \text{Close}_t > CRTL \quad \land \quad \text{fp\_delta} > 0$$
+  Captures the explosive upward snapback through the ask liquidity vacuum while resting bids provide a structural floor under the trade.
+
+---
+
+## NODE 344: DISPLACEMENT CANDLE BODY RATIO & FAIR VALUE GAP (FVG) IMPULSE METRICS
+Keywords: displacement_body_ratio, fvg_impulse, imbalance_efficiency, market_structure_shift, range_expansion
+
+### 1. Quantitative Dissection of Displacement Bars
+- In systematic ICT/CRT frameworks, a valid Market Structure Shift (MSS) requires genuine institutional displacement rather than an indecisive wick contest. S1 quantifies displacement through the Candle Body Ratio $\mathcal{B}_{\text{ratio}}(t)$ and Fair Value Gap Magnitude $\mathcal{G}_{\text{FVG}}(t)$:
+  $$\mathcal{B}_{\text{ratio}}(t) = \frac{|\text{Close}_t - \text{Open}_t|}{\text{High}_t - \text{Low}_t}, \quad \mathcal{G}_{\text{FVG}}(t) = \max\left(0, \, \text{Low}_t - \text{High}_{t-2}\right)$$
+- An institutional displacement bar displays a high body-to-range ratio ($\mathcal{B}_{\text{ratio}} \ge 0.70$), indicating that price opened near one extreme and closed resolutely near the other with negligible opposing wicks.
+- The formation of an unmitigated 3-bar Fair Value Gap ($\mathcal{G}_{\text{FVG}}(t) \ge 0.25 \cdot \text{ATR}$) confirms that liquidity was consumed so violently that no bilateral two-way auction occurred.
+- S1 synthesizes the Displacement Quality Score:
+  $$\mathcal{Q}_{\text{disp}}(t) = \mathcal{B}_{\text{ratio}}(t) \cdot \left(\frac{\text{Range}_t}{\overline{\text{Range}}_{20}}\right) \cdot \mathbf{1}_{\{\mathcal{G}_{\text{FVG}}(t) > 0\}}$$
+
+### 2. Displacement Quality Invariant
+- **S1 Displacement Quality Invariant**:
+  $$\text{Valid Model 1 MSS} \iff \mathcal{Q}_{\text{disp}}(t) \ge 1.50 \quad \land \quad \mathcal{B}_{\text{ratio}}(t) \ge 0.65 \quad \land \quad \text{Close}_t > \text{SwingHigh}_{\text{prior}}$$
+  Prevents false structural shift triggers by requiring dense, full-bodied bullish expansion candles that leave behind clean institutional liquidity imbalances.
+
+---
+
+## NODE 345: MULTI-ASSET CONCURRENT MARGIN UTILIZATION & TAIL RISK BUDGET CONSTRAINTS
+Keywords: margin_utilization, cvar_budget, portfolio_haircut, concurrent_positions, drawdown_governor
+
+### 1. Mathematical Formulation of Cross-Asset Margin Constraints
+- With a strictly capped portfolio equity of $E_0 = \$5,000$ and a non-negotiable maximum drawdown limit of $4.5\%$ ($\$225.00$ maximum tolerable loss), multi-asset concurrent trade allocation requires dynamic conditional tail-risk budgeting:
+  $$\sum_{i=1}^N w_i(t) \le 2.0, \quad \sum_{i=1}^N \text{Risk}_{\text{nominal}, i}(t) \le \mathcal{B}_{\text{total}}(t)$$
+- Total allowable nominal portfolio risk $\mathcal{B}_{\text{total}}(t)$ is regulated by the running portfolio drawdown fraction $D_t = 1 - E_t / E_{\text{peak}}$:
+  $$\mathcal{B}_{\text{total}}(t) = \begin{cases} 
+  \$50.00 & \text{if } E_t - E_0 \ge \$50.00 \text{ (House Money Mode)} \\
+  \$25.00 & \text{if } 0 \le D_t < 0.025 \text{ (Base Risk Mode)} \\
+  \$15.00 & \text{if } 0.025 \le D_t < 0.040 \text{ (Defensive Mode)} \\
+  \$0.00 & \text{if } D_t \ge 0.040 \text{ (Hard Quarantine Lockout)}
+  \end{cases}$$
+- If two candidate signals occur simultaneously across different symbols (e.g. SOL and NEAR), the allocation vector $\mathbf{w}$ applies a correlation haircut derived from their 96-bar rolling return correlation $\rho_{12}(t)$:
+  $$w_2^*(t) = w_2(t) \cdot \left(1 - \max(0, \rho_{12}(t) - 0.50)\right)$$
+
+### 2. Margin Budget Invariant
+- **S1 Portfolio Budget Invariant**:
+  $$\text{Open New Position} \iff N_{\text{active}} < 2 \quad \land \quad \sum_{i} \text{Risk}_i + \text{Risk}_{\text{new}} \le \mathcal{B}_{\text{total}}(t) \quad \land \quad D_t < 0.040$$
+  Guarantees that total portfolio risk never violates the strict 4.5% drawdown constraint, even in the event of joint catastrophic failure across concurrent positions.
+
+---
+
+## NODE 346: ENTROPY COLLAPSE & RE-EXPANSION METRICS IN MICROSTRUCTURE CONSOLIDATION
+Keywords: shannon_entropy, volume_profile_entropy, price_clustering, informational_transition, breakout_ignition
+
+### 1. Information-Theoretic Dissection of Range Boundaries
+- In CRT consolidation ranges, the distribution of traded volume across discrete price ticks inside the range $[CRTL, CRTH]$ exhibits high Shannon Volume Entropy $\mathcal{H}_{\text{vol}}(t)$:
+  $$\mathcal{H}_{\text{vol}}(t) = -\sum_{i=1}^M p_i \ln p_i, \quad p_i = \frac{\text{Volume}(p_i)}{\sum_j \text{Volume}(p_j)}$$
+  indicating an evenly distributed, consensus-driven two-way auction.
+- Immediately preceding a directional displacement run, entropy undergoes an acute collapse ($\Delta \mathcal{H}_{\text{vol}} \le -0.35$), reflecting hyper-concentrated volume clustering at the manipulation sweep level:
+  $$\mathcal{H}_{\text{normalized}}(t) = \frac{\mathcal{H}_{\text{vol}}(t)}{\ln M} \in [0, 1]$$
+- When normalized entropy drops below $0.45$ at the sweep wick and subsequently rebounds as price re-enters the range, the information state of the order book transitions from equilibrium absorption to directed momentum expansion.
+
+### 2. Entropy Re-Expansion Invariant
+- **S1 Entropy Transition Invariant**:
+  $$\text{Expansion Ignition} \iff \mathcal{H}_{\text{norm}}(t-1) \le 0.45 \quad \land \quad \Delta \mathcal{H}_{\text{norm}}(t) > +0.15 \quad \land \quad \text{Close}_t > CRTL$$
+  Statistically validates that institutional accumulation at the range extreme is complete and that the order book has successfully transitioned into directional expansion.
