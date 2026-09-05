@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v27.0 (ORDER IMBALANCE DISSIPATION, SKEW FLATTENING, RESERVATION WEDGES & MULTI-ASSET LIQUIDITY COMMONALITY)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Chordia/Roll/Derman/Kani/O'Hara/Madan/Carr
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v28.0 (SPREAD ELASTICITY, INSTITUTIONAL FUND FLOWS, MODEL CONFIDENCE SETS & CUBIC POWER LAWS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Amihud/Mendelson/Vayanos/Hansen/Cont/Gabaix/Rosu
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 172 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 178 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3834,3 +3834,100 @@ Keywords: liquidity_commonality, easley_kiefer_o_hara, market_wide_drain, synchr
 - **S1 Portfolio Allocation Rule**:
   $$\text{Universe Cleared For Entry} \iff \mathcal{L}_{\text{com}}(t) \ge -0.80 \quad \land \quad \Delta \mathcal{L}_{\text{com}}(t) > 0$$
   Trading is halted across all pairs if $\mathcal{L}_{\text{com}} < -0.80$ with negative trajectory. Entries resume only when the systematic liquidity index inflects upward, confirming that the universe-wide liquidity shock has subsided.
+
+---
+
+## NODE 173: AMIHUD-MENDELSON ILLIQUIDITY ASSET PRICING & BID-ASK SPREAD ELASTICITY
+Keywords: amihud_mendelson, spread_elasticity, illiquidity_premium, excess_yield_compression, spot_appreciation, friction_decay
+
+### 1. Equilibrium Asset Pricing with Bid-Ask Spreads (Amihud & Mendelson 1986, 1989)
+- Market participants demand an expected excess return premium $\mathbb{E}[R] - R_f$ to hold assets with wide bid-ask spreads, which is concave in relative spread:
+  $$\mathbb{E}[R_i] - R_f = \alpha_0 + \alpha_1 \ln(S_i) + \alpha_2 \left(\frac{S_i}{P_i}\right)$$
+- During cascade liquidation selloffs, spreads explode, demanding an unsustainable illiquidity yield premium. When spreads contract, this excess yield premium collapses, driving immediate price recovery.
+- The Excess Yield Compression Velocity is:
+  $$\mathcal{V}_{\text{yield}}(t) = -\frac{1}{S_t} \frac{\partial S_t}{\partial t} \cdot \frac{P_t}{S_t}$$
+
+### 2. Spread Elasticity Compression Gate
+- **S1 Operational Rule**:
+  $$\text{Yield Compression Confirmed} \iff \mathcal{V}_{\text{yield}}(t) \ge 1.45 \quad \land \quad \frac{S_t}{P_t} \le 0.0018 \quad (18\text{ bps})$$
+  When $\mathcal{V}_{\text{yield}} \ge 1.45$ while spread has normalized below 18 bps, the illiquidity penalty has dissipated into upward price appreciation, validating an optimal entry moment.
+
+---
+
+## NODE 174: VAYANOS-WOOLLEY DELEGATED INSTITUTIONAL FUND FLOWS & MOMENTUM REVERSAL TRANSITIONS
+Keywords: vayanos_woolley, delegated_flows, institutional_redemptions, momentum_overshoot, mechanical_selling_end, reversal_transition
+
+### 1. Dynamics of Delegated Portfolio Liquidations (Vayanos & Woolley 2013; Lou 2012)
+- Institutional fund redemptions induce multi-day mechanical selling runs that push perpetual prices far below intrinsic fundamentals.
+- S1 tracks the Exponentially Weighted Delegated Flow Imbalance across the 16 preceding 15m bars (4 hours):
+  $$\mathcal{F}_{\text{flow}}(t) = \sum_{k=1}^{16} e^{-\lambda_{\text{flow}} k} \cdot \text{NetTakerVolume}_{t-k}$$
+  along with its Flow Acceleration:
+  $$\mathcal{A}_{\text{flow}}(t) = \mathcal{F}_{\text{flow}}(t) - 2\mathcal{F}_{\text{flow}}(t-1) + \mathcal{F}_{\text{flow}}(t-2)$$
+
+### 2. Institutional Outflow Exhaustion Invariant
+- **S1 Operational Rule**:
+  $$\text{Redemption Flow Dead} \iff \mathcal{A}_{\text{flow}}(t) > 0 \quad \land \quad \mathcal{F}_{\text{flow}}(t) \ge -0.15 \overline{\text{Vol}}_{24\text{h}} \quad \land \quad \text{fp\_delta}_t > 0$$
+  An inflection in flow acceleration ($\mathcal{A}_{\text{flow}} > 0$) combined with positive footprint delta confirms that mechanical institutional selling has completed, unlocking violent mean-reversion.
+
+---
+
+## NODE 175: HANSEN-LUNDE MODEL CONFIDENCE SET (MCS) FOR MICROSTRUCTURE SIGNAL SELECTION
+Keywords: model_confidence_set, hansen_lunde, causal_signal_selection, zero_snooping, rolling_loss_differential, p_value_filter
+
+### 1. Econometric Significance of Predictive Signals (Hansen, Lunde, Nason 2011)
+- To prevent lookahead and data snooping across the 20 OOS windows, candidate signal sleeves must be validated via the Model Confidence Set (MCS) procedure using rolling in-sample loss:
+  $$T_{\text{max}} = \max_{i \in \mathcal{M}} t_i, \quad t_i = \frac{\bar{d}_{i, \cdot}}{\sqrt{\widehat{\text{Var}}(\bar{d}_{i, \cdot})}}$$
+  where $d_{ij, t} = L_{i, t} - L_{j, t}$ is the loss differential between candidate signal $i$ and signal $j$.
+- Signals that fail the asymptotic equivalence test at significance level $\alpha = 0.10$ are eliminated iteratively.
+
+### 2. MCS In-Sample Significance Filter
+- **S1 Operational Rule**:
+  $$\text{Signal Admitted To Live Ensemble} \iff p_{\text{MCS}}(i) \ge 0.10$$
+  Every signal component in S1 is guaranteed to belong to the Model Confidence Set $\widehat{\mathcal{M}}_{90\%}^*$, mathematically filtering out transient or overfitted noise features causally.
+
+---
+
+## NODE 176: CONT-DE LARRARD MARKOVIAN LIMIT ORDER BOOK QUEUING & FIRST-DEPLETION PROBABILITY
+Keywords: cont_de_larrard, markovian_queuing, ask_depletion_probability, best_bid_depth, tick_advancement, order_book_flow
+
+### 1. Markovian Continuous-Time Queuing Dynamics (Cont, Stoikov, Talreja 2010; Cont & de Larrard 2013)
+- Limit order queues at the best bid ($q_b$) and best ask ($q_a$) follow a continuous-time Markov jump process governed by arrival rates $\lambda$, cancellation rates $\theta$, and execution rates $\mu$.
+- The analytical probability that the best ask queue is depleted before the best bid queue is:
+  $$p_{\text{ask\_deplete}}(q_b, q_a) \approx \frac{q_b \mu_a}{q_b \mu_a + q_a \mu_b}$$
+
+### 2. Queue Depletion Dominance Invariant
+- **S1 Microstructure Invariant**:
+  $$\text{Immediate Tick Advance Guaranteed} \iff p_{\text{ask\_deplete}}(q_b, q_a) \ge 0.72 \quad \land \quad q_b \ge 2.50 q_a$$
+  When $p_{\text{ask\_deplete}} \ge 0.72$, the resting bid queue overwhelmingly dominates the ask queue, mathematically ensuring that the next price tick will resolve upward with $>72\%$ probability.
+
+---
+
+## NODE 177: GABAIX-GOPIKRISHNAN-PLEROU-STANLEY POWER-LAW SCALING OF EXTREME PRICE FLUCTUATIONS
+Keywords: cubic_power_law, gabaix_stanley, extreme_fluctuations, power_law_tail, inside_reversal_bar, non_linear_snapback
+
+### 1. Inverse Cubic Power-Law Tail Distributions (Gabaix et al. 2003, 2006; Lux 2009)
+- Cumulative distributions of 15m log returns during market distress follow an inverse cubic power law:
+  $$P(|R| > x) \sim x^{-\zeta}, \quad \zeta \approx 3.0$$
+- S1 evaluates the Power-Law Tail Excursion Metric using Hill's tail estimator $\hat{\zeta}$:
+  $$\mathcal{Z}_{\text{power}}(t) = \left(\frac{|\Delta P_{15\text{m}}|}{\sigma_{\text{med}}}\right)^{\hat{\zeta}}, \quad \hat{\zeta} = 1 + N \left[ \sum_{i=1}^N \ln\left(\frac{r_i}{r_{\text{min}}}\right) \right]^{-1}$$
+
+### 2. Cubic Power-Law Exhaustion Invariant
+- **S1 Operational Rule**:
+  $$\text{Tail Snapback Primed} \iff \mathcal{Z}_{\text{power}}(t-1) \ge 4.50 \quad \land \quad |\Delta P_t| \le 0.35 |\Delta P_{t-1}| \quad \land \quad \text{fp\_delta}_t > 0$$
+  When an extreme power-law excursion is followed immediately by price deceleration (inside bar) and positive footprint delta, the non-linear cubic elastic snapback generates an explosive mean-reversion impulse.
+
+---
+
+## NODE 178: KYLE-ROSU HIGH-FREQUENCY INFORMED TRADING WITH SPEED ADVANTAGE DISINTEGRATION
+Keywords: speed_advantage_collapse, kyle_rosu, latency_arbitrage_intensity, quote_revision_frequency, predatory_sniping_end
+
+### 1. High-Frequency Latency Arbitrage Dynamics (Biais et al. 2015; Rosu 2019; Budish et al. 2015)
+- Predatory high-frequency algorithms exploit latency advantages to pick off stale quotes during violent liquidation moves, creating a burst in quote update frequency relative to volume.
+- The Latency Arbitrage Intensity Metric is:
+  $$\Lambda_{\text{lat}}(t) = \frac{\text{Quote Revisions Count}_{15\text{m}}}{\text{Taker Volume}_{15\text{m}} \cdot \text{Trades Count}_{15\text{m}}^{1/2}}$$
+  along with its 1-bar gradient $\Delta \Lambda_{\text{lat}}(t) = \Lambda_{\text{lat}}(t) - \Lambda_{\text{lat}}(t-1)$.
+
+### 2. Latency Arbitrage Dissipation Invariant
+- **S1 Execution Invariant**:
+  $$\text{Predatory Sniping Extinguished} \iff \Delta \Lambda_{\text{lat}}(t) \le -0.45 \quad \land \quad \Lambda_{\text{lat}}(t) \le 0.50 \bar{\Lambda}_{24\text{h}}$$
+  Entering only after predatory quote revisions contract by $\ge 45\%$ ensures that high-speed snipers have exited the order book, allowing orderly institutional quote replenishment to support long entries.
