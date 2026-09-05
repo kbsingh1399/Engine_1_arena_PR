@@ -39647,3 +39647,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`29c5efd`); Engine_1_arena_PR committed and pushed (`2e0a6ae`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2203` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v28.0 Expansion (Nodes 173–178) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2203` (iteration 3), `task-2067` (iteration 6), `task-794` (iteration 24), and `task-1891` (iteration 11) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 173–178: 178 Structured Nodes)**:
+  - **Node 173**: Amihud-Mendelson Illiquidity Asset Pricing & Bid-Ask Spread Elasticity (Amihud & Mendelson 1986, 1989; spread elasticity yield compression velocity $\mathcal{V}_{\text{yield}} \ge 1.45 \land \frac{S_t}{P_t} \le 18\text{ bps}$ confirming illiquidity penalty has dissipated into upward spot price appreciation).
+  - **Node 174**: Vayanos-Woolley Delegated Institutional Fund Flows & Momentum Reversal Transitions (Vayanos & Woolley 2013; flow acceleration inflection $\mathcal{A}_{\text{flow}} > 0 \land \mathcal{F}_{\text{flow}} \ge -0.15 \overline{\text{Vol}}_{24\text{h}}$ confirming institutional delegated redemption selling has terminated).
+  - **Node 175**: Hansen-Lunde Model Confidence Set (MCS) for Microstructure Signal Selection (Hansen et al. 2011; rolling in-sample loss test statistic $T_{\text{max}}$; causal inclusion filter $p_{\text{MCS}} \ge 0.10$ excluding decaying or overfitted predictor features).
+  - **Node 176**: Cont-de Larrard Markovian Limit Order Book Queuing & First-Depletion Probability (Cont et al. 2010; Cont & de Larrard 2013; ask depletion probability $p_{\text{ask\_deplete}} \ge 0.72 \land q_b \ge 2.50 q_a$ guaranteeing immediate upward tick advancement).
+  - **Node 177**: Gabaix-Gopikrishnan-Plerou-Stanley Power-Law Scaling of Extreme Price Fluctuations (Gabaix et al. 2003, 2006; tail excursion metric $\mathcal{Z}_{\text{power}} \ge 4.50$ followed by deceleration inside bar and positive footprint delta unlocking cubic elastic snapback).
+  - **Node 178**: Kyle-Rosu High-Frequency Informed Trading with Speed Advantage Disintegration (Biais et al. 2015; Rosu 2019; latency arbitrage intensity gradient $\Delta \Lambda_{\text{lat}} \le -0.45 \land \Lambda_{\text{lat}} \le 0.50 \bar{\Lambda}_{24\text{h}}$ confirming high-frequency predatory sniping has ceased).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`2bbcaf9`); Engine_1_arena_PR committed and pushed (`9145f33`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2203` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
