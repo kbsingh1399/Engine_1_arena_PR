@@ -39966,4 +39966,15 @@ eferences.bib into architecture memory in both repositories.
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`7c2ea0c`); Engine_1_arena_PR committed and pushed (`0e0efc4`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
-- **Standing Daemon**: Cron task `task-3249` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+- **Standing Daemon**: Cron task `task-3322` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Data Architecture & Canonical Pipeline Enshrinement + Branch Push (2026-09-05)
+- **User Directive**: "push all to main and attached" and confirmed: "by the way data is correct@[Engine_2/binance_backtesting_data] and method to download it @[Engine_2/run_historical_pipeline.py]".
+- **Operational Deliverables**:
+  - **Data Provenance Locked**: Confirmed and enshrined `Engine_2/binance_backtesting_data/` as the verified, continuous 15m Master and Footprint Ladder Parquet dataset across 18 symbols (2020–2026, 0 nulls, monotonic timestamps).
+  - **Canonical Pipeline Orchestrator Registered**: Enshrined `Engine_2/run_historical_pipeline.py` as the master production pipeline runner in `ACTIVE_CONTEXT.md`.
+  - **Dual-Repo Git Synchronization**: Pushed all commits across both repositories to `origin/main` and `origin/arena/01a06dc4-engine-1-arena-pr`.
+  - **Parity**: Verified 100% byte-for-byte sync across all 7,993 files in `.agents`.
+  - **Standing Daemon**: Background cron sentinel `task-3322` (`*/15 * * * *`, `isDaemon=true`) active.
