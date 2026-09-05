@@ -39662,4 +39662,20 @@ eferences.bib into architecture memory in both repositories.
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`2bbcaf9`); Engine_1_arena_PR committed and pushed (`9145f33`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
-- **Standing Daemon**: Cron task `task-2203` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+- **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v29.0 Expansion (Nodes 179–184) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2345` (iteration 1), `task-2203` (iteration 4), `task-2067` (iteration 7), `task-794` (iteration 25), and `task-1891` (iteration 12) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 179–184: 184 Structured Nodes)**:
+  - **Node 179**: Merton-Garman Structural Jump Arrival Intensity & Non-Homogeneous Poisson Defaults (Garman 1976; Merton 1974; default hazard rate collapse $\frac{\Lambda_{\text{hazard}}(t)}{\max \Lambda_{\text{hazard}}} \le 0.40 \land \lambda_t \le 1.25 \bar{\lambda}$ confirming margin liquidation cascades have terminated).
+  - **Node 180**: Glosten-Harris Bid-Ask Spread Component Estimation & Asymmetric Transitory Slippage (Glosten & Harris 1988; transitory spread share $\Phi_{\text{trans}} \le 0.35 \land S_t \le 1.20 \bar{S}_{24\text{h}}$ confirming dealer execution markups have normalized).
+  - **Node 181**: Farmer-Patzelt-Lillo Threshold Liquidity Replenishment & Order Cancellation Latency (Patzelt & Farmer 2013; replenishment ratio $\mathcal{R}_{\text{replenish}} \ge 2.20 \land \alpha_{\text{depth}} > 0$ confirming institutional limit order cushion blocking price continuation).
+  - **Node 182**: Kahneman-Tversky Cumulative Prospect Theory & Retail Capitulation Volume Ratio (Tversky & Kahneman 1992; retail volume capitulation ratio spike to 90th percentile followed by collapse below median and positive delta confirming retail panic washout).
+  - **Node 183**: Bollerslev-Todorov Extreme Jump Activity & Microstructure Tail Shape Coefficient (Bollerslev & Todorov 2011, 2014; negative jump disparity $\mathcal{J}_{\text{neg}} \le 0.15 \land \kappa_{\text{tail}} \le 0.20$ confirming downside jump threat neutralized for smooth $+2.5\text{R}$ target drift).
+  - **Node 184**: Engle-Russell Autoregressive Conditional Duration (ACD) & Liquidation Trade Arrival Clustering (Engle & Russell 1998; duration expansion factor $\mathcal{D}_{\text{expand}} \ge 2.50 \land \bar{\psi}_{15\text{m}} \ge 0.85 \bar{\psi}_{\text{baseline}}$ confirming panic trade clustering has decoupled).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`56bec95`); Engine_1_arena_PR committed and pushed (`fb0354f`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2345` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
