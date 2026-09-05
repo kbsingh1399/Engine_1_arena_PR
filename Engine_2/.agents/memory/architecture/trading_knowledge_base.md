@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v26.0 (SPREAD DECOMPOSITION, DIURNAL PERIODICITY, TOXIC FILL RATIO & SPOT INFORMATION SHARE)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Huang/Stoll/Andersen/Lee/Biais/Merton/Hasbrouck
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v27.0 (ORDER IMBALANCE DISSIPATION, SKEW FLATTENING, RESERVATION WEDGES & MULTI-ASSET LIQUIDITY COMMONALITY)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Chordia/Roll/Derman/Kani/O'Hara/Madan/Carr
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 166 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 172 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3739,3 +3739,98 @@ Keywords: information_shares, hasbrouck, cointegration_var, spot_leadership, fut
 - **S1 Operational Rule**:
   $$\text{Bull Pivot Validated} \iff \text{IS}_{\text{spot}}(t) \ge 0.58 \quad \land \quad \Delta \text{IS}_{\text{spot}}(t) > 0 \quad \land \quad \Delta\text{SpotVol} > 0$$
   Entering only when $\text{IS}_{\text{spot}} \ge 0.58$ confirms that genuine unleveraged spot buyers have seized control from forced futures liquidation orders, cementing a durable institutional reversal floor.
+
+---
+
+## NODE 167: CHORDIA-ROLL-SUBRAHMANYAM HIGH-FREQUENCY ORDER IMBALANCE DYNAMICS & AUTOREGRESSIVE PERSISTENCE
+Keywords: order_imbalance_dissipation, chordia_roll_subrahmanyam, autoregressive_persistence, inventory_resolution, order_flow_exhaustion
+
+### 1. Dynamics of Extreme Order Imbalances (Chordia, Roll, Subrahmanyam 2002, 2005)
+- During margin liquidations, extreme negative Order Imbalance ($\text{OIB}_t = \frac{\text{BuyVol}_t - \text{SellVol}_t}{\text{BuyVol}_t + \text{SellVol}_t}$) forces market makers into involuntary inventory accumulation.
+- The persistence of order imbalance follows a localized AR(1) process:
+  $$\text{OIB}_t = \rho_{\text{OIB}} \text{OIB}_{t-1} + u_t, \quad \rho_{\text{OIB}}(t) = \frac{\sum_{i=0}^7 (\text{OIB}_{t-i} - \overline{\text{OIB}})(\text{OIB}_{t-i-1} - \overline{\text{OIB}})}{\sum_{i=0}^7 (\text{OIB}_{t-i-1} - \overline{\text{OIB}})^2}$$
+- When $\rho_{\text{OIB}}$ collapses toward zero after a cumulative selling cascade ($\text{COIB} = \sum_{j=0}^3 \text{OIB}_{t-j} \le -2.40$), the structural seller-dominated regime has terminated.
+
+### 2. Order Imbalance Dissipation Invariant
+- **S1 Operational Rule**:
+  $$\text{Imbalance Cleared} \iff \rho_{\text{OIB}}(t) \le 0.35 \quad \land \quad \text{OIB}_t \ge +0.15 \quad \land \quad \text{COIB}_{t-1} \le -2.40$$
+  This mathematical inflection confirms that the memory of past aggressive selling has decoupled, allowing a swift mean-reversion rally without overhead liquidation supply.
+
+---
+
+## NODE 168: DERMAN-KANI LOCAL VOLATILITY SURFACE CURVATURE & REBOUND SKEW FLATTENING
+Keywords: local_volatility_curvature, derman_kani, skew_flattening, crash_premium_dissipation, synthetic_moneyness, tail_relief
+
+### 1. Local Volatility Dynamics Across Synthetic Moneyness (Derman & Kani 1994; Dupire 1994)
+- In crypto perpetuals, synthetic option moneyness calculated from liquidation trigger thresholds reveals localized tail risk pricing. During severe cascades, downside skew steepens violently:
+  $$\mathcal{S}_{\text{skew}}(t) = \frac{\sigma_{\text{IV}}(0.90) - \sigma_{\text{IV}}(1.00)}{0.10}$$
+- When liquidations exhaust, the skew curvature flattens as fear premia dissipate:
+  $$\mathcal{C}_{\text{skew}}(t) = \frac{\sigma_{\text{IV}}(0.85) - 2\sigma_{\text{IV}}(0.95) + \sigma_{\text{IV}}(1.05)}{(0.10)^2}$$
+
+### 2. Skew Flattening Rebound Invariant
+- **S1 Operational Rule**:
+  $$\text{Downside Risk Extinguished} \iff \mathcal{S}_{\text{skew}}(t) \le 2.20 \quad \land \quad \frac{\mathcal{S}_{\text{skew}}(t)}{\max_{k \in [0, 8]} \mathcal{S}_{\text{skew}}(t-k)} \le 0.65$$
+  A $35\%$ drop in downside skew slope confirms that institutional liquidity providers have ceased charging emergency crash insurance premia, restoring symmetric price dispersion.
+
+---
+
+## NODE 169: O'HARA-SHORISH HIGH-FREQUENCY LIQUIDITY UNCERTAINTY & DYNAMIC RESERVATION SPREAD
+Keywords: reservation_spread, o_hara_shorish, parameter_uncertainty, informed_arrival, spread_wedge, competitive_quotes
+
+### 1. Market Maker Reservation Spread Under Parameter Uncertainty (O'Hara & Shorish 2000)
+- In cascade turbulence, market makers widen spreads beyond pure adverse selection due to parameter uncertainty regarding the arrival intensity $\mu_t$ of informed liquidation algorithms:
+  $$\mathcal{W}_{\text{reserv}}(t) = S_t - \left( \mathbb{E}[V \mid \text{Buy}] - \mathbb{E}[V \mid \text{Sell}] \right) = 2 \sigma_V \sqrt{\text{Var}(\mu_t \mid \mathcal{F}_t)}$$
+- This uncertainty wedge $\mathcal{W}_{\text{reserv}}$ inflates execution costs artificially during peak panic.
+
+### 2. Reservation Wedge Collapse Invariant
+- **S1 Operational Rule**:
+  $$\text{Quotes Competitive} \iff \mathcal{W}_{\text{reserv}}(t) \le 0.40 \overline{\mathcal{W}}_{24\text{h}} \quad \land \quad \text{Quoted Spread}_t \le 1.25 \bar{S}_{24\text{h}}$$
+  Entering only after the reservation wedge contracts below $40\%$ of its 24-hour mean ensures market makers have resolved information uncertainty, enabling long execution with minimal friction dissipation.
+
+---
+
+## NODE 170: BARNDORFF-NIELSEN-SHEPHARD QUARTICITY & NOISE-ROBUST VOLATILITY CONFIDENCE BOUNDS
+Keywords: realized_quarticity, barndorff_nielsen_shephard, volatility_confidence_interval, stop_geometry_robustness, asymptotic_variance
+
+### 1. Finite-Sample Precision of Realized Variance (Barndorff-Nielsen & Shephard 2002)
+- To ensure trailing stop ratchets are not distorted by finite-sample measurement error, S1 computes Realized Quarticity ($\text{RQ}_t$), which determines the asymptotic variance of Realized Variance:
+  $$\text{RQ}_t = \frac{N}{3} \sum_{i=1}^N r_{t, i}^4$$
+- The Confidence Interval Width for true continuous volatility is:
+  $$\mathcal{CI}_{\text{vol}}(t) = 1.96 \sqrt{\frac{2}{3} \frac{\text{RQ}_t}{\text{RV}_t}}$$
+
+### 2. Quarticity Precision Invariant
+- **S1 Execution Invariant**:
+  $$\text{Volatility Precision Verified} \iff \mathcal{CI}_{\text{vol}}(t) \le 0.30 \cdot \text{RV}_t$$
+  Restricting trade entry to regimes where the volatility confidence bound is $\le 30\%$ of realized variance guarantees that ATR stop distances and ratchet increments reflect genuine market diffusion rather than estimation noise.
+
+---
+
+## NODE 171: MADAN-CARR-CHANG VARIANCE GAMMA (VG) LÉVY PROCESS & SKEWED TAIL JUMPS
+Keywords: variance_gamma, madan_carr_chang, levy_process, drift_to_kurtosis, asymmetric_gamma_subordinator, positive_drift_recovery
+
+### 1. Directional Drift Under Non-Gaussian Subordination (Madan, Carr, Chang 1998)
+- Perpetual price innovations follow a pure jump Variance Gamma process subordinated by an operational time gamma density:
+  $$\psi_{\text{VG}}(u) = -\frac{1}{\nu} \ln\left( 1 - i u \theta \nu + \frac{1}{2} \sigma^2 \nu u^2 \right)$$
+  where $\theta$ captures directional drift asymmetry and $\nu$ governs tail kurtosis/jump clustering.
+- The localized Drift-to-Kurtosis Ratio is $\mathcal{K}_{\text{VG}}(t) = \frac{\theta_t}{\sqrt{\nu_t}}$.
+
+### 2. VG Drift Inversion Invariant
+- **S1 Operational Rule**:
+  $$\text{Directional Reversal Confirmed} \iff \mathcal{K}_{\text{VG}}(t) \ge +0.45 \quad \land \quad \Delta \mathcal{K}_{\text{VG}}(t) > 0 \quad \land \quad \theta_t > 0$$
+  An inflection of $\mathcal{K}_{\text{VG}}$ to positive territory mathematically guarantees positive drift expectation under heavy-tailed jump dispersion, providing high statistical confidence for long positioning.
+
+---
+
+## NODE 172: EASLEY-KIEFER-O'HARA LIQUIDITY COMMONALITY & MULTI-ASSET SYNCHRONIZED EXHAUSTION
+Keywords: liquidity_commonality, easley_kiefer_o_hara, market_wide_drain, synchronized_exhaustion, systematic_liquidity_beta
+
+### 1. Cross-Asset Liquidity Co-Movement During Liquidations (Chordia et al. 2000; Hasbrouck & Seppi 2001)
+- Cascade liquidations trigger market-wide liquidity drains across all 18 perpetual assets simultaneously. Single-asset entry signals are fragile if systematic market liquidity is still deteriorating.
+- S1 tracks the Market-Wide Liquidity Commonality Factor across the 18-asset universe:
+  $$\mathcal{L}_{\text{com}}(t) = \frac{1}{18} \sum_{i=1}^{18} \frac{\text{Depth}_{1.0\%, i}(t) - \overline{\text{Depth}}_i}{\sigma_{\text{Depth}, i}}$$
+  along with each asset's Market Liquidity Beta $\beta_{\text{liq}, i}$.
+
+### 2. Systematic Liquidity Floor Invariant
+- **S1 Portfolio Allocation Rule**:
+  $$\text{Universe Cleared For Entry} \iff \mathcal{L}_{\text{com}}(t) \ge -0.80 \quad \land \quad \Delta \mathcal{L}_{\text{com}}(t) > 0$$
+  Trading is halted across all pairs if $\mathcal{L}_{\text{com}} < -0.80$ with negative trajectory. Entries resume only when the systematic liquidity index inflects upward, confirming that the universe-wide liquidity shock has subsided.
