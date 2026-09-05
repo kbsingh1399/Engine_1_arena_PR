@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v30.0 (COLLATERAL SLACK, ASYMMETRIC REALIZED BETA, PERMANENT INFORMATION SHARES & PARZEN REALIZED KERNELS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Froot/Scharfstein/Stein/Biais/Hillion/Spatt/Andersen/Diebold/Hasbrouck/Parzen/Vayanos/Wang
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v31.0 (AFFINE TERM STRUCTURE, SUB-TICK SWEEP CESSATION, VULNERABLE MARGIN MASS & GKYZ REALIZED RANGE)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Duffie/Kan/Piazzesi/OHara/Biais/Merton/Garman/Klass/Yang/Zhang/Kyle/Back/Brunnermeier/Pedersen
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 190 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 196 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4118,3 +4118,98 @@ Keywords: vayanos_wang, liquidity_cycles, search_frictions, matching_velocity, e
 - **S1 Operational Rule**:
   $$\text{Natural Liquidity Restored} \iff \mathcal{D}_{\text{recov}}(t) \ge 1.65 \quad \land \quad \Delta \mathcal{D}_{\text{recov}}(t) > 0$$
   When $\mathcal{D}_{\text{recov}} \ge 1.65$ with positive trajectory, the endogenous liquidity drought has broken, enabling seamless trade fills with zero market impact.
+
+---
+
+## NODE 191: DUFFIE-KAN MULTI-FACTOR AFFINE YIELD CURVE DYNAMICS & CROSS-MATURITY FUNDING TERM STRUCTURE
+Keywords: duffie_kan, funding_term_structure, affine_yield_curve, backwardation_snapback, term_structure_inversion
+
+### 1. Affine State Dynamics of Multi-Maturity Futures Basis (Duffie & Kan 1996; Piazzesi 2010)
+- The term structure of basis across perpetuals, weekly, and quarterly futures contracts is governed by an affine state vector $\mathbf{X}_t = (L_t, S_t, C_t)^T$ (Level, Slope, Curvature):
+  $$y_t(\tau) = A(\tau) + \mathbf{B}(\tau)^T \mathbf{X}_t, \quad S_t = y_t(\tau_{\text{long}}) - y_t(\tau_{\text{short}})$$
+- S1 evaluates the Term Structure Inversion Snapback Metric:
+  $$\Theta_{\text{slope}}(t) = \frac{S_t - \bar{S}_{30\text{d}}}{\sigma(S)}$$
+
+### 2. Term Structure Normalization Invariant
+- **S1 Operational Rule**:
+  $$\text{Term Structure Normalized} \iff \Theta_{\text{slope}}(t) \ge -0.50 \quad \land \quad \Delta \Theta_{\text{slope}}(t) > +0.75$$
+  When the slope inverts from severe backwardation back toward a normal carry regime, synthetic short borrowing panic has ended, unlocking upward price drift.
+
+---
+
+## NODE 192: O'HARA-SHORTER HIGH-FREQUENCY STRUCTURAL LATENCY ARBITRAGE & SUB-PENNY QUOTE SNIPING DEFENSE
+Keywords: ohara_shorter, sub_tick_sweeps, predatory_latency_sniping, book_depth_stability, quote_replenishment
+
+### 1. High-Frequency Multi-Tick Sweeps and Toxic Sniping (O'Hara 2015; Biais et al. 2015)
+- Predatory algorithms execute micro-tick sweeps across resting limit orders during cascades, destabilizing top-of-book depth.
+- S1 tracks the Sub-Tick Sweep Aggression Factor:
+  $$\Xi_{\text{sweep}}(t) = \frac{\text{Aggressive Taker Swept Volume}_{15\text{m}}}{\text{Total Volume}_{15\text{m}} \cdot (1 + \text{Ticks Swept}_{15\text{m}})}$$
+  and the Depth Stability Metric $\mathcal{Q}_{\text{stab}}(t) = \frac{\min(\text{BidDepth}_t, \text{BidDepth}_{t-1})}{\max(\text{BidDepth}_t, \text{BidDepth}_{t-1}) \cdot (1 + \Xi_{\text{sweep}}(t))}$.
+
+### 2. Sub-Tick Sweep Cessation Invariant
+- **S1 Microstructure Invariant**:
+  $$\text{Predatory Sweeps Halted} \iff \Xi_{\text{sweep}}(t) \le 0.12 \quad \land \quad \mathcal{Q}_{\text{stab}}(t) \ge 0.75$$
+  A collapse in swept volume combined with high depth stability confirms that predatory snipers have vanished, allowing orderly bid accumulation.
+
+---
+
+## NODE 193: MERTON JUMP-DIFFUSION STOPPING TIME & OPTIMAL PRE-LIQUIDATED MARGIN CUSHION
+Keywords: merton_stopping_time, margin_cushion_depletion, vulnerable_open_interest, first_passage_liquidation, cascade_tail_exhaustion
+
+### 1. Stopping Time Distributions on Leverage Default Barriers (Merton 1976; Kou 2002)
+- Liquidation first-passage times $\tau_{\text{liq}} = \inf \{t > 0 : S_t \le B_{\text{liq}}\}$ cluster heavily during selloffs. Once the primary wave exhausts, remaining accounts possess substantial margin cushions.
+- S1 calculates the Vulnerable Margin Mass Ratio:
+  $$\mathcal{M}_{\text{vuln}}(t) = \frac{\int_{P_t}^{1.03 P_t} \text{Estimated Liquidation Density}(p) dp}{\text{Total Open Interest}_t}$$
+  and the Depletion Velocity $\mathcal{V}_{\text{deplete}}(t) = -\frac{\mathcal{M}_{\text{vuln}}(t) - \mathcal{M}_{\text{vuln}}(t-2)}{2\Delta t}$.
+
+### 2. Liquidation Barrier Clearance Invariant
+- **S1 Execution Invariant**:
+  $$\text{Liquidation Cascade Mass Exhausted} \iff \mathcal{M}_{\text{vuln}}(t) \le 0.04 \quad \land \quad \mathcal{V}_{\text{deplete}}(t) \le 0.01\text{ bar}^{-1}$$
+  When less than $4\%$ of open interest sits within $3\%$ of liquidation, the risk of a secondary domino cascade is mathematically eliminated.
+
+---
+
+## NODE 194: ENGLE-LUNDE-SHEPHARD HIGH-FREQUENCY REALIZED RANGE VOLATILITY & EXTREMUM SCALING
+Keywords: garman_klass_yang_zhang, realized_range_volatility, intraday_extremum, efficiency_gain, execution_frictions
+
+### 1. High-Efficiency Continuous-Time Range Estimators (Parkinson 1980; Garman & Klass 1980; Yang & Zhang 2000)
+- Capturing intra-bar price extremes and opening jumps via the Garman-Klass-Yang-Zhang (GKYZ) volatility estimator ($8\times$ statistical efficiency over close-to-close):
+  $$\sigma_{\text{GKYZ}}^2(t) = \frac{(\ln O_t - \ln C_{t-1})^2}{2} + \frac{(\ln H_t - \ln L_t)^2}{2(2\ln 2 - 1)} - (2\ln 2 - 1)(\ln C_t - \ln O_t)^2$$
+- The Range Expansion Ratio is $\mathcal{E}_{\text{range}}(t) = \frac{\sigma_{\text{GKYZ}}(t)}{\text{ATR}_{14}(t)}$.
+
+### 2. Range Volatility Contraction Invariant
+- **S1 Risk Geometry Rule**:
+  $$\text{Intra-bar Turbulence Quenched} \iff \mathcal{E}_{\text{range}}(t) \le 1.15 \quad \land \quad \sigma_{\text{GKYZ}}(t) \le 0.80 \sigma_{\text{GKYZ}}(t-1)$$
+  A rapid contraction in extreme range volatility ensures that the entry bar is stable, eliminating wide slippage and protecting initial stop geometry.
+
+---
+
+## NODE 195: KYLE-BACK STRATEGIC TRADING WITH CONTINUOUS SIGNAL ARRIVALS & INFORMATION DISPERSION
+Keywords: kyle_back, strategic_informed_trading, order_flow_linearity, institutional_absorption, continuous_pricing_martingale
+
+### 1. Continuous Equilibrium Pricing Under Strategic Informed Accumulation (Back 1992; Kyle 1985)
+- Strategic institutional buyers disguise large block accumulation by trading continuously, forcing price updates into a Martingale linear in cumulative volume:
+  $$\mathcal{R}_{\text{impact}}^2(t) = \text{Corr}(\Delta P_{\tau}, \text{CVD}_{\tau})^2, \quad \tau \in [t-8, t]$$
+- S1 tracks the Strategic Accumulation Signal:
+  $$\mathcal{S}_{\text{accum}}(t) = \mathcal{R}_{\text{impact}}^2(t) \cdot \frac{\text{CVD}_t - \text{CVD}_{t-8}}{\text{Volume}_{8\text{bar}}}$$
+
+### 2. Strategic Informed Absorption Invariant
+- **S1 Operational Rule**:
+  $$\text{Institutional Accumulator Leading} \iff \mathcal{R}_{\text{impact}}^2(t) \ge 0.75 \quad \land \quad \mathcal{S}_{\text{accum}}(t) \ge +0.35$$
+  High correlation between CVD and price changes coupled with positive volume expansion confirms deliberate institutional accumulation driving price recovery.
+
+---
+
+## NODE 196: BRUNNERMEIER-PEDERSEN DYNAMIC MARGIN REQUIREMENTS & PROCYCLICAL LIQUIDITY SPIRALS
+Keywords: brunnermeier_pedersen, procyclical_margin_haircuts, clearinghouse_escalation, leverage_spiral_halt, margin_plateau
+
+### 1. Exchange Haircut Escalation and Liquidity Destabilization (Brunnermeier & Pedersen 2009; Adrian & Shin 2010)
+- In market drops, exchange risk engines dynamically raise maintenance margin requirements, forcing mechanical liquidation of solvent traders.
+- S1 monitors the Exchange Margin Haircut Multiplier:
+  $$\mathcal{H}_{\text{margin}}(t) = \frac{\text{Current Required Initial Margin Rate}_t}{\text{Baseline Initial Margin Rate}}$$
+  and its change rate $\Delta \mathcal{H}_{\text{margin}}(t) = \frac{\mathcal{H}_{\text{margin}}(t) - \mathcal{H}_{\text{margin}}(t-4)}{4\Delta t}$.
+
+### 2. Procyclical Margin Plateau Invariant
+- **S1 Risk Governance Rule**:
+  $$\text{Margin Escalation Terminated} \iff \Delta \mathcal{H}_{\text{margin}}(t) \le 0 \quad \land \quad \mathcal{H}_{\text{margin}}(t) \le 1.25 \bar{\mathcal{H}}_{24\text{h}}$$
+  Entering only after exchange margin increases have plateaued guarantees that no unexpected haircut hikes will trigger secondary forced liquidations.
