@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v39.0 (SPREAD ELASTICITY, LIQUIDITY COMMONALITY, QUEUE IMBALANCE & HAIRCU SNAPBACK)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Glosten/Harris/O'Hara/Shorish/Lehalle/Neuman/Duffie/Zhu/Hasbrouck/Barndorff-Nielsen/Shephard
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v40.0 (ILLIQUIDITY PREMIA, SEQUENTIAL FREEZES, HIDDEN ORDERS & LEVEL-1 JUMPS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Amihud/Mendelson/Easley/Kiefer/OHara/Paperman/Biais/Hillier/Spatt/Brunnermeier/Sannikov/Cont/deLarrard/AitSahalia/Jacod
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 244 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 250 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4970,3 +4970,99 @@ Keywords: barndorff_nielsen_shephard, semimartingale_decomposition, bipower_vari
 - **S1 Stable Drift Resumption Invariant**:
   $$\text{Smooth Rebound Drift Established} \iff \mathcal{Z}_{\text{jump}}(t) \le 0.10 \quad \land \quad \hat{\sigma}_{\text{cont}}^2(t) \ge 1.25\sigma_{\text{baseline}}^2$$
   When jump variance drops below $10\%$ of realized variance while continuous volatility expands, the asset transitions from chaotic liquidation jumps to an orderly, high-convexity trend.
+
+---
+
+## NODE 245: AMIHUD-MENDELSON ILLIQUIDITY PREMIA & ASSET RETURN ASYMMETRY
+Keywords: amihud_mendelson, illiquidity_premia, return_asymmetry, endogenous_spread_premium, market_clearing_compensation
+
+### 1. Equilibrium Asset Pricing with Microstructure Friction (Amihud & Mendelson 1986)
+- Expected return incorporates concave compensation for relative bid-ask spreads:
+  $$\mathbb{E}[R_i] = R_f + \beta_i \lambda_{\text{market}} + c_0 \left(\frac{S_i}{P_i}\right)^\alpha, \quad \alpha \approx 0.65$$
+- S1 evaluates the Illiquidity Premium Convexity:
+  $$\Pi_{\text{prem}}(t) = \frac{S_t / P_t}{\mathbb{E}[S / P]_{\text{baseline}}}$$
+
+### 2. Illiquidity Premium Reversal Invariant
+- **S1 Spread Compensation Rebound Rule**:
+  $$\text{Illiquidity Compensation Peak Reached} \iff \Pi_{\text{prem}}(t) \ge 2.80 \quad \land \quad \Delta \Pi_{\text{prem}}(t) < 0$$
+  When relative bid-ask spread reaches extreme illiquidity compensation levels and begins contracting, expected forward returns surge to re-establish market clearing equilibrium.
+
+---
+
+## NODE 246: EASLEY-KIEFER-O'HARA-PAPERMAN (EKOP) SEQUENTIAL TRADE ARRIVAL & PINPOINT LIQUIDITY FREEZES
+Keywords: ekop, sequential_trade_arrival, pinpoint_liquidity_freezes, private_information_probability, unobserved_event_state
+
+### 1. Sequential Trade Probability of Information Tree (Easley, Kiefer, O'Hara, Paperman 1996)
+- Evaluating the occurrence of unobserved bad events $\alpha$ and informed arrival rate $\mu$:
+  $$\text{PIN}_t = \frac{\alpha \mu}{\alpha \mu + 2\epsilon}, \quad \mathcal{P}_{\text{event}}(t) = \mathbb{P}(\text{Informed Wave} \mid \mathcal{F}_t)$$
+- S1 tracks the Informed Selling Depletion Metric:
+  $$\Omega_{\text{EKOP}}(t) = \frac{\mu_{\text{sell}}(t)}{\epsilon_{\text{uninformed}}}$$
+
+### 2. Informed Flow Exhaustion Invariant
+- **S1 Informed Wave Termination Invariant**:
+  $$\text{Informed Cascade Exhausted} \iff \Omega_{\text{EKOP}}(t) \le 1.15 \quad \land \quad \Delta \text{PIN}_t < 0$$
+  When informed selling intensity drops back toward uninformed baseline noise, the information asymmetry freeze resolves, restoring aggressive liquidity provision.
+
+---
+
+## NODE 247: BIAIS-HILLIER-SPATT EQUILIBRIUM QUOTE DISCRETION & HIDDEN ORDER CUSHION
+Keywords: biais_hillier_spatt, quote_discretion, hidden_order_cushion, iceberg_detection, undisclosed_liquidity_depth
+
+### 1. Equilibrium Limit Orders with Hidden Discretion (Biais, Hillier, Spatt 1995)
+- Institutional participants deploy iceberg orders to mitigate information exposure:
+  $$\mathcal{D}_{\text{true}}(t) = \mathcal{D}_{\text{visible}}(t) + \mathcal{D}_{\text{hidden}}(t), \quad \phi_{\text{iceberg}}(t) = \frac{\mathcal{D}_{\text{hidden}}(t)}{\mathcal{D}_{\text{visible}}(t) + \epsilon}$$
+- S1 estimates the Hidden Bid Accumulation Ratio:
+  $$\chi_{\text{hidden}}(t) = \frac{\text{Cumulative Executed Buys} - \Delta \mathcal{D}_{\text{visible}}^{\text{ask}}}{\text{Total Volume}_{15\text{m}}}$$
+
+### 2. Hidden Cushion Wall Invariant
+- **S1 Undisclosed Liquidity Support Rule**:
+  $$\text{Hidden Bid Wall Verified} \iff \phi_{\text{iceberg}}(t) \ge 1.85 \quad \land \quad \chi_{\text{hidden}}(t) \ge 0.40$$
+  When executed volume vastly exceeds visible depth reductions, institutional participants are absorbing selling pressure via undisclosed resting bid icebergs.
+
+---
+
+## NODE 248: BRUNNERMEIER-SANNIKOV MACROECONOMIC LIQUIDITY SPIRALS & NON-LINEAR MARGIN AMPLIFIER
+Keywords: brunnermeier_sannikov, liquidity_spirals, non_linear_margin_amplifier, wealth_share_collapse, margin_boundary_equilibrium
+
+### 1. Macroeconomic Capital Constraints and Feedback Loops (Brunnermeier & Sannikov 2014)
+- Highly leveraged financial intermediaries drive price spirals as wealth share $\eta_t$ drops:
+  $$d\eta_t = \mu_\eta(\eta_t) dt + \sigma_\eta(\eta_t) dW_t, \quad \text{Amplifier}(t) = \frac{1}{1 - m \cdot \frac{\partial \text{Haircut}}{\partial P}}$$
+- S1 tracks the Systemic Deleveraging Crest Metric:
+  $$\Psi_{\text{macro}}(t) = \frac{\Delta \text{Cumulative Liquidations}_{1\text{h}}}{\text{Open Interest}_{t-4\text{h}}}$$
+
+### 2. Deleveraging Spiral Neutralization Invariant
+- **S1 Margin Amplifier Dissipation Rule**:
+  $$\text{Amplifier Feedback Neutralized} \iff \Psi_{\text{macro}}(t) \ge 0.08 \quad \land \quad \Delta \text{Amplifier}(t) < 0$$
+  When cumulative forced liquidations exceed $8\%$ of open interest and margin feedback amplification peaks, forced liquidations lose the power to drive further price decline.
+
+---
+
+## NODE 249: CONT-DE LARRARD CONTINUOUS-TIME LEVEL-1 ORDER BOOK JUMP HYDRODYNAMICS
+Keywords: cont_de_larrard, level1_order_book, jump_hydrodynamics, queue_first_passage_time, mid_price_rebound_prob
+
+### 1. Markov Chain First-Passage Times of Level-1 Queues (Cont & de Larrard 2013)
+- Modeling the probability that the next price move is an upward tick:
+  $$p_{\text{up}}(q_{\text{bid}}, q_{\text{ask}}) = \mathbb{P}(T_{\text{ask}} < T_{\text{bid}} \mid q_{\text{bid}}, q_{\text{ask}})$$
+- S1 computes the Analytical Level-1 Rebound Probability:
+  $$\hat{p}_{\text{up}}(t) = \frac{q_{\text{bid}}^2(t)}{q_{\text{bid}}^2(t) + q_{\text{ask}}^2(t)}$$
+
+### 2. Level-1 Tick Reversal Invariant
+- **S1 Tick Pressure Reversal Rule**:
+  $$\text{Next Tick Deterministically Up} \iff \hat{p}_{\text{up}}(t) \ge 0.78 \quad \land \quad q_{\text{bid}}(t) \ge 2.5 \cdot \bar{q}$$
+  When the analytical first-passage probability of consuming the inside ask exceeds $78\%$, the subsequent price movement exhibits overwhelming upward probability.
+
+---
+
+## NODE 250: AÏT-SAHALIA-JACOD HIGH-FREQUENCY SPECTRAL SEPARATION OF JUMP ACTIVITY & TRUE CONTINUOUS VOLATILITY
+Keywords: ait_sahalia_jacod, spectral_jump_separation, jump_activity_index, semimartingale_purity, robust_volatility_scaling
+
+### 1. Non-Parametric Jump Activity Metric (Aït-Sahalia & Jacod 2009, 2012)
+- Disentangling continuous Brownian motion ($\beta = 2$) from jump intensity ($\beta \in [0, 2)$):
+  $$\hat{\beta}(k, u) = \frac{\ln(U(k \Delta_n, u)) - \ln(U(\Delta_n, u))}{\ln(k)}$$
+- S1 computes the Pure Diffusion Ratio:
+  $$\Phi_{\text{diff}}(t) = \frac{\hat{\sigma}_{\text{cont}}^2(t)}{\hat{\sigma}_{\text{total}}^2(t)}$$
+
+### 2. Pure Diffusion Resumption Invariant
+- **S1 Volatility Quality Verification Invariant**:
+  $$\text{Diffusion Dominance Restored} \iff \hat{\beta}(t) \ge 1.80 \quad \land \quad \Phi_{\text{diff}}(t) \ge 0.88$$
+  When the jump activity index approaches pure diffusion ($\beta \to 2.0$) and continuous variation explains $>88\%$ of volatility, entry risk is minimized for the $+2.5\text{R}$ target.
