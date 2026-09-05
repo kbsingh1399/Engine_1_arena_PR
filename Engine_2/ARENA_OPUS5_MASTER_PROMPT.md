@@ -297,7 +297,39 @@ Every candidate strategy and the dynamic allocation engine must be tested across
 
 ---
 
-## 8. CODE ARCHITECTURE & EXPECTED DELIVERABLE STRUCTURE
+## 8. FORENSIC POST-MORTEM OF COMMIT `ffc3ce2`: 4 LETHAL BUGS TO ELIMINATE
+
+The previous iteration generated in commit `ffc3ce2` contained four structural flaws that caused execution failure and prevented conquering the 20 OOS windows. You MUST address and eliminate these four root causes:
+
+### 1. BUG 1: Sub-Friction Stop Loss Geometry ($0.35\text{ ATR} = 28\text{ bps}$ vs $41\text{ bps}$ Friction)
+- **The Defect**: Signals set `stop = l - (0.35 + 0.05 * variant) * atr`. On 15m crypto bars, $0.35\text{ ATR} \approx 0.28\%$. Our VIP0 transaction friction (8 bps fee + 10 bps entry slippage + 15 bps stop slippage = 41 bps) is wider than the entire stop distance! Every trade was mathematically stopped out by execution frictions and normal noise, creating negative expectancy ($-\$1.70$ to $-\$8.50$) across all candidates.
+- **The Mandatory Cure**: Widen stop loss distance to institutional standards:
+  $$\text{Stop Distance} \ge 1.50 \dots 2.00 \times \text{ATR}_{14}$$
+  with profit targets at $+2.0\text{R} \dots +2.5\text{R}$ (or Yang-Zhang volatility band exits).
+
+### 2. BUG 2: Empty Slice Crash on Early Listings (`IndexError`)
+- **The Defect**: For early lookbacks (e.g. 2020), newly listed altcoins (SUI, ARB, OP, APT) have 0 rows in the date filter. Indexing `ret[0] = 0.0` threw an unhandled `IndexError: index 0 is out of bounds for axis 0 with size 0`.
+- **The Mandatory Cure**: At the very start of `strategy_signals(f, sid)`, add an immediate guard:
+  ```python
+  if len(f) == 0:
+      return _blank(0)
+  ```
+
+### 3. BUG 3: The 0-Sleeve Flat Trap (`FLAT: no qualified IS sleeve`)
+- **The Defect**: In `select_strategies`, when low-volatility chop caused all candidate sleeves to fail the in-sample filter, the function returned `chosen = []`. The simulator went 100% into cash, generated 0 trades, and automatically failed the `TRADES >= 6` gate on all 20 windows!
+- **The Mandatory Cure**: Never go 100% flat. If no candidate sleeve passes the strict filter during an in-sample lookback, fallback to the top 2 robust baseline sleeves (e.g. S01 Liquidation Rebound + S11 CVD Absorption with calibrated $1.5\text{ATR}$ stops) so the portfolio maintains exposure.
+
+### 4. BUG 4: Halting Early Without Executing All 20 Windows
+- **The Defect**: Halting execution and claiming code completion without running the walk-forward test because `pandas` was missing in the sandbox.
+- **The Mandatory Mandate**: Install required dependencies immediately:
+  ```bash
+  pip install pandas pyarrow numba fastparquet
+  ```
+  **DO NOT STOP. DO NOT DECLARE COMPLETION UNTIL YOU EXECUTE `python Engine_2/test_all_20_regimes.py`, CAPTURE THE LIVE SCORECARD OUTPUT, AND CONFIRM THAT ALL 20 OUT-OF-SAMPLE WINDOWS PASS.**
+
+---
+
+## 9. CODE ARCHITECTURE & EXPECTED DELIVERABLE STRUCTURE
 
 Provide pure, clean, production-grade Python code across the files:
 
@@ -315,5 +347,6 @@ Engine_2/
 - **NO LOOKUP TABLES BY WINDOW INDEX (`WINDOW_CONFIGURATIONS[w_idx]`)**.
 - **Vectorized indicator computation** using NumPy/Pandas and `@njit(fastmath=True)` trade path execution for maximum computational efficiency.
 - Support parallel execution of multiple selected strategies with concurrent positions under the shared $5,000 risk governor.
+- **EXECUTE AND VERIFY ALL 20 OOS REGIMES LOCALLY BEFORE RETURNING YOUR FINAL RESPONSE.**
 
 *Produce the complete, uncompromised, production-grade implementation now.*
