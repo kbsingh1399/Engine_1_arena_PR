@@ -23,6 +23,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numba import njit
+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 # ---------------------------------------------------------------------------
 # 1. INVARIANTS  (single global configuration — identical for all 20 windows)
@@ -840,6 +844,8 @@ def assemble_window(store: DataStore, start_ms: int, end_ms: int, strategy_ids):
 
         for sid in strategy_ids:
             fire, md, tg, sl, tr, rk, hb = caches[sid][sym]
+            if getattr(store, "_ml_gate", None) is not None and sym in store._ml_gate:
+                fire = fire & store._ml_gate[sym]
             sel = rows[fire[rows]]
             if sel.size == 0:
                 continue
@@ -944,6 +950,75 @@ def evaluate_gates(m: dict, min_roi: float = 10.0, max_dd: float = 5.0,
 
 
 # ---------------------------------------------------------------------------
+# 7. CAUSAL MULTI-MODEL META FILTER
+# ---------------------------------------------------------------------------
+
+ML_FEATURES = ("rsi_14", "atr_14", "vwap_z", "zc_div", "d_spot", "d_fut",
+               "long_liq_zs", "funding_rate_pct", "basis_usd", "bid_repl",
+               "depth_ratio", "close_pos", "fp_delta")
+
+
+def _fit_causal_ensemble(store: DataStore, is_start: int, is_end: int,
+                         forward_start: int, horizon: int = 4) -> None:
+    """Fit four heterogeneous classifiers on IS labels and gate forward bars.
+
+    Labels are deliberately built only where the complete forward horizon is
+    still inside the IS interval. The resulting predictions are then frozen
+    and used only at timestamps after ``forward_start``; no OOS label is ever
+    consumed by training or model selection.
+    """
+    rows = []
+    for sym in store.symbols:
+        f = store.features[sym]
+        t = f["open_time_ms"].to_numpy()
+        m = (t >= is_start) & (t <= is_end)
+        ix = np.flatnonzero(m)
+        if len(ix) <= horizon:
+            continue
+        ix = ix[:-horizon]
+        x = f.loc[ix, list(ML_FEATURES)].replace([np.inf, -np.inf], np.nan).fillna(0.0).to_numpy()
+        close = f["close"].to_numpy()
+        y = (close[ix + horizon] / np.maximum(close[ix], 1e-12) - 1.0 > 0.004).astype(np.int8)
+        rows.append((x, y))
+    if not rows:
+        store._ml_gate = None
+        return
+    X = np.vstack([x for x, _ in rows])
+    y = np.concatenate([v for _, v in rows])
+    if len(X) > 60_000:
+        keep = np.linspace(0, len(X) - 1, 60_000, dtype=np.int64)
+        X, y = X[keep], y[keep]
+    if np.unique(y).size < 2:
+        store._ml_gate = None
+        return
+    models = [
+        ExtraTreesClassifier(n_estimators=80, min_samples_leaf=20, max_features=0.8,
+                             random_state=17, n_jobs=1, class_weight="balanced"),
+        RandomForestClassifier(n_estimators=80, min_samples_leaf=20, max_features=0.8,
+                               random_state=23, n_jobs=1, class_weight="balanced"),
+        HistGradientBoostingClassifier(max_iter=80, max_leaf_nodes=15,
+                                       learning_rate=0.05, random_state=29),
+        make_pipeline(StandardScaler(), LogisticRegression(max_iter=300, C=0.25,
+                                                            class_weight="balanced")),
+    ]
+    for model in models:
+        model.fit(X, y)
+    store._ml_gate = {}
+    for sym in store.symbols:
+        f = store.features[sym]
+        t = f["open_time_ms"].to_numpy()
+        m = t >= forward_start
+        x = f.loc[:, list(ML_FEATURES)].replace([np.inf, -np.inf], np.nan).fillna(0.0).to_numpy()
+        if not m.any():
+            store._ml_gate[sym] = np.zeros(len(f), dtype=bool)
+            continue
+        p = np.mean([model.predict_proba(x[m])[:, 1] for model in models], axis=0)
+        gate = np.zeros(len(f), dtype=bool)
+        gate[m] = p >= 0.52
+        store._ml_gate[sym] = gate
+
+
+# ---------------------------------------------------------------------------
 # 7. CAUSAL IN-SAMPLE STRATEGY SELECTOR
 # ---------------------------------------------------------------------------
 
@@ -958,6 +1033,7 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
     """
     is_end = int(oos_start_ms - purge_hours * 3_600_000)
     is_start = int(is_end - lookback_days * 86_400_000)
+    _fit_causal_ensemble(store, is_start, is_end, oos_start_ms)
     rows = []
     signals = {}
     for sid in STRATEGY_NAMES:
@@ -1003,8 +1079,7 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
         # invariant family, never by OOS window or its realized result.
         baseline = report.loc[
             (report["trades"] >= 4) & (report["max_dd"] < RISK.drawdown_risk_limit),
-            "strategy_id",
-        ].astype(int).tolist()
+        ].sort_values(["expectancy_usd", "win_rate"], ascending=False)["strategy_id"].astype(int).tolist()
         baseline.extend([1, 11])
         for sid in baseline:
             if sid not in chosen and sid in STRATEGY_NAMES:
