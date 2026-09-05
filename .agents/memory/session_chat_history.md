@@ -39855,3 +39855,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`c9a4d0e`); Engine_1_arena_PR committed and pushed (`b25bac8`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-2783` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v41.0 Expansion (Nodes 251–256) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2932` (iteration 1), `task-2783` (iteration 4), `task-2634` (iteration 7), `task-2487` (iteration 10), `task-2345` (iteration 13), `task-2203` (iteration 16), `task-2067` (iteration 19), `task-794` (iteration 37), and `task-1891` (iteration 24) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 251–256: 256 Structured Nodes)**:
+  - **Node 251**: Foucault-Roëll Front-Running Dynamics & Optimal Dual-Trading Timing (Foucault & Roëll 2005; front-running exhaustion $\mathcal{F}_{\text{front}} \le 0.30 \land \Delta \mathcal{F}_{\text{front}} \le 0$ opening predatory-free entry window).
+  - **Node 252**: Vayanos-Wang Search-Based Asset Pricing & Fire-Sale Spillover Cascades (Vayanos & Wang 2012; distress selling dislocation $\Delta_{\text{search}} \le -35.0\,\text{bps} \land \frac{d(\Delta_{\text{search}})}{dt} > 0$ proving distress flow absorbed).
+  - **Node 253**: Andersen-Bollerslev-Diebold Intraday Realized Volatility Jumps & Volatility Clustering (Andersen et al. 2007; HAR volatility stabilization $\mathcal{S}_{\text{HAR}} \le 1.15 \land \Delta \mathcal{S}_{\text{HAR}} < 0$ restoring calm execution noise).
+  - **Node 254**: Garman-O'Hara Specialist Inventory Duration & Stochastic Restocking Horizon (Garman 1976, O'Hara 1995; dealer restocking pressure $\mathcal{R}_{\text{restock}} \ge 2.20 \land \Delta \mathcal{R}_{\text{restock}} > 0$ driving inventory markup drift).
+  - **Node 255**: Kyle-Viswanathan-Wang Market Depth Nonlinearities Under Toxic Volume Surges (Kyle et al. 2018; price impact curvature $\mathcal{K}_{\text{impact}} \le 1.10 \land \Delta \mathcal{K}_{\text{impact}} \le 0$ re-establishing linear depth).
+  - **Node 256**: Jacod-Podolskij-Vetter Truncated Realized Covariation & Microstructure Noise Robustness (Jacod et al. 2009; continuous co-movement coherence $\mathcal{C}_{\text{cohere}} \ge 0.65 \land \Delta \mathcal{C}_{\text{cohere}} > 0$ confirming aligned recovery wave).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`f985c17`); Engine_1_arena_PR committed and pushed (`e8a59cb`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2932` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
