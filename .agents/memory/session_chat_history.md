@@ -39758,4 +39758,20 @@ eferences.bib into architecture memory in both repositories.
 - **Parity & Delivery**:
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`29280db`); Engine_1_arena_PR committed and pushed (`beb40ab`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
-- **Standing Daemon**: Cron task `task-2487` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+- **Standing Daemon**: Cron task `task-2634` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v35.0 Expansion (Nodes 215–220) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-2634` (iteration 1), `task-2487` (iteration 4), `task-2345` (iteration 7), `task-2203` (iteration 10), `task-2067` (iteration 13), `task-794` (iteration 31), and `task-1891` (iteration 18) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 215–220: 220 Structured Nodes)**:
+  - **Node 215**: O'Hara-Wang Endogenous Liquidity Provision & Asymmetric Speed Advantages (O'Hara & Wang 2021; liquidity availability $\mathcal{L}_{\text{avail}} \ge 2.00 \land \Delta \mathcal{F}_{\text{fade}} \le -0.30$ confirming firm resting bid depth).
+  - **Node 216**: Glosten-Milgrom Sequential Information Dissemination & Cross-Tier Adverse Selection (Glosten & Milgrom 1985; Hasbrouck 1995; informed state $\pi_{\text{BTC}}^H \ge 0.75 \land \mathcal{I}_{\text{lead}} \ge 0.65$ clearing altcoin cross-tier cascades).
+  - **Node 217**: Merton Jump-Diffusion Compound Poisson Recovery & Finite Arrival Intensity (Merton 1976; jump arrival rate $\lambda^+ \ge 1.50\text{ / hr} \land \mu_J \ge +1.20\%$ validating explosive jump impulse momentum).
+  - **Node 218**: Brunnermeier-Pedersen Predator-Prey Margin Spirals & Equilibrium Runaways (Brunnermeier & Pedersen 2005, 2009; unwind index $\mathcal{M}_{\text{spiral}} \ge -0.15 \land \mathcal{P}_{\text{unwind}} \ge 1.25$ confirming short covering squeeze).
+  - **Node 219**: Gârleanu-Pedersen Dynamic Margin Constraints & Haircut Dislocation Pricing (Gârleanu & Pedersen 2011; shadow cost elasticity $\Psi_{\text{cap}} \ge +1.80 \land \Delta \Psi_{\text{cap}} > 0$ confirming collateral snapback).
+  - **Node 220**: Biais-Hillion-Spatt Asymmetric Information in Limit Order Markets & Transitory Volatility Filtering (Biais et al. 1995; information purity $\mathcal{S}_{\text{info}} \ge 0.80 \land \Delta \mathcal{S}_{\text{info}} > 0$ filtering noise for clean $+2.5\text{R}$ target capture).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`cdcadab`); Engine_1_arena_PR committed and pushed (`2ecbef0`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-2634` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
