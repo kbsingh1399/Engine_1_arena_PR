@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v43.0 (TRADE SIZE SURPRISES, SPIRAL DECOUPLING, SPATIAL DECAY & MANCINI PURITY)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Madhavan/Richardson/Roomans/Brunnermeier/Pedersen/Hautsch/Sheng/Huang/Stoll/Cont/Stoikov/Mancini
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v44.0 (OPTIMAL EXECUTION, BOOK TRANSITIONS, THRESHOLD BIPOWER & RESILIENCE KERNELS)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Cartea/Jaimungal/Biais/Hillion/Spatt/Corsi/Pirino/Gromb/Vayanos/Gatheral/Schied/Podolskij/Vetter
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 268 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 274 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -5356,3 +5356,100 @@ Keywords: mancini, threshold_truncation, continuous_semimartingale, robust_jump_
 - **S1 Pure Diffusion Stability Rule**:
   $$\text{Continuous Rebound Assured} \iff \mathcal{P}_{\text{cont}}(t) \ge 0.90 \quad \land \quad \Delta \mathcal{P}_{\text{cont}}(t) \ge 0$$
   When Mancini threshold truncation confirms $>90\%$ of total variation is pure continuous diffusion, execution risk from discontinuous jump traps is eliminated, allowing trailing stop ratchets to advance safely toward $+2.5\text{R}$.
+
+
+---
+
+## NODE 269: CARTEA-JAIMUNGAL STOCHASTIC OPTIMAL EXECUTION WITH TERMINAL INVENTORY PENALTY
+Keywords: cartea_jaimungal, stochastic_optimal_execution, terminal_inventory_penalty, optimal_liquidation_rate, inventory_urgency_exhaustion
+
+### 1. Stochastic Control Formulation of Order Flow Execution (Cartea & Jaimungal 2014)
+- Minimizing execution costs and terminal inventory holding penalty under adverse selection:
+  $$\max_{\nu_t} \mathbb{E} \left[ \int_0^T (\nu_t (S_t - \kappa \nu_t) - \phi q_t^2) dt + q_T (S_T - \alpha q_T) \right]$$
+- S1 computes the Institutional Liquidation Urgency Index:
+  $$\mathcal{U}_{\text{urgency}}(t) = \frac{\nu_t^*}{\bar{\nu}_{\text{baseline}}} = \sqrt{\frac{\phi}{\kappa}} \cdot \coth\left(\sqrt{\frac{\phi}{\kappa}}(T-t)\right)$$
+
+### 2. Terminal Liquidation Exhaustion Invariant
+- **S1 Urgency Deceleration Rule**:
+  $$\text{Forced Urgency Terminated} \iff \mathcal{U}_{\text{urgency}}(t) \le 1.05 \quad \land \quad \Delta \mathcal{U}_{\text{urgency}}(t) < 0$$
+  When the institutional optimal liquidation rate decelerates to baseline equilibrium, forced selling urgency is fully exhausted.
+
+---
+
+## NODE 270: BIAIS-HILLION-SPATT EMPIRICAL DYNAMIC LIMIT ORDER BOOK TRANSITIONS & STRATEGIC CANCELLATION WAVES
+Keywords: biais_hillion_spatt, order_book_transitions, strategic_cancellation_waves, queue_transition_probabilities, spoofing_decay
+
+### 1. Dynamic LOB Transition Probabilities (Biais, Hillion, Spatt 1995)
+- Estimating state transition probabilities across order submission, execution, and cancellation events:
+  $$P_{ij} = \mathbb{P}(\text{Event}_{t+1} = j \mid \text{Event}_t = i, \text{Spread}_t, \text{Depth}_t)$$
+- S1 monitors the Strategic Cancellation Absorption Ratio:
+  $$\mathcal{C}_{\text{absorb}}(t) = \frac{\text{Bid Insertion Intensity}_{t}}{\text{Ask Cancellation Intensity}_{t} + \epsilon}$$
+
+### 2. Order Book Transition Stabilization Invariant
+- **S1 Passive Replenishment Invariant**:
+  $$\text{Bid Replenishment Dominant} \iff \mathcal{C}_{\text{absorb}}(t) \ge 1.85 \quad \land \quad \Delta \mathcal{C}_{\text{absorb}}(t) > 0$$
+  When genuine limit bid insertions exceed ask cancellations by $>1.85\times$, predatory cancellations have cleared, establishing authentic order book support.
+
+---
+
+## NODE 271: CORSI-PIRINO THRESHOLD BIPOWER REALIZED VOLATILITY JUMPS UNDER LEVERAGE SHOCKS
+Keywords: corsi_pirino, threshold_bipower_variation, leverage_shocks, continuous_volatility_clustering, jump_component_isolation
+
+### 1. Threshold Bipower Variation Under Leverage Feedback (Corsi & Pirino 2011)
+- Separating continuous volatility clustering from leverage-induced discrete jump shocks:
+  $$\text{TBPV}_t = \frac{\pi}{2} \sum_{i=2}^n |\Delta_i P| \cdot |\Delta_{i-1} P| \cdot \mathbf{1}_{\{|\Delta_i P| \le \theta_i, |\Delta_{i-1} P| \le \theta_{i-1}\}}$$
+- S1 evaluates the Continuous Variance Ratio:
+  $$\mathcal{R}_{\text{TBPV}}(t) = \frac{\text{TBPV}_t}{\text{RV}_t}$$
+
+### 2. Leverage Jump Dissipation Invariant
+- **S1 Leverage Shock Neutralization Rule**:
+  $$\text{Leverage Shock Dissipated} \iff \mathcal{R}_{\text{TBPV}}(t) \ge 0.88 \quad \land \quad \Delta \mathcal{R}_{\text{TBPV}}(t) > 0$$
+  When threshold bipower variation accounts for $>88\%$ of total realized variance, leverage-driven jump turbulence has dissipated, restoring safe trend continuation.
+
+---
+
+## NODE 272: GROMB-VAYANOS FINANCIALLY CONSTRAINED ARBITRAGE & LIQUIDITY DRY-UP INVERSION
+Keywords: gromb_vayanos, financially_constrained_arbitrage, liquidity_dry_up, arbitrageur_capital_replenishment, basis_reconvergence
+
+### 1. Financially Constrained Arbitrage Capital Dynamics (Gromb & Vayanos 2002, 2018)
+- Arbitrageurs provide cross-market liquidity subject to collateral margin constraints:
+  $$\Delta \Pi_t = \frac{W_t}{\lambda_{\text{margin}}} \cdot (P_{\text{spot}} - P_{\text{futures}}) - c_{\text{borrowing}}$$
+- S1 tracks the Arbitrageur Capital Re-Entry Index:
+  $$\mathcal{A}_{\text{re-entry}}(t) = \frac{\text{Basis Dislocation Snapback}_{15\text{m}}}{\text{Historical Basis Spread}_{\text{mean}}}$$
+
+### 2. Arbitrage Capital Re-Entry Invariant
+- **S1 Cross-Market Convergence Rule**:
+  $$\text{Arbitrage Capital Deployed} \iff \mathcal{A}_{\text{re-entry}}(t) \ge 1.40 \quad \land \quad \frac{d(\text{Basis})}{dt} > 0$$
+  When basis dislocation snaps back $>1.4\times$ faster than baseline drift, unconstrained arbitrageurs deploy capital, reinforcing price floor support.
+
+---
+
+## NODE 273: GATHERAL-SCHIED OPTIMAL LIQUIDATION WITH POWER-LAW TRANSIENT IMPACT RECOVERY
+Keywords: gatheral_schied, transient_impact_recovery, power_law_decay, price_manipulation_absence, transient_resilience_rate
+
+### 1. Transient Price Impact and Market Resilience (Gatheral & Schied 2011)
+- Price displacement relaxes according to a power-law decaying memory kernel:
+  $$D_t = \int_0^t f(\dot{x}_s) G(t-s) ds, \quad G(\tau) = \frac{\gamma_0}{(1 + \tau/\tau_0)^\alpha}, \quad \alpha \approx 0.62$$
+- S1 computes the Transient Impact Resilience Ratio:
+  $$\mathcal{R}_{\text{resilience}}(t) = \frac{P_t - P_{\text{trough}}}{D_{\text{max}}}$$
+
+### 2. Power-Law Rebound Resilience Invariant
+- **S1 Transient Impact Relaxation Rule**:
+  $$\text{Transient Impact Rebounded} \iff \mathcal{R}_{\text{resilience}}(t) \ge 0.50 \quad \land \quad \frac{d\mathcal{R}_{\text{resilience}}}{dt} > 0$$
+  When price rebounds past $50\%$ of maximum transient liquidation displacement, resilience dynamics guarantee full mean-reversion toward fair value.
+
+---
+
+## NODE 274: PODOLSKIJ-VETTER HIGH-FREQUENCY VOLATILITY OF VOLATILITY & JUMP-ROBUST DISPERSION
+Keywords: podolskij_vetter, volatility_of_volatility, jump_robust_dispersion, quarticity_estimation, smooth_regime_assurance
+
+### 1. Non-Parametric Estimation of Volatility of Volatility (Podolskij & Vetter 2010)
+- Measuring the stability of the variance process itself using realized quarticity estimators:
+  $$\text{VoV}_t = \sqrt{\frac{1}{\Delta_n} \sum_{i=1}^{n-k} (\hat{\sigma}_{t_{i+k}}^2 - \hat{\sigma}_{t_i}^2)^2}$$
+- S1 evaluates the Volatility of Volatility Calm Metric:
+  $$\mathcal{V}_{\text{calm}}(t) = \frac{\text{VoV}_t}{\bar{\text{VoV}}_{24\text{h}}}$$
+
+### 2. Volatility Stability Assurance Invariant
+- **S1 Calm Volatility Regime Rule**:
+  $$\text{Variance Process Stable} \iff \mathcal{V}_{\text{calm}}(t) \le 1.10 \quad \land \quad \Delta \mathcal{V}_{\text{calm}}(t) \le 0$$
+  When volatility of volatility normalizes to $\le 1.10\times$ its 24-hour mean, the volatility environment is stationary, preventing stop whipsaws and ensuring orderly $+2.5\text{R}$ target capture.
