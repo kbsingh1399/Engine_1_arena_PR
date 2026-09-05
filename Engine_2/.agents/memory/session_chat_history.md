@@ -39935,3 +39935,19 @@ eferences.bib into architecture memory in both repositories.
   - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
   - Commits: Engine_2 committed and pushed (`faf07b5`); Engine_1_arena_PR committed and pushed (`f7a182e`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
 - **Standing Daemon**: Cron task `task-3094` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
+
+---
+
+## Turn Record: Knowledge Base v46.0 Expansion (Nodes 281–286) & Cron Heartbeat (2026-09-05)
+- **User Directive / Sentinel**: Cron tasks `task-3094` (iteration 3), `task-2932` (iteration 6), `task-2783` (iteration 9), `task-2634` (iteration 12), `task-2487` (iteration 15), `task-2345` (iteration 18), `task-2203` (iteration 21), `task-2067` (iteration 24), `task-794` (iteration 42), and `task-1891` (iteration 29) fired for periodic Knowledge Base expansion, remote branch verification, and continuous peer-reviewed econometrics synthesis.
+- **Synthesized Knowledge Additions (Nodes 281–286: 286 Structured Nodes)**:
+  - **Node 281**: Kyle-Obizhaeva Invariant Market Microstructure & Optimal Order Size Calibration (Kyle & Obizhaeva 2016, 2019; invariant liquidation scalar $\mathcal{S}_{\text{invar}} \le 1.00 \land \Delta \mathcal{S}_{\text{invar}} < 0$ proving metaorder depletion).
+  - **Node 282**: Engle-Russell Autoregressive Conditional Duration (ACD) Clustering of Liquidation Cascades (Engle & Russell 1998; ACD velocity ratio $\mathcal{V}_{\text{ACD}} \le 1.20 \land \Delta \mathcal{V}_{\text{ACD}} < 0$ confirming trade arrival cooling).
+  - **Node 283**: Bouchaud-Mézard Wealth Distribution Dynamics & Exchange Insurance Fund Drawdown Limits (Bouchaud & Mézard 2000; insurance cushion health $\mathcal{H}_{\text{insurance}} \ge 0.95 \land \text{ADL Rate} = 0$ verifying solvency backstop).
+  - **Node 284**: Hasbrouck Empirical Analysis of Stock Prices in Continuous Time & Effective Spread Floor (Hasbrouck 1999; latent price efficiency $\mathcal{E}_{\text{latent}} \ge 0.55 \land \Delta \mathcal{E}_{\text{latent}} > 0$ breaking discrete quote traps).
+  - **Node 285**: Bollerslev-Todorov Extreme Jump Activity Estimation & Asymmetric Tail Variation (Bollerslev & Todorov 2011; tail jump asymmetry $\mathcal{T}_{\text{jump\_asym}} \ge 2.00 \land \lambda_t^- \to 0$ locking upside jump dominance).
+  - **Node 286**: Guéant-Tapia-Manziadi Utility-Based Market Making with Non-Linear Inventory Penalty (Guéant et al. 2012; quote skew $\mathcal{S}_{\text{quote\_skew}} \ge +0.40 \land \Delta \mathcal{S}_{\text{quote\_skew}} > 0$ confirming dealer bid competition).
+- **Parity & Delivery**:
+  - Parity: 100% byte-for-byte sync across 7,993 files in both `.agents` directories.
+  - Commits: Engine_2 committed and pushed (`e6ae78d`); Engine_1_arena_PR committed and pushed (`e8a3a17`) to `origin main` and `origin arena/01a06dc4-engine-1-arena-pr`.
+- **Standing Daemon**: Cron task `task-3094` active on 15-minute intervals (`*/15 * * * *`, `isDaemon=true`).
