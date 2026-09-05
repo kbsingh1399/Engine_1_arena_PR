@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v31.0 (AFFINE TERM STRUCTURE, SUB-TICK SWEEP CESSATION, VULNERABLE MARGIN MASS & GKYZ REALIZED RANGE)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Duffie/Kan/Piazzesi/OHara/Biais/Merton/Garman/Klass/Yang/Zhang/Kyle/Back/Brunnermeier/Pedersen
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v32.0 (ORDER FLOW IMBALANCE, HETEROGENEOUS MULTI-SCALE VOLATILITY, SPREAD ELASTICITY & IMPULSE REBALANCING)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Chordia/Roll/Subrahmanyam/Dacorogna/Muller/Amihud/Mendelson/Bensoussan/Lions/Pagan/Schwert/Biais/Weill
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 196 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 202 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4213,3 +4213,97 @@ Keywords: brunnermeier_pedersen, procyclical_margin_haircuts, clearinghouse_esca
 - **S1 Risk Governance Rule**:
   $$\text{Margin Escalation Terminated} \iff \Delta \mathcal{H}_{\text{margin}}(t) \le 0 \quad \land \quad \mathcal{H}_{\text{margin}}(t) \le 1.25 \bar{\mathcal{H}}_{24\text{h}}$$
   Entering only after exchange margin increases have plateaued guarantees that no unexpected haircut hikes will trigger secondary forced liquidations.
+
+---
+
+## NODE 197: CHORDIA-ROLL-SUBRAHMANYAM ORDER FLOW IMBALANCE (OFI) & MULTI-TICK INVENTORY ABSORPTION
+Keywords: order_flow_imbalance, chordia_roll_subrahmanyam, inside_depth_evolution, book_pressure, aggressive_bid_absorption
+
+### 1. High-Frequency Order Flow Imbalance at the BBO (Chordia et al. 2002, 2005; Cont et al. 2014)
+- Tracking dynamic order arrivals, cancellations, and trades across consecutive 15m order book states via BBO order flow imbalance:
+  $$\text{OFI}_t = I_{\{P_{b, t} \ge P_{b, t-1}\}} q_{b, t} - I_{\{P_{b, t} \le P_{b, t-1}\}} q_{b, t-1} - I_{\{P_{a, t} \le P_{a, t-1}\}} q_{a, t} + I_{\{P_{a, t} \ge P_{a, t-1}\}} q_{a, t-1}$$
+- S1 normalizes OFI via the Cumulative OFI Gradient:
+  $$\mathcal{G}_{\text{OFI}}(t) = \frac{\sum_{k=0}^3 \text{OFI}_{t-k}}{\sum_{k=0}^3 (q_{b, t-k} + q_{a, t-k})}$$
+
+### 2. Order Flow Imbalance Absorption Invariant
+- **S1 Microstructure Invariant**:
+  $$\text{Aggressive Bid Dominance} \iff \mathcal{G}_{\text{OFI}}(t) \ge +0.45 \quad \land \quad \Delta \mathcal{G}_{\text{OFI}}(t) > 0$$
+  When the normalized OFI gradient exceeds $+0.45$ with positive acceleration, institutional limit bids are absorbing all resting ask orders, driving upward price pressure.
+
+---
+
+## NODE 198: DACOROGNA-MÜLLER HIGH-FREQUENCY HETEROGENEOUS MARKET HYPOTHESIS & MULTI-SCALE VOLATILITY CASCADES
+Keywords: heterogeneous_market_hypothesis, dacorogna_muller, multi_scale_volatility, volatility_transmission, cascade_decoupling
+
+### 1. Volatility Transmission Across Heterogeneous Horizons (Müller et al. 1997; Dacorogna et al. 2001)
+- Market participants operate across distinct horizons. Cascade selloffs occur when short-scale (15m) turbulence spills into macro (4h) horizons. A reversal is established when micro-volatility drops below macro-volatility:
+  $$\mathcal{H}_{\text{scale}}(t) = \frac{\sigma_{15\text{m}}(t)}{\frac{1}{16} \sum_{k=0}^{15} \sigma_{4\text{h}}(t-k)}$$
+- S1 tracks the Damping Derivative $\Delta \mathcal{H}_{\text{scale}}(t) = \mathcal{H}_{\text{scale}}(t) - \mathcal{H}_{\text{scale}}(t-2)$.
+
+### 2. Multi-Scale Volatility Decoupling Invariant
+- **S1 Operational Rule**:
+  $$\text{Micro-Scale Turbulence Decoupled} \iff \mathcal{H}_{\text{scale}}(t) \le 1.10 \quad \land \quad \Delta \mathcal{H}_{\text{scale}}(t) \le -0.25$$
+  When short-horizon volatility collapses below macro levels, panic selling has decoupled, allowing macro swing buyers to assert price control.
+
+---
+
+## NODE 199: AMIHUD-MENDELSON ASSET PRICING WITH LIQUIDITY RISK & EFFECTIVE BID-ASK SPREAD ELASTICITY
+Keywords: amihud_mendelson, spread_elasticity, volume_sensitivity, book_resilience, execution_friction_suppression
+
+### 1. Effective Spread Elasticity Under Volume Surges (Amihud & Mendelson 1986; Acharya & Pedersen 2005)
+- In thin markets, volume expansion triggers spread blowouts. Institutional market resilience is characterized by spread inelasticity with respect to volume:
+  $$\mathcal{E}_{\text{spread}}(t) = \frac{\Delta \ln(\text{Spread}_{\text{eff}}(t))}{\Delta \ln(\text{Volume}_{15\text{m}}(t))}$$
+- S1 computes the Depth Resilience Score $\mathcal{D}_{\text{resil}}(t) = \frac{1}{1 + \max(0, \mathcal{E}_{\text{spread}}(t))}$.
+
+### 2. Spread Elasticity Resilience Invariant
+- **S1 Execution Invariant**:
+  $$\text{Order Book Fully Resilient} \iff \mathcal{E}_{\text{spread}}(t) \le 0.15 \quad \land \quad \mathcal{D}_{\text{resil}}(t) \ge 0.85$$
+  Low spread elasticity confirms that the book easily absorbs large execution volumes without price impact, protecting entries against slippage.
+
+---
+
+## NODE 200: BENSOUSSAN-LIONS IMPULSE CONTROL & DISCRETE INSTITUTIONAL POSITION REBALANCING BOUNDARIES
+Keywords: bensoussan_lions, impulse_control, discrete_rebalancing, block_accumulation, institutional_intervention
+
+### 1. Quasi-Variational Inequalities and Optimal Impulse Rebalancing (Bensoussan & Lions 1984; Korn 1999)
+- Due to fixed execution fees, large institutional allocators rebalance via discrete lump-sum impulse orders when inventory breaches optimal boundaries.
+- S1 captures discrete block intervention via:
+  $$\mathcal{I}_{\text{rebal}}(t) = \frac{\sum_{i=1}^N V_i \mathbf{1}_{\{V_i \ge 5\bar{V}_{\text{median}}\}}}{\text{Total Volume}_{15\text{m}}(t)}$$
+  and the Impulse Net Buying Ratio $\mathcal{B}_{\text{impulse}}(t) = \frac{\sum V_i \mathbf{1}_{\{V_i \ge 5\bar{V}_{\text{median}} \land \Delta P_i > 0\}}}{\sum V_i \mathbf{1}_{\{V_i \ge 5\bar{V}_{\text{median}}\}} + \epsilon}$.
+
+### 2. Institutional Impulse Rebalancing Invariant
+- **S1 Strategic Accumulation Rule**:
+  $$\text{Institutional Impulse Buying Active} \iff \mathcal{I}_{\text{rebal}}(t) \ge 0.35 \quad \land \quad \mathcal{B}_{\text{impulse}}(t) \ge 0.80$$
+  When discrete large-block trades represent $\ge 35\%$ of bar volume and $\ge 80\%$ are buy executions, major institutional allocators are aggressively accumulating.
+
+---
+
+## NODE 201: PAGAN-SCHWERT GARCH VOLATILITY ASYMMETRY & LEVERAGE EFFECT PHASE INVERSION
+Keywords: pagan_schwert, gjr_garch, leverage_effect_inversion, volatility_feedback, relief_volatility_expansion
+
+### 1. Conditional Leverage Dynamics in Cascading Regimes (Pagan & Schwert 1990; Nelson 1991)
+- The negative leverage effect saturates during panic liquidations. At the reversal turning point, upside return shocks begin generating positive volatility expansion:
+  $$\sigma_t^2 = \omega + (\alpha + \gamma \mathbf{1}_{\{r_{t-1} < 0\}}) r_{t-1}^2 + \beta \sigma_{t-1}^2$$
+- S1 evaluates the Rolling Asymmetry Ratio:
+  $$\Lambda_{\text{asym}}(t) = \frac{\mathbb{E}[\sigma_{t+1}^2 \mid r_t < 0] - \mathbb{E}[\sigma_{t+1}^2 \mid r_t > 0]}{\bar{\sigma}_{24\text{h}}^2}$$
+
+### 2. Leverage Asymmetry Neutralization Invariant
+- **S1 Volatility Filter**:
+  $$\text{Downside Feedback Extinguished} \iff \Lambda_{\text{asym}}(t) \le 0.20 \quad \land \quad \Delta \Lambda_{\text{asym}}(t) < 0$$
+  A sharp contraction in conditional leverage asymmetry confirms that downward volatility spirals have ceased, allowing orderly trend upside progression.
+
+---
+
+## NODE 202: BIAIS-WEILL LIQUIDITY CO-MOVEMENT & SYSTEMIC DARK POOL LIQUIDITY SPILLOVER
+Keywords: biais_weill, dark_pool_spillover, iceberg_absorption, hidden_liquidity, institutional_stealth_accumulation
+
+### 1. Inter-Venue Liquidity Transmission and Hidden Iceberg Volume (Biais & Weill 2009; Cespa & Foucault 2014)
+- Large participants deploy iceberg orders to accumulate post-cascade inventory without flashing size on the public lit book.
+- S1 isolates hidden trade execution through the Hidden Execution Intensity Index:
+  $$\mathcal{H}_{\text{hidden}}(t) = \frac{\text{Executed Trade Volume}_{15\text{m}} - \text{Top-of-Book Visible Depth Depleted}_{15\text{m}}}{\text{Executed Trade Volume}_{15\text{m}} + \epsilon}$$
+  and its change rate $\Delta \mathcal{H}_{\text{hidden}}(t) = \mathcal{H}_{\text{hidden}}(t) - \mathcal{H}_{\text{hidden}}(t-2)$.
+
+### 2. Dark Liquidity Re-entry Invariant
+- **S1 Operational Rule**:
+  $$\text{Hidden Institutional Accumulation} \iff \mathcal{H}_{\text{hidden}}(t) \ge 0.40 \quad \land \quad \Delta \mathcal{H}_{\text{hidden}}(t) > 0 \quad \land \quad \text{fp\_delta}_t > 0$$
+  When $>40\%$ of trade volume is absorbed by non-displayed liquidity alongside positive footprint delta, institutional stealth accumulators are locking in the market bottom.
