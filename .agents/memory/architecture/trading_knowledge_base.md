@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v28.0 (SPREAD ELASTICITY, INSTITUTIONAL FUND FLOWS, MODEL CONFIDENCE SETS & CUBIC POWER LAWS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Amihud/Mendelson/Vayanos/Hansen/Cont/Gabaix/Rosu
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v29.0 (STOCHASTIC JUMP INTENSITY, GLOSTEN SPREAD DECOMPOSITION, LIMIT REPLENISHMENT & CONDITIONAL DURATION)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Merton/Garman/Glosten/Harris/Farmer/Kahneman/Tversky/Bollerslev/Engle/Russell
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 178 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 184 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3931,3 +3931,96 @@ Keywords: speed_advantage_collapse, kyle_rosu, latency_arbitrage_intensity, quot
 - **S1 Execution Invariant**:
   $$\text{Predatory Sniping Extinguished} \iff \Delta \Lambda_{\text{lat}}(t) \le -0.45 \quad \land \quad \Lambda_{\text{lat}}(t) \le 0.50 \bar{\Lambda}_{24\text{h}}$$
   Entering only after predatory quote revisions contract by $\ge 45\%$ ensures that high-speed snipers have exited the order book, allowing orderly institutional quote replenishment to support long entries.
+
+---
+
+## NODE 179: MERTON-GARMAN STRUCTURAL JUMP ARRIVAL INTENSITY & NON-HOMOGENEOUS POISSON DEFAULTS
+Keywords: jump_intensity, merton_garman, default_hazard_rate, non_homogeneous_poisson, liquidation_cascade_exhaustion
+
+### 1. Stochastic Jump Arrival Dynamics (Garman 1976; Merton 1974; Jarrow & Turnbull 1995)
+- Forced margin liquidations manifest as clustered default jumps governed by a non-homogeneous Poisson process with stochastic intensity $\lambda(t)$:
+  $$d\lambda_t = \kappa_\lambda (\bar{\lambda} - \lambda_t)dt + \sigma_\lambda \sqrt{\lambda_t} dW_t^\lambda + J_\lambda dN_t$$
+- S1 integrates the Cumulative Default Hazard Rate across a rolling 4-bar window (1 hour):
+  $$\Lambda_{\text{hazard}}(t) = \int_{t-4\Delta t}^t \lambda(s) ds \approx \sum_{k=0}^3 \lambda_{t-k}$$
+
+### 2. Hazard Rate Exhaustion Invariant
+- **S1 Operational Rule**:
+  $$\text{Default Dominoes Terminated} \iff \frac{\Lambda_{\text{hazard}}(t)}{\max_{k \in [0, 8]} \Lambda_{\text{hazard}}(t-k)} \le 0.40 \quad \land \quad \lambda_t \le 1.25 \bar{\lambda}$$
+  A $60\%$ collapse in the short-term hazard rate confirms that under-margined leverage has been completely purged, allowing a low-risk long entry before the subsequent relief rally.
+
+---
+
+## NODE 180: GLOSTEN-HARRIS BID-ASK SPREAD COMPONENT ESTIMATION & ASYMMETRIC TRANSITORY SLIPPAGE
+Keywords: glosten_harris, spread_components, transitory_order_processing, adverse_selection, execution_slippage_normalization
+
+### 1. Econometric Decomposition of Trade-to-Trade Price Changes (Glosten & Harris 1988)
+- Using transaction price changes and signed trade indicators $Q_t \in \{-1, +1\}$, S1 estimates the transitory order processing cost ($c_t$) versus permanent adverse selection ($z_t$):
+  $$\Delta P_t = c_0 \Delta Q_t + c_1 \Delta (Q_t V_t) + z_0 Q_t + z_1 (Q_t V_t) + \epsilon_t$$
+- The Transitory Spread Share is:
+  $$\Phi_{\text{trans}}(t) = \frac{2(c_0 + c_1 \bar{V}_t)}{S_t}$$
+
+### 2. Transitory Slippage Dissipation Invariant
+- **S1 Execution Invariant**:
+  $$\text{Execution Frictions Minimal} \iff \Phi_{\text{trans}}(t) \le 0.35 \quad \land \quad S_t \le 1.20 \bar{S}_{24\text{h}}$$
+  Restricting entry to regimes where transitory dealer markup is $\le 35\%$ guarantees that market makers are quoting tight, low-friction prices, minimizing entry slippage.
+
+---
+
+## NODE 181: FARMER-PATZELT-LILLO THRESHOLD LIQUIDITY REPLENISHMENT & ORDER CANCELLATION LATENCY
+Keywords: liquidity_replenishment, farmer_patzelt_lillo, cancellation_arrival_ratio, depth_recovery_acceleration, passive_cushion
+
+### 1. Order Book Queue Inflow vs Outflow Dynamics (Patzelt & Farmer 2013; Lillo & Farmer 2004)
+- During liquidation panics, limit order cancellations outpace incoming bids, causing order book cavities. When market makers re-enter, the Order Book Replenishment Ratio inverts:
+  $$\mathcal{R}_{\text{replenish}}(t) = \frac{\text{New Bid Limit Volume}_{15\text{m}}}{\text{Canceled Bid Volume}_{15\text{m}} + \epsilon}$$
+- The Depth Recovery Acceleration is $\alpha_{\text{depth}}(t) = \frac{\mathcal{R}_{\text{replenish}}(t) - \mathcal{R}_{\text{replenish}}(t-1)}{\Delta t}$.
+
+### 2. Limit Order Cushion Re-establishment Invariant
+- **S1 Microstructure Invariant**:
+  $$\text{Bid Cushion Solidified} \iff \mathcal{R}_{\text{replenish}}(t) \ge 2.20 \quad \land \quad \alpha_{\text{depth}}(t) > 0$$
+  When limit bid arrivals exceed cancellations by more than $2.2\times$ with positive acceleration, an institutional floor has formed, blocking downward price continuation.
+
+---
+
+## NODE 182: KAHNEMAN-TVERSKY CUMULATIVE PROSPECT THEORY & RETAIL CAPITULATION RATIO
+Keywords: cumulative_prospect_theory, kahneman_tversky, retail_capitulation, loss_aversion_inflection, small_trade_dumping_exhaustion
+
+### 1. Loss Aversion and Capitulation Dynamics (Tversky & Kahneman 1992; Barberis et al. 2001)
+- Retail traders exhibit loss aversion with an asymmetric S-shaped value function $v(x) = -\lambda_{\text{loss}} (-x)^\beta$ ($\lambda_{\text{loss}} \approx 2.25$). When unrealized losses cross their pain threshold, loss aversion flips into panic capitulation.
+- S1 tracks the Retail Capitulation Volume Ratio:
+  $$\mathcal{C}_{\text{retail}}(t) = \frac{\text{Small Trade Sell Volume}_{15\text{m}}}{\text{Large Trade Sell Volume}_{15\text{m}}}$$
+
+### 2. Retail Capitulation Exhaustion Invariant
+- **S1 Operational Rule**:
+  $$\text{Retail Panic Cleared} \iff \mathcal{C}_{\text{retail}}(t-1) \ge \text{Percentile}_{90}(\mathcal{C}_{\text{retail}}) \quad \land \quad \mathcal{C}_{\text{retail}}(t) \le \text{Percentile}_{50}(\mathcal{C}_{\text{retail}}) \quad \land \quad \text{fp\_delta}_t > 0$$
+  A violent spike in small-retail selling followed immediately by a collapse to below median confirms that retail stop dumping has exhausted, clearing the path for institutional accumulation.
+
+---
+
+## NODE 183: BOLLERSLEV-TODOROV EXTREME JUMP ACTIVITY & MICROSTRUCTURE TAIL SHAPE COEFFICIENT
+Keywords: extreme_jump_activity, bollerslev_todorov, tail_shape_coefficient, jump_disparity, asymmetric_tail_neutralization
+
+### 1. Non-Parametric Disentanglement of Extreme Tail Jumps (Bollerslev & Todorov 2011, 2014)
+- Separating continuous Gaussian price diffusion from extreme non-Gaussian liquidation jumps via the Extreme Negative Jump Disparity Index:
+  $$\mathcal{J}_{\text{neg}}(t) = \frac{\sum_{i=1}^N r_{t, i}^2 \mathbf{1}_{\{r_{t, i} < -\alpha_k \sigma_t\}}}{\sum_{i=1}^N r_{t, i}^2}$$
+  and the Jump Tail Shape Coefficient $\kappa_{\text{tail}}(t) = \frac{\ln(\mathcal{J}_{\text{neg}}(t) / \mathcal{J}_{\text{pos}}(t))}{\ln(\alpha_k)}$.
+
+### 2. Asymmetric Tail Jump Neutralization Invariant
+- **S1 Execution Invariant**:
+  $$\text{Downside Jump Threat Neutralized} \iff \mathcal{J}_{\text{neg}}(t) \le 0.15 \quad \land \quad \kappa_{\text{tail}}(t) \le 0.20$$
+  When negative jump disparity contracts below $15\%$ of total variation, downside jump risk has dissipated, ensuring that the $+2.5\text{R}$ target is governed by smooth continuous price drift.
+
+---
+
+## NODE 184: ENGLE-RUSSELL AUTOREGRESSIVE CONDITIONAL DURATION (ACD) & TRADE ARRIVAL CLUSTERING
+Keywords: autoregressive_conditional_duration, engle_russell, trade_interval_clustering, duration_expansion, high_frequency_normalization
+
+### 1. Modeling High-Frequency Trade Arrival Intervals (Engle & Russell 1998; Bauwens & Giot 2000)
+- During cascading liquidations, inter-trade durations $x_i = t_i - t_{i-1}$ compress toward zero. The ACD(1,1) model captures this temporal clustering:
+  $$\psi_i = \mathbb{E}[x_i \mid \mathcal{F}_{i-1}] = \omega_{\text{ACD}} + \alpha_{\text{ACD}} x_{i-1} + \beta_{\text{ACD}} \psi_{i-1}$$
+- S1 tracks the Duration Expansion Factor:
+  $$\mathcal{D}_{\text{expand}}(t) = \frac{\bar{\psi}_{15\text{m}}(t)}{\min_{k \in [0, 4]} \bar{\psi}_{15\text{m}}(t-k)}$$
+
+### 2. Trade Duration Expansion Invariant
+- **S1 Operational Rule**:
+  $$\text{Cascade Frequency Normal} \iff \mathcal{D}_{\text{expand}}(t) \ge 2.50 \quad \land \quad \bar{\psi}_{15\text{m}}(t) \ge 0.85 \bar{\psi}_{\text{baseline}}$$
+  An expansion of inter-trade durations by $\ge 2.5\times$ from cascade lows mathematically proves that panic market orders have stopped flooding the matching engine, confirming order flow stability.
