@@ -39,6 +39,18 @@ UNIVERSE_CORE = [
 ]
 UNIVERSE_EXTENDED = UNIVERSE_CORE + ["BCHUSDT", "DOTUSDT", "LTCUSDT", "TRXUSDT"]
 
+# Read only columns used by the causal feature engine. This prevents the
+# multi-million-row metadata/diagnostic columns from exhausting RAM while
+# retaining native parquet execution against the verified master tables.
+MASTER_COLUMNS = [
+    "open_time_ms", "open", "high", "low", "close", "volume_base", "volume_sma9",
+    "future_cvd_15m", "future_cvd_lifetime", "spot_cvd_15m", "spot_cvd_lifetime",
+    "funding_rate_pct", "basis_usd", "oi_change_pct", "long_liq_usd",
+    "ls_ratio_global", "top_account_ratio", "whale_index", "avg_trade_size_usd",
+    "bid_depth_usd", "ask_depth_usd", "fp_delta", "fp_stacked_buy_imb", "fp_poc",
+    "rsi_14", "atr_14", "atr_100", "ema_8", "session_val",
+]
+
 STRATEGY_NAMES = {
     1: "S01_LongLiqConvexRebound", 2: "S02_ShortSqueezeIgnition",
     3: "S03_DoubleLiqExhaustionBottom", 4: "S04_HighLeverageWipeoutFlush",
@@ -412,7 +424,8 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
         # family-specific gates below keep the 100 candidates heterogeneous
         # without introducing test-window-specific parameters.
         ret = c / np.maximum(np.roll(c, 1), 1e-12) - 1.0
-        ret[0] = 0.0
+        if n:
+            ret[0] = 0.0
         vol = np.maximum(f["atr_14"].to_numpy(), 1e-12)
         body = (c - f["open"].to_numpy()) / vol
         flow = f["fp_delta"].to_numpy()
@@ -767,10 +780,11 @@ class DataStore:
                 if verbose:
                     print(f"  [skip] {sym}: {path.name} not found")
                 continue
-            df = pd.read_parquet(path)
+            df = pd.read_parquet(path, columns=MASTER_COLUMNS)
             df = df.sort_values("open_time_ms").drop_duplicates("open_time_ms")
             df = df.reset_index(drop=True)
             f = build_features(df)
+            del df
             self.features[sym] = f
             self.symbols.append(sym)
             if verbose:
@@ -945,6 +959,11 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
     signals = {}
     for sid in STRATEGY_NAMES:
         trades, metrics, _ = run_window(store, is_start, is_end, [sid])
+        # Candidate simulations are independent. Do not retain 100 x symbol
+        # signal arrays across the selector; that cache would be quadratic in
+        # pool size and can exhaust memory on the full parquet universe.
+        if hasattr(store, "_sig"):
+            store._sig.pop(sid, None)
         expectancy = float(metrics["expectancy_usd"])
         dd = float(metrics["max_dd_pct"]) / 100.0
         n = int(metrics["trades"])
