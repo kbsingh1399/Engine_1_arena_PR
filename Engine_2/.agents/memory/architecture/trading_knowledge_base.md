@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v36.0 (VELOCITY DECAY IMPACT, PRECISION ACQUISITION, SEARCH RE-EQUILIBRATION & BASIS VECM)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Almgren/Kyle/Lee/Duffie/Garleanu/Biais/Declerck/Hasbrouck/Engle/Granger
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v37.0 (SPREAD DECOMPOSITION, INVARIANT ARRIVALS, LOB SLOPES & FUNDING CONTAGION)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Huang/Stoll/Menkveld/Yueshen/Cont/Kukanov/Stoikov/Foucault/Rosu/Biais/Hansen/Lunde
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 226 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 232 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -4682,3 +4682,99 @@ Keywords: engle_granger, vecm, basis_cointegration, error_correction_speed, long
 - **S1 Basis Mean-Reversion Invariant**:
   $$\text{Basis Snapback Imminent} \iff z_{t-1} \le -2.0\sigma_{\text{basis}} \quad \land \quad \mathcal{V}_{\text{snap}}(t) \ge +0.85$$
   When perpetual price is dislocated by $>2\sigma$ below spot price and the error correction velocity is strongly positive, basis arbitrageurs drive an aggressive upward reversion.
+
+---
+
+## NODE 227: HUANG-STOLL MULTI-COMPONENT SPREAD DECOMPOSITION & REALIZED INVENTORY HOLDING RISK
+Keywords: huang_stoll, spread_decomposition, order_processing_cost, inventory_holding_risk, adverse_selection_component
+
+### 1. Three-Way Spread Decomposition (Huang & Stoll 1997)
+- Decomposing the effective half-spread $S/2$ into adverse selection ($\alpha$), inventory holding risk ($\beta$), and order processing friction ($\gamma$):
+  $$\frac{S}{2} = \alpha + \beta + \gamma, \quad \Delta P_t = (\alpha + \beta) q_t - \beta (1 - 2\pi) q_{t-1} + \epsilon_t$$
+- S1 monitors the Inventory Risk Absorption Ratio:
+  $$\mathcal{R}_{\text{inv}}(t) = \frac{\beta(t)}{\alpha(t) + \epsilon}$$
+
+### 2. Inventory Risk Dominance Invariant
+- **S1 Inventory Clearance Rule**:
+  $$\text{Inventory Risk Transferred} \iff \mathcal{R}_{\text{inv}}(t) \le 0.35 \quad \land \quad \Delta \beta(t) < 0$$
+  When inventory holding penalties collapse below $35\%$ of adverse selection rent, market makers have cleared stale liquidation inventory and are receptive to new long flow.
+
+---
+
+## NODE 228: MENKVELD-YUESHEN CROSS-VENUE HIGH-FREQUENCY PRICE DISCOVERY & INVARIANT INFORMATION ARRIVALS
+Keywords: menkveld_yueshen, cross_venue_discovery, invariant_information_arrivals, consolidated_order_book, multi_market_arbitrage
+
+### 1. Invariant Information Inflow Across Fragmented Exchanges (Menkveld & Yueshen 2019)
+- Information arrives continuously at rate $\lambda_{\text{info}}$ and splits across venues according to instantaneous depth elasticity:
+  $$\mathcal{I}_{\text{cross}}(t) = \sum_{v \in \mathcal{V}} w_v(t) \cdot \frac{\Delta P_{v, t}}{\sigma_{v, t}}$$
+- S1 computes the Cross-Venue Coherence Score:
+  $$\mathcal{C}_{\text{venue}}(t) = \min_{u, v} \text{Corr}(\Delta P_{u, 15\text{m}}, \Delta P_{v, 15\text{m}})$$
+
+### 2. Cross-Market Consensus Confirmation Invariant
+- **S1 Multi-Exchange Alignment Rule**:
+  $$\text{Cross-Venue Price Floor Confirmed} \iff \mathcal{C}_{\text{venue}}(t) \ge 0.85 \quad \land \quad \mathcal{I}_{\text{cross}}(t) \ge +1.20$$
+  When all major exchanges exhibit synchronized positive price innovations with correlation $>0.85$, localized exchange anomalies or liquidation spillovers are eliminated.
+
+---
+
+## NODE 229: CONT-KUKANOV-STOIKOV ORDER BOOK SLOPE DYNAMICS & OPTIMAL LIMIT ORDER ALLOCATION
+Keywords: cont_kukanov_stoikov, lob_slope, limit_order_allocation, queue_replenishment_rate, execution_probability_gradient
+
+### 1. Limit Order Book Slope and Refill Dynamics (Cont, Kukanov, Stoikov 2014)
+- Evaluating the depth gradient with respect to distance from mid-price:
+  $$\mathcal{S}_{\text{LOB}}^{\text{bid}}(t) = \frac{\partial \text{Cumulative Depth}(p)}{\partial (p_{\text{mid}} - p)} \Bigg|_{p = p_{\text{bid}}}$$
+- S1 tracks the Asymmetric Slope Ratio:
+  $$\Gamma_{\text{slope}}(t) = \frac{\mathcal{S}_{\text{LOB}}^{\text{bid}}(t)}{\mathcal{S}_{\text{LOB}}^{\text{ask}}(t) + \epsilon}$$
+
+### 2. Slope Gradient Support Invariant
+- **S1 Order Book Wall Invariant**:
+  $$\text{Bid Side Depth Wall Formed} \iff \Gamma_{\text{slope}}(t) \ge 2.25 \quad \land \quad \Delta \Gamma_{\text{slope}}(t) > 0$$
+  When the bid-side book slope is $>2.25\times$ steeper than the ask side, downward price penetration requires disproportionate sell volume, cementing the rebound floor.
+
+---
+
+## NODE 230: FOUCAULT-ROŞU HIGH-FREQUENCY NEWS TRADING & DYNAMIC SPEED COMPETITION IN PERPETUALS
+Keywords: foucault_rosu, news_trading, speed_competition, low_latency_arbitrage, fast_trader_sniping
+
+### 1. Speed Competition and Adverse Selection Under Fast News (Foucault & Roşu 2016)
+- High-frequency news traders execute immediately upon macro prints, increasing quote sniping intensity $\theta_{\text{snipe}}$:
+  $$\theta_{\text{snipe}}(t) = \frac{\text{Microsecond Market Buys}_{50\text{ms}}}{\text{Resting Inside Ask Volume}}$$
+- S1 measures the Fast Trader Exhaustion Metric:
+  $$\mathcal{E}_{\text{fast}}(t) = \frac{\text{Resting Spread}_t}{\text{Historical Baseline Spread}} \cdot (1 - \theta_{\text{snipe}}(t))$$
+
+### 2. Fast Trader Sniping Exhaustion Invariant
+- **S1 Microstructure Equilibrium Rule**:
+  $$\text{Sniping Risk Subsides} \iff \theta_{\text{snipe}}(t) \le 0.15 \quad \land \quad \mathcal{E}_{\text{fast}}(t) \ge 0.90$$
+  When quote sniping probability falls below $15\%$ and spreads normalize, fast predatory traders have exited, allowing structural price recovery to take hold.
+
+---
+
+## NODE 231: BIAIS-BIAIS MARKET BREAKDOWN UNDER ASYMMETRIC FUNDING LIQUIDITY CONTAGION
+Keywords: biais_funding, funding_liquidity_contagion, margin_cascade_feedback, capital_starvation, systemic_freeze
+
+### 1. Interaction Between Market Liquidity and Funding Liquidity (Biais et al. 2010, 2016)
+- Declining collateral valuations trigger margin calls that starve market makers of financing, contracting market depth:
+  $$\mathcal{F}_{\text{contagion}}(t) = \frac{\Delta \text{Funding Rate}_{8\text{h}}}{\Delta \text{Open Interest}_{15\text{m}}} \cdot \text{Sign}(\text{long\_liq\_zs}_t)$$
+- S1 tracks the Funding Contagion Dissipation Score:
+  $$\Phi_{\text{fund}}(t) = \frac{\text{Cash Collateral Margin Ratio}}{\text{Minimum Maintenance Margin}}$$
+
+### 2. Funding Contagion Termination Invariant
+- **S1 Capital Constraint Relief Rule**:
+  $$\text{Funding Squeeze Cleared} \iff \mathcal{F}_{\text{contagion}}(t) \ge -0.05 \quad \land \quad \Phi_{\text{fund}}(t) \ge 1.40$$
+  When margin financing contagion neutralizes and available capital buffer exceeds maintenance requirements by $>40\%$, market makers restore aggressive two-sided quoting.
+
+---
+
+## NODE 232: HANSEN-LUNDE DYNAMIC REALIZED SPREAD VOLATILITY FORECASTING & MICROSTRUCTURE NOISE BOUNDARIES
+Keywords: hansen_lunde, realized_spread, microstructure_noise_boundary, high_frequency_volatility_forecasting, realized_kernel
+
+### 1. High-Frequency Realized Spread Variance and Noise Estimation (Hansen & Lunde 2006)
+- Disentangling unobserved efficient price variance $\sigma_{\text{eff}}^2$ from microstructure friction noise $\omega^2$:
+  $$\hat{\sigma}_{\text{eff}}^2(t) = \text{RV}_t - 2 \sum_{k=1}^q \frac{q - k + 1}{q + 1} \hat{\gamma}_k(t)$$
+- S1 computes the Microstructure Noise Attenuation Factor:
+  $$\Omega_{\text{noise}}(t) = \frac{\hat{\omega}^2(t)}{\text{RV}_t}$$
+
+### 2. Noise Attenuation Clean Signal Invariant
+- **S1 Volatility Purity Rule**:
+  $$\text{Noise Displaced by Trend} \iff \Omega_{\text{noise}}(t) \le 0.12 \quad \land \quad \hat{\sigma}_{\text{eff}}^2(t) \ge 1.50\sigma_{\text{baseline}}^2$$
+  When microstructure noise accounts for $<12\%$ of realized variance, directional momentum reflects genuine underlying capital flows, validating $+2.5\text{R}$ target capture.
