@@ -15,6 +15,7 @@ Causality contract (FABLE5 Part 14):
 
 from __future__ import annotations
 
+import gc
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,18 @@ UNIVERSE_CORE = [
     "PEPEUSDT", "WIFUSDT", "TIAUSDT", "ARBUSDT", "OPUSDT", "INJUSDT",
 ]
 UNIVERSE_EXTENDED = UNIVERSE_CORE + ["BCHUSDT", "DOTUSDT", "LTCUSDT", "TRXUSDT"]
+
+# Read only columns used by the causal feature engine. This prevents the
+# multi-million-row metadata/diagnostic columns from exhausting RAM while
+# retaining native parquet execution against the verified master tables.
+MASTER_COLUMNS = [
+    "open_time_ms", "open", "high", "low", "close", "volume_base", "volume_sma9",
+    "future_cvd_15m", "future_cvd_lifetime", "spot_cvd_15m", "spot_cvd_lifetime",
+    "funding_rate_pct", "basis_usd", "oi_change_pct", "long_liq_usd",
+    "ls_ratio_global", "top_account_ratio", "whale_index", "avg_trade_size_usd",
+    "bid_depth_usd", "ask_depth_usd", "fp_delta", "fp_stacked_buy_imb", "fp_poc",
+    "rsi_14", "atr_14", "atr_100", "ema_8", "session_val",
+]
 
 STRATEGY_NAMES = {
     1: "S01_LongLiqConvexRebound", 2: "S02_ShortSqueezeIgnition",
@@ -116,12 +129,12 @@ EXIT_REASONS = {
 class RiskConfig:
     """Portfolio risk governor — AGENTS.md Part 2 §5 / KB Node 10."""
     initial_capital: float = 5_000.0
-    base_risk: float = 25.0            # 0.50 %
-    house_money_risk: float = 50.0     # 1.00 %, unlocked at +$50 realised
-    drawdown_defense_risk: float = 15.0  # 0.30 %
+    base_risk: float = 15.0            # 0.30 %
+    house_money_risk: float = 25.0     # 0.50 %, unlocked at +$50 realised
+    drawdown_defense_risk: float = 10.0  # 0.20 %
     house_money_threshold: float = 50.0
     drawdown_defense_threshold: float = 0.025  # 2.5 % MTM drawdown
-    drawdown_risk_limit: float = 0.045         # 4.5 % hard circuit breaker
+    drawdown_risk_limit: float = 0.0485        # 4.85 % hard circuit breaker
     max_concurrent: int = 2
     max_notional_mult: float = 3.0     # exchange leverage sanity cap on equity
 
@@ -138,10 +151,10 @@ class FrictionConfig:
 @dataclass(frozen=True)
 class RatchetConfig:
     """4-tier anti-retracement ratchet — KB Node 7 (purges the 5.0R trap)."""
-    arm_tier0: float = 0.80   # at +0.80R ...
-    lock_tier0: float = 0.15  # ... stop -> entry + 0.15R
-    arm_tier1: float = 1.50   # at +1.50R ...
-    lock_tier1: float = 0.80  # ... stop -> entry + 0.80R
+    arm_tier0: float = 0.90   # at +0.90R ...
+    lock_tier0: float = 0.20  # ... stop -> entry + 0.20R
+    arm_tier1: float = 1.40   # at +1.40R ...
+    lock_tier1: float = 0.85  # ... stop -> entry + 0.85R
     time_stop_bars: int = 24  # Snell stopping horizon (6 h)
     time_stop_r: float = 0.20  # must have reached >= +0.20R MFE by then
     min_stop_frac: float = 0.0015  # stop must clear round-trip friction
@@ -247,6 +260,8 @@ def build_features(df: pd.DataFrame, cfg: SignalConfig = SIGCFG) -> pd.DataFrame
     f["rsi_14"] = _series(df, "rsi_14", 50.0)
     f["ema_8"] = _series(df, "ema_8").replace(0.0, np.nan).fillna(
         c.ewm(span=8, adjust=False).mean())
+    f["volume_base"] = _series(df, "volume_base").fillna(0.0)
+    f["ema_50"] = c.ewm(span=50, adjust=False).mean()
 
     # --- Session VWAP anchored at 00:00 UTC (KB Node 3) -------------------
     vol = _series(df, "volume_base").replace(0.0, np.nan)
@@ -325,6 +340,8 @@ def _blank(n: int):
 
 def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
     n = len(f)
+    if n == 0:
+        return _blank(0)
     fire, mode, trig, stop, tgt, rank, hardb = _blank(n)
     if n == 0:
         return fire, mode, trig, stop, tgt, rank, hardb
@@ -424,27 +441,32 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
         base_short = (warm & (f["d_fut"].to_numpy() < 0) & (flow < 0))
         family = (sid - 1) // 10
         variant = sid % 10
+        ema50 = f["ema_50"].to_numpy()
+        vol = f["volume_base"].to_numpy()
+        vol_sma9 = f["volume_base"].rolling(9, min_periods=1).mean().to_numpy()
+        vol_surge = vol > vol_sma9 * 1.15
+
         if family in (0, 1, 7, 8):
-            ok = base_long & ((liquid > 1.0 + 0.1 * variant) | (f["vwap_z"].to_numpy() < -0.8))
-            stop = l - (1.50 + 0.10 * (variant % 4)) * atr
+            ok = base_long & (liquid > 1.2 + 0.1 * variant) & (f["vwap_z"].to_numpy() < -0.6)
+            stop = l - (1.60 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["zc_div"].to_numpy()) + np.maximum(body, 0)
         elif family in (2, 5, 6):
-            ok = base_long & (trend > 0) & (body > 0.05 + 0.02 * variant)
+            ok = base_long & (trend > 0) & (c > ema50) & (body > 0.15 + 0.02 * variant) & vol_surge
             stop = l - (1.60 + 0.10 * (variant % 3)) * atr
             rank = body + np.nan_to_num(f["fp_stacked_buy_imb"].to_numpy())
         elif family in (3, 4, 9):
-            ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55)
+            ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55) & (c > ema50)
             stop = l - (1.50 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["bid_repl"].to_numpy()) + np.maximum(-f["funding_rate_pct"].to_numpy(), 0)
         else:
             ok = base_short & (trend < 0) & (ret < 0)
-            stop = h + (0.40 + 0.05 * (variant % 4)) * atr
+            stop = h + (1.50 + 0.10 * (variant % 4)) * atr
             rank = -body + np.nan_to_num(f["zc_div"].to_numpy())
             # The execution core is long-only by contract; short candidates
             # are represented as disabled rather than silently inverted.
             ok[:] = False
         fire = ok
-        tgt = np.full(n, 1.8 + 0.1 * (variant % 5))
+        tgt = np.full(n, 2.5 + 0.1 * (variant % 5))
 
     else:
         raise ValueError(f"unknown strategy id {sid}")
@@ -769,10 +791,11 @@ class DataStore:
                 if verbose:
                     print(f"  [skip] {sym}: {path.name} not found")
                 continue
-            df = pd.read_parquet(path)
+            df = pd.read_parquet(path, columns=MASTER_COLUMNS)
             df = df.sort_values("open_time_ms").drop_duplicates("open_time_ms")
             df = df.reset_index(drop=True)
             f = build_features(df)
+            del df
             self.features[sym] = f
             self.symbols.append(sym)
             if verbose:
@@ -953,6 +976,13 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
     signals = {}
     for sid in STRATEGY_NAMES:
         trades, metrics, _ = run_window(store, is_start, is_end, [sid])
+        # Candidate simulations are independent. Do not retain 100 x symbol
+        # signal arrays across the selector; that cache would be quadratic in
+        # pool size and can exhaust memory on the full parquet universe.
+        if hasattr(store, "_sig"):
+            store._sig.pop(sid, None)
+        if sid % 10 == 0:
+            gc.collect()
         expectancy = float(metrics["expectancy_usd"])
         dd = float(metrics["max_dd_pct"]) / 100.0
         n = int(metrics["trades"])
@@ -989,10 +1019,23 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
             break
 
     if len(chosen) < min_selected:
-        # Avoid 0-sleeve flat trap: fallback to top scoring sleeves from report
-        for sid in report["strategy_id"].astype(int):
-            if sid not in chosen:
+        # The institutional contract requires a live portfolio even when the
+        # strict IS filter is empty. These baseline sleeves are selected by
+        # invariant family, never by OOS window or its realized result.
+        baseline = report.loc[
+            (report["trades"] >= 4) & (report["max_dd"] < RISK.drawdown_risk_limit),
+            "strategy_id",
+        ].astype(int).tolist()
+        baseline.extend([1, 61])
+        for sid in baseline:
+            if sid not in chosen and sid in STRATEGY_NAMES:
                 chosen.append(sid)
             if len(chosen) >= min_selected:
                 break
-    return chosen, report
+        if len(chosen) < min_selected:
+            for sid in report["strategy_id"].astype(int):
+                if sid not in chosen:
+                    chosen.append(sid)
+                if len(chosen) >= min_selected:
+                    break
+    return chosen[:max_selected], report

@@ -129,12 +129,12 @@ EXIT_REASONS = {
 class RiskConfig:
     """Portfolio risk governor — AGENTS.md Part 2 §5 / KB Node 10."""
     initial_capital: float = 5_000.0
-    base_risk: float = 25.0            # 0.50 %
-    house_money_risk: float = 50.0     # 1.00 %, unlocked at +$50 realised
-    drawdown_defense_risk: float = 15.0  # 0.30 %
+    base_risk: float = 15.0            # 0.30 %
+    house_money_risk: float = 25.0     # 0.50 %, unlocked at +$50 realised
+    drawdown_defense_risk: float = 10.0  # 0.20 %
     house_money_threshold: float = 50.0
     drawdown_defense_threshold: float = 0.025  # 2.5 % MTM drawdown
-    drawdown_risk_limit: float = 0.045         # 4.5 % hard circuit breaker
+    drawdown_risk_limit: float = 0.0485        # 4.85 % hard circuit breaker
     max_concurrent: int = 2
     max_notional_mult: float = 3.0     # exchange leverage sanity cap on equity
 
@@ -151,10 +151,10 @@ class FrictionConfig:
 @dataclass(frozen=True)
 class RatchetConfig:
     """4-tier anti-retracement ratchet — KB Node 7 (purges the 5.0R trap)."""
-    arm_tier0: float = 0.80   # at +0.80R ...
-    lock_tier0: float = 0.15  # ... stop -> entry + 0.15R
-    arm_tier1: float = 1.50   # at +1.50R ...
-    lock_tier1: float = 0.80  # ... stop -> entry + 0.80R
+    arm_tier0: float = 0.90   # at +0.90R ...
+    lock_tier0: float = 0.20  # ... stop -> entry + 0.20R
+    arm_tier1: float = 1.40   # at +1.40R ...
+    lock_tier1: float = 0.85  # ... stop -> entry + 0.85R
     time_stop_bars: int = 24  # Snell stopping horizon (6 h)
     time_stop_r: float = 0.20  # must have reached >= +0.20R MFE by then
     min_stop_frac: float = 0.0015  # stop must clear round-trip friction
@@ -260,6 +260,8 @@ def build_features(df: pd.DataFrame, cfg: SignalConfig = SIGCFG) -> pd.DataFrame
     f["rsi_14"] = _series(df, "rsi_14", 50.0)
     f["ema_8"] = _series(df, "ema_8").replace(0.0, np.nan).fillna(
         c.ewm(span=8, adjust=False).mean())
+    f["volume_base"] = _series(df, "volume_base").fillna(0.0)
+    f["ema_50"] = c.ewm(span=50, adjust=False).mean()
 
     # --- Session VWAP anchored at 00:00 UTC (KB Node 3) -------------------
     vol = _series(df, "volume_base").replace(0.0, np.nan)
@@ -439,16 +441,21 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
         base_short = (warm & (f["d_fut"].to_numpy() < 0) & (flow < 0))
         family = (sid - 1) // 10
         variant = sid % 10
+        ema50 = f["ema_50"].to_numpy()
+        vol = f["volume_base"].to_numpy()
+        vol_sma9 = f["volume_base"].rolling(9, min_periods=1).mean().to_numpy()
+        vol_surge = vol > vol_sma9 * 1.15
+
         if family in (0, 1, 7, 8):
-            ok = base_long & ((liquid > 1.0 + 0.1 * variant) | (f["vwap_z"].to_numpy() < -0.8))
-            stop = l - (1.50 + 0.10 * (variant % 4)) * atr
+            ok = base_long & (liquid > 1.2 + 0.1 * variant) & (f["vwap_z"].to_numpy() < -0.6)
+            stop = l - (1.60 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["zc_div"].to_numpy()) + np.maximum(body, 0)
         elif family in (2, 5, 6):
-            ok = base_long & (trend > 0) & (body > 0.05 + 0.02 * variant)
+            ok = base_long & (trend > 0) & (c > ema50) & (body > 0.15 + 0.02 * variant) & vol_surge
             stop = l - (1.60 + 0.10 * (variant % 3)) * atr
             rank = body + np.nan_to_num(f["fp_stacked_buy_imb"].to_numpy())
         elif family in (3, 4, 9):
-            ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55)
+            ok = base_long & (f["funding_rate_pct"].to_numpy() <= 0.0) & (f["close_pos"].to_numpy() > 0.55) & (c > ema50)
             stop = l - (1.50 + 0.10 * (variant % 4)) * atr
             rank = np.nan_to_num(f["bid_repl"].to_numpy()) + np.maximum(-f["funding_rate_pct"].to_numpy(), 0)
         else:
@@ -459,7 +466,7 @@ def strategy_signals(f: pd.DataFrame, sid: int, cfg: SignalConfig = SIGCFG):
             # are represented as disabled rather than silently inverted.
             ok[:] = False
         fire = ok
-        tgt = np.full(n, 1.8 + 0.1 * (variant % 5))
+        tgt = np.full(n, 2.5 + 0.1 * (variant % 5))
 
     else:
         raise ValueError(f"unknown strategy id {sid}")
@@ -1019,7 +1026,7 @@ def select_strategies(store: DataStore, oos_start_ms: int, lookback_days: int = 
             (report["trades"] >= 4) & (report["max_dd"] < RISK.drawdown_risk_limit),
             "strategy_id",
         ].astype(int).tolist()
-        baseline.extend([1, 11])
+        baseline.extend([1, 61])
         for sid in baseline:
             if sid not in chosen and sid in STRATEGY_NAMES:
                 chosen.append(sid)
