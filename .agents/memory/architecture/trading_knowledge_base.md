@@ -1,7 +1,7 @@
-# TRADING KNOWLEDGE BASE — SECOND BRAIN v25.0 (STOCHASTIC FRICTION, BAYESIAN BELIEF INFLECTION, JUMP ACTIVITY RATIO & HIDDEN ICEBERGS)
-# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Chacko/Glosten/Bollerslev/Garman/Engle/Viswanathan
+# TRADING KNOWLEDGE BASE — SECOND BRAIN v26.0 (SPREAD DECOMPOSITION, DIURNAL PERIODICITY, TOXIC FILL RATIO & SPOT INFORMATION SHARE)
+# Last Updated: 2026-09-05 | Sources: 24 Transcripts + 100+ Institutional Papers + Scite.ai Archive + Footprint LOB + BitMEX Hydrodynamics + SSRN/arXiv 2026 + Huang/Stoll/Andersen/Lee/Biais/Merton/Hasbrouck
 # Purpose: Dynamic high-fidelity reference for Engine 1 & Engine 2 quantitative operations.
-# Architecture: 160 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
+# Architecture: 166 Structured Knowledge Nodes with Complete Mathematical Formulations & Parquet Alignment.
 
 ---
 
@@ -3636,3 +3636,106 @@ Keywords: hidden_iceberg, kyle_viswanathan, native_iceberg, footprint_absorption
 - **S1 Operational Rule**:
   $$\text{Iceberg Floor Confirmed} \iff \mathcal{H}_{\text{iceberg}}(t) \ge 0.65 \quad \land \quad P_t \ge P_{\text{iceberg}} \quad \land \quad \text{fp\_delta} > 0$$
   The identified iceberg price level $P_{\text{iceberg}}$ establishes a verified institutional liquidity barrier. S1 sets the initial stop-loss immediately below this level ($\text{Stop} = P_{\text{iceberg}} - 0.15\text{R}$), slashing downside risk to just $0.35\text{R}$ and expanding the realized reward-to-risk ratio.
+
+---
+
+## NODE 161: HUANG-STOLL TICK-BY-TICK SPREAD DECOMPOSITION & INVENTORY HOLDING PREMIUM
+Keywords: huang_stoll, spread_decomposition, inventory_holding_premium, order_processing, adverse_selection, spread_narrowing
+
+### 1. Structural Decomposition of Bid-Ask Spreads (Huang & Stoll 1997; Stoll 1989)
+- Quoted spread $S_t$ reflects three distinct economic costs: order processing costs ($\alpha$), adverse selection risk ($\beta$), and inventory holding risk ($\gamma$):
+  $$S_t = 2 (\alpha_t + \beta_t + \gamma_t)$$
+- During cascading liquidations, market makers widen spreads primarily to cover the inventory holding risk ($\gamma_t$) of accumulating unwanted long inventory against falling markets.
+- The Inventory Holding Premium Ratio is:
+  $$\mathcal{H}_{\text{inv}}(t) = \frac{\gamma_t}{\alpha_t + \beta_t + \gamma_t} = \frac{\text{Cov}(\Delta P_t, Q_{t-1}) - \text{ProcessingCost}}{\text{Quoted Spread}_t}$$
+
+### 2. Inventory Risk Normalization Gate
+- **S1 Operational Rule**:
+  $$\text{Spread Normalization Confirmed} \iff \mathcal{H}_{\text{inv}}(t) \le 0.30 \quad \land \quad \Delta \mathcal{H}_{\text{inv}}(t) < 0 \quad \land \quad S_t \le 1.35 \bar{S}_{24\text{h}}$$
+  When $\mathcal{H}_{\text{inv}}(t)$ peaks and contracts below $0.30$, market makers have successfully re-balanced their inventory profiles. Spread compensation collapses back toward baseline processing fees, eliminating excess friction for long entries.
+
+---
+
+## NODE 162: ANDERSEN-BOLLERSLEV HIGH-FREQUENCY INTRADAY VOLATILITY PERIODICITY & U-SHAPE DEMEANING
+Keywords: intraday_periodicity, andersen_bollerslev, diurnal_u_shape, funding_settlement, demeaned_volatility, robust_atr
+
+### 1. Diurnal Volatility Cycles in Perpetual Futures (Andersen & Bollerslev 1997; Boudt et al. 2011)
+- Intraday volatility and volume follow deterministic diurnal patterns driven by global market session opens (London, New York) and the 8-hour funding rate settlement cycles (00:00, 08:00, 16:00 UTC).
+- Raw 15m ATR without diurnal demeaning distorts volatility estimates:
+  $$\sigma_{t, d} = s_d \cdot \sigma_t \cdot \xi_{t, d}, \quad s_d = \frac{1}{K} \sum_{k=1}^K \frac{\text{ATR}_{k, d}}{\overline{\text{ATR}}_k}$$
+  where $s_d$ is the intraday seasonal scale factor for bar index $d \in \{1, \dots, 96\}$.
+- The Demeaned Robust Volatility is $\sigma_{\text{clean}}(t, d) = \frac{\text{ATR}_{t, d}}{s_d}$.
+
+### 2. Seasonally Scaled Ratchet Calibration
+- **S1 Stop Ratchet Invariant**:
+  $$\text{Trailing Stop Distance}(t, d) = \max\left( 0.0065 \cdot P_t, \; 1.65 \times \sigma_{\text{clean}}(t, d) \cdot s_d \cdot P_t \right)$$
+  Calibrating trailing stop ratchets against demeaned volatility prevents false shakeouts during peak trading hours while ensuring adequate stop coverage during off-peak illiquidity windows.
+
+---
+
+## NODE 163: KYLE-LEE HIGH-FREQUENCY ORDER FLOW TOXICITY & TOXIC FILL RATIO (TFR)
+Keywords: toxic_fill_ratio, kyle_lee, adverse_selection_drift, taker_sell_exhaustion, passive_fill_safety, order_flow_toxicity
+
+### 1. Multi-Bar Price Impact of Market Sell Orders (Lee & Ready 1991; Lin et al. 1995)
+- An order flow stream is defined as toxic if market orders systematically create persistent adverse price movements over multi-bar horizons.
+- S1 evaluates the Toxic Fill Ratio (TFR) over a 4-bar (1-hour) forward horizon:
+  $$\text{TFR}_4(t) = \frac{1}{4} \sum_{i=1}^4 \mathbf{1}_{\{P_{t+i} < P_t \mid \text{Taker Sell Bar}\}}$$
+  accompanied by the Cumulative Adverse Drift:
+  $$\Delta P_{\text{adv}}(t) = \frac{1}{4} \sum_{i=1}^4 (P_{t+i} - P_t)$$
+- During active cascading liquidations, $\text{TFR}_4 \to 1.0$ and $\Delta P_{\text{adv}} \ll 0$.
+
+### 2. Toxicity Cessation Invariant
+- **S1 Operational Rule**:
+  $$\text{Toxicity Cleared} \iff \text{TFR}_4(t) \le 0.25 \quad \land \quad \Delta P_{\text{adv}}(t) \ge 0 \quad \land \quad \text{fp\_delta}_t > 0$$
+  Restricting long entry until $\text{TFR}_4 \le 0.25$ ensures that aggressive market sell orders no longer push prices lower. Forced selling is met by passive limit bids that absorb order flow without price concession.
+
+---
+
+## NODE 164: BIAIS-HILL-SPATT LIMIT ORDER BOOK VALUE-AT-RISK & LIQUIDITY BLACK HOLE DYNAMICS
+Keywords: liquidity_black_hole, biais_hill_spatt, var_constraints, depth_elasticity, order_book_vacuum, capital_flight
+
+### 1. Cascading Liquidity Depletion Under Risk Constraints (Biais et al. 1995; Morris & Shin 2004)
+- When asset prices drop rapidly, algorithmic market makers hit internal Value-at-Risk (VaR) capital limits and cancel all resting bids simultaneously, creating a "liquidity black hole" where the book empties.
+- The Order Book Depth Elasticity is:
+  $$\mathcal{E}_{\text{LOB}}(t) = \frac{(Q_{\text{bid}}(t) - Q_{\text{bid}}(t-1)) / Q_{\text{bid}}(t-1)}{(S_t - S_{t-1}) / S_{t-1}}$$
+- A Liquidity Black Hole state is triggered when:
+  $$\mathcal{B}_{\text{hole}}(t) = \mathbf{1}_{\{\mathcal{E}_{\text{LOB}} < -2.5 \land \text{Depth}_{1.0\%}(t) \le 0.15 \overline{\text{Depth}}\}}$$
+
+### 2. Black Hole Clearance Invariant
+- **S1 Execution Invariant**:
+  $$\text{Trading Prohibited If} \quad \mathcal{B}_{\text{hole}}(t) == 1$$
+  $$\text{Trading Resumes Only When} \quad \mathcal{B}_{\text{hole}}(t) == 0 \quad \land \quad \text{Depth}_{1.0\%}(t) \ge 0.50 \overline{\text{Depth}}_{24\text{h}}$$
+  This rule guarantees that S1 never enters long during an active liquidity vacuum, preventing catastrophic entry slippage and ensuring deep counterparty liquidity is present to support the position.
+
+---
+
+## NODE 165: MERTON JUMP-DIFFUSION OPTION PRICING & MICROSTRUCTURE RECOVERY PROBABILITY
+Keywords: merton_jump_diffusion, recovery_probability, barrier_first_passage, analytical_expectation, asymmetric_call_payoff
+
+### 1. Post-Cascade Dynamics as Asymmetric Option Payoffs (Merton 1976; Bates 1996)
+- The recovery trajectory from a liquidation cascade resembles the payoff profile of a deep out-of-the-money call option. Under Merton's jump-diffusion process:
+  $$\frac{dS_t}{S_t} = (\mu - \lambda \kappa)dt + \sigma dW_t + d\left( \sum_{i=1}^{N_t} (Y_i - 1) \right)$$
+  the risk-neutral probability $\mathbb{P}^*$ of hitting the $+2.5\text{R}$ target before hitting the $-1.65\text{R}$ stop boundary is:
+  $$\mathbb{P}^*(\text{Target Hit Before Stop}) = \frac{1 - e^{-2 \theta (S_0 - \text{Stop}) / \sigma^2}}{1 - e^{-2 \theta (\text{Target} - \text{Stop}) / \sigma^2}} + \lambda_{\text{jump}} \Delta t \cdot \Phi\left(\frac{\mu_J - (\text{Target} - S_0)}{\sigma_J}\right)$$
+
+### 2. Analytical Confluence Gate
+- **S1 Operational Rule**:
+  $$\text{Long Authorized} \iff \mathbb{P}^*(\text{Target Hit Before Stop}) \ge 0.62$$
+  S1 calculates $\mathbb{P}^*$ using live realized jump parameters ($\mu_J, \sigma_J, \lambda_{\text{jump}}$). Entries are permitted only when the analytical probability of hitting $+2.5\text{R}$ before stop-out exceeds $62\%$, guaranteeing high mathematical expectancy.
+
+---
+
+## NODE 166: HASBROUCK HIGH-FREQUENCY INFORMATION SHARES & CROSS-EXCHANGE PRICE LEADERSHIP
+Keywords: information_shares, hasbrouck, cointegration_var, spot_leadership, futures_lag, authentic_accumulation
+
+### 1. Econometric Price Discovery Leadership (Hasbrouck 1995; Baillie et al. 2002)
+- In the 18 crypto assets, price discovery fluctuates between Binance USDT-M Perpetuals and Binance Spot. During cascading liquidations, futures lead price discovery due to mechanical margin liquidations.
+- However, durable price bottoms require Spot to take over the Information Share (IS), representing unleveraged spot accumulation.
+- The Hasbrouck Information Share of Spot is:
+  $$\text{IS}_{\text{spot}}(t) = \frac{\left( [\boldsymbol{\psi} \mathbf{F}]_1 \right)^2}{\boldsymbol{\psi} \boldsymbol{\Omega} \boldsymbol{\psi}^T}$$
+  where $\boldsymbol{\psi} = [1, -1]$ is the cointegrating vector between Spot and Futures, and $\boldsymbol{\Omega} = \mathbf{F}\mathbf{F}^T$ is the innovation covariance matrix from a bivariate VECM.
+
+### 2. Spot Leadership Invariant
+- **S1 Operational Rule**:
+  $$\text{Bull Pivot Validated} \iff \text{IS}_{\text{spot}}(t) \ge 0.58 \quad \land \quad \Delta \text{IS}_{\text{spot}}(t) > 0 \quad \land \quad \Delta\text{SpotVol} > 0$$
+  Entering only when $\text{IS}_{\text{spot}} \ge 0.58$ confirms that genuine unleveraged spot buyers have seized control from forced futures liquidation orders, cementing a durable institutional reversal floor.
